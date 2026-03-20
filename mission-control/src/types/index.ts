@@ -125,3 +125,76 @@ export interface VpsServiceStatus {
   nginx: string;
   openclawGateway: boolean;
 }
+
+// ── Cost & Token Tracking (Module 3) ────────────────────────────────────────
+
+/** Per-agent, per-model daily cost entry. */
+export interface DailyAgentCost {
+  date: string;          // YYYY-MM-DD
+  agentId: string;
+  modelId: string;
+  inputTokens: number;
+  outputTokens: number;
+  costUsd: number;
+  source: 'openrouter' | 'estimated';
+}
+
+/** Price table row for a single model. */
+export interface ModelPrice {
+  modelId: string;
+  inputPer1MTokens: number;   // USD per 1M input tokens
+  outputPer1MTokens: number;  // USD per 1M output tokens
+  updatedAt: string;          // ISO timestamp
+}
+
+/** Individual session cost record (from OpenClaw SQLite or OpenRouter). */
+export interface SessionCost {
+  sessionId: string;
+  agentId: string;
+  modelId: string;
+  inputTokens: number;
+  outputTokens: number;
+  costUsd: number;
+  durationMs: number | undefined;
+  startedAt: string;
+  source: 'openrouter' | 'estimated';
+}
+
+/** Summary numbers for the monthly projection card. */
+export interface CostSummary {
+  today: number;
+  thisWeek: number;
+  thisMonth: number;
+  projectedMonth: number;
+  vsLastMonthPct: number | undefined;
+}
+
+/** Row shape for the per-agent summary table. */
+export interface AgentCostSummaryRow {
+  agentId: string;
+  today: number;
+  thisWeek: number;
+  thisMonth: number;
+  avgCostPerSession: number;
+  sessionCount: number;
+  weeklySparkline: number[];  // 7 data points, oldest first
+}
+
+/** Row shape for the per-cron summary table. */
+export interface CronCostSummaryRow {
+  cronId: string;
+  cronName: string;
+  avgTokensPerRun: number;
+  avgCostPerRun: number;
+  totalThisMonth: number;
+  runCount: number;
+}
+
+/** Paginated session cost response. */
+export interface PaginatedSessionCosts {
+  items: SessionCost[];
+  total: number;
+  page: number;
+  limit: number;
+  agentMeanCost: Record<string, number>;  // agentId → mean cost, used for outlier detection
+}
