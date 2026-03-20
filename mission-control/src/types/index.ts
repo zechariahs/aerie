@@ -87,3 +87,41 @@ export interface BriefHistory {
   drive_url: string;
   created_at: string;
 }
+
+// ── VPS Health (Module 7) ────────────────────────────────────────────────────
+
+/** Normalized system metrics returned by /api/vps/metrics. */
+export interface VpsMetrics {
+  cpuPct: number;
+  memUsedMb: number;
+  memTotalMb: number;
+  diskUsedGb: number;
+  diskTotalGb: number;
+  networkInBps: number;
+  networkOutBps: number;
+  loadAvg1m: number;
+  loadAvg5m: number;
+  loadAvg15m: number;
+  uptimeSeconds: number;
+  sampledAt: number;
+}
+
+/** A single Docker container record returned by /api/vps/docker. */
+export interface DockerContainer {
+  name: string;
+  status: string;
+  cpuPct: number;
+  memMb: number;
+  uptimeSeconds: number;
+}
+
+/** Response shape for /api/vps/docker. */
+export interface DockerList {
+  containers: DockerContainer[];
+}
+
+/** Response shape for /api/vps/services. */
+export interface VpsServiceStatus {
+  nginx: string;
+  openclawGateway: boolean;
+}
