@@ -22,6 +22,7 @@ node_modules/
 .next/
 dist/
 mission-control-host-agent/dist/
+*.tsbuildinfo
 
 # OS
 .DS_Store
