@@ -1,0 +1,28 @@
+# Environment — never commit these
+.env
+.env.local
+.env.production
+.env.*.local
+*.env
+mission-control/.env.production
+mission-control/.env.local
+
+# Operational state — local only, not for public repo
+SESSION-STATE-MC.md
+DEPENDENCY-DECISION-*.md
+
+# Data
+/app/data/
+*.db
+*.db-shm
+*.db-wal
+
+# Build artifacts
+node_modules/
+.next/
+dist/
+mission-control-host-agent/dist/
+
+# OS
+.DS_Store
+Thumbs.db

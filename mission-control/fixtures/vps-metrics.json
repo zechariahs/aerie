@@ -1,0 +1,38 @@
+{
+  "metrics": {
+    "cpuPct": 12.4,
+    "memUsedMb": 1820,
+    "memTotalMb": 3900,
+    "diskUsedGb": 18,
+    "diskTotalGb": 80,
+    "networkInBps": 1024,
+    "networkOutBps": 512,
+    "loadAvg1m": 0.3,
+    "loadAvg5m": 0.25,
+    "loadAvg15m": 0.2,
+    "uptimeSeconds": 432000,
+    "sampledAt": 0
+  },
+  "docker": {
+    "containers": [
+      {
+        "name": "openclaw-v5t3-openclaw-1",
+        "status": "running",
+        "cpuPct": 2.1,
+        "memMb": 412,
+        "uptimeSeconds": 430000
+      },
+      {
+        "name": "mc-wintermute",
+        "status": "running",
+        "cpuPct": 0.4,
+        "memMb": 180,
+        "uptimeSeconds": 430000
+      }
+    ]
+  },
+  "services": {
+    "nginx": "active",
+    "openclawGateway": true
+  }
+}
