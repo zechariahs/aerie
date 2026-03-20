@@ -1,0 +1,106 @@
+// Copyright (c) 2026 Zack Schwenk
+// SPDX-License-Identifier: MIT
+//
+// Node.js-only auth helpers — argon2 and otplib are native modules that cannot
+// run on the Edge runtime. Import from session.ts for edge-safe session operations.
+
+import { SignJWT, jwtVerify } from 'jose';
+import { authenticator } from 'otplib';
+import type { TempTokenPayload } from '@/types';
+
+export { createSession, destroySession, getSession } from './session';
+
+const TEMP_TOKEN_DURATION_SECONDS = 5 * 60; // 5 minutes
+
+const RATE_LIMIT_MAX = 5;
+const RATE_LIMIT_WINDOW_MS = 15 * 60 * 1000; // 15 minutes
+
+/** In-memory rate limiter keyed by IP. Resets on process restart. */
+const loginAttempts = new Map<string, { count: number; resetAt: number }>();
+
+function getSecret(): Uint8Array {
+  const secret = process.env['AUTH_SECRET'];
+  if (!secret) throw new Error('AUTH_SECRET environment variable is not set');
+  return new TextEncoder().encode(secret);
+}
+
+/**
+ * Returns true if the IP is within the rate limit window.
+ * Increments the attempt count on each call.
+ */
+export function checkRateLimit(ip: string): boolean {
+  const now = Date.now();
+  const entry = loginAttempts.get(ip);
+
+  if (!entry || entry.resetAt < now) {
+    loginAttempts.set(ip, { count: 1, resetAt: now + RATE_LIMIT_WINDOW_MS });
+    return true;
+  }
+
+  if (entry.count >= RATE_LIMIT_MAX) return false;
+
+  entry.count++;
+  return true;
+}
+
+/** Clears the rate limit record for an IP after a successful login. */
+export function clearRateLimit(ip: string): void {
+  loginAttempts.delete(ip);
+}
+
+/**
+ * Verifies a plain-text password against the stored argon2 hash.
+ * The hash is read from MC_ADMIN_PASSWORD_HASH env var.
+ */
+export async function verifyPassword(password: string): Promise<boolean> {
+  const hash = process.env['MC_ADMIN_PASSWORD_HASH'];
+  if (!hash) return false;
+
+  // Dynamic import keeps argon2 (native module) isolated — avoids issues if
+  // this file is ever imported from a code path analyzed by the Edge bundler.
+  const argon2 = await import('argon2');
+  return argon2.verify(hash, password);
+}
+
+/**
+ * Creates a short-lived temp token issued after password verification.
+ * The client must present this when submitting the TOTP step.
+ */
+export async function createTempToken(): Promise<string> {
+  return new SignJWT({ sub: 'admin', step: 'totp' } satisfies Omit<TempTokenPayload, 'iat' | 'exp'>)
+    .setProtectedHeader({ alg: 'HS256' })
+    .setIssuedAt()
+    .setExpirationTime(`${TEMP_TOKEN_DURATION_SECONDS}s`)
+    .sign(getSecret());
+}
+
+/**
+ * Verifies the temp token and returns its payload, or null if invalid.
+ */
+export async function verifyTempToken(token: string): Promise<TempTokenPayload | null> {
+  try {
+    const { payload } = await jwtVerify(token, getSecret());
+    if (payload['step'] !== 'totp') return null;
+    return payload as unknown as TempTokenPayload;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Validates the TOTP token from the X-TOTP-Token request header.
+ * Returns true only if the token matches the current or adjacent 30-second window.
+ * Every write API route must call this before executing business logic.
+ */
+export function validateTotpFromRequest(request: Request): boolean {
+  const token = request.headers.get('X-TOTP-Token');
+  if (!token) return false;
+
+  const secret = process.env['MC_TOTP_SECRET'];
+  if (!secret) return false;
+
+  // ±1 interval grace window (90-second total)
+  authenticator.options = { window: 1 };
+
+  return authenticator.verify({ token, secret });
+}

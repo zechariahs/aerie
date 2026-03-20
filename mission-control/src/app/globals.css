@@ -1,0 +1,18 @@
+/* Copyright (c) 2026 Zack Schwenk */
+/* SPDX-License-Identifier: MIT */
+
+@import "tailwindcss";
+
+@theme {
+  --color-background: #0a0a0f;
+  --color-surface: #12121a;
+  --color-border: #1e1e2e;
+  --color-muted: #6b7280;
+  --color-accent: #6366f1;
+}
+
+body {
+  background-color: var(--color-background);
+  color: #e2e8f0;
+  font-family: ui-monospace, 'Cascadia Code', 'Source Code Pro', Menlo, Consolas, monospace;
+}

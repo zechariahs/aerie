@@ -1,0 +1,24 @@
+[Unit]
+Description=Mission Control Host Agent
+Documentation=https://github.com/zechariahs/wintermute-agent
+After=network.target docker.service
+Wants=docker.service
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/mission-control-host-agent
+EnvironmentFile=-/opt/mission-control-host-agent/.env
+ExecStart=/usr/bin/node /opt/mission-control-host-agent/dist/index.js
+Restart=on-failure
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=mc-host-agent
+
+# Security hardening
+NoNewPrivileges=yes
+PrivateTmp=yes
+
+[Install]
+WantedBy=multi-user.target
