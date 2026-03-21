@@ -198,3 +198,40 @@ export interface PaginatedSessionCosts {
   limit: number;
   agentMeanCost: Record<string, number>;  // agentId → mean cost, used for outlier detection
 }
+
+// ── Cron Manager (Module 2) ──────────────────────────────────────────────────
+
+/** Summary of the most recent cron run, embedded in CronJob for the per-job panel. */
+export interface CronRunSummary {
+  runId: string;
+  status: 'success' | 'failure' | 'running';
+  startedAt: string;
+  durationMs?: number;
+}
+
+/** Cron job descriptor, derived from openclaw.json plus live run data. */
+export interface CronJob {
+  id: string;
+  name: string;
+  /** Standard cron expression, e.g. "0 5 * * *" */
+  schedule: string;
+  enabled: boolean;
+  agentId: string;
+  modelOverride?: string;
+  /** Derived from the most recent cron_runs entry, if any. */
+  status: 'active' | 'disabled' | 'running';
+  lastRun?: CronRunSummary;
+}
+
+/** Full cron run record as stored in mc.db cron_runs table. */
+export interface CronRun {
+  id: string;
+  cronId: string;
+  status: 'success' | 'failure' | 'running';
+  startedAt: string;
+  finishedAt?: string;
+  durationMs?: number;
+  outputExcerpt?: string;
+  driveUrl?: string;
+  errorMessage?: string;
+}
