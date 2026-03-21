@@ -140,16 +140,17 @@ export function StatusStrip(): React.JSX.Element {
   const gwStatus: GatewayStatus = gatewayData?.status ?? 'disconnected';
 
   return (
-    <div className="h-8 border-b border-[#1e1e2e] bg-[#12121a] flex items-center px-4 gap-4 text-xs text-[#6b7280] shrink-0 overflow-hidden">
-      {/* Gateway health */}
+    <div className="h-8 border-b border-[#1e1e2e] bg-[#12121a] flex items-center px-4 gap-4 text-xs text-[#6b7280] shrink-0 overflow-hidden pl-12 md:pl-4">
+      {/* Gateway health dot — visible on all breakpoints */}
       <span className="flex items-center gap-1.5 shrink-0">
         <span className={`w-1.5 h-1.5 rounded-full inline-block ${gatewayIndicatorColor(gwStatus)}`} />
-        {gatewayLabel(gwStatus)}
+        {/* Full label only on md+ */}
+        <span className="hidden md:inline">{gatewayLabel(gwStatus)}</span>
       </span>
 
-      {/* Per-agent status dots */}
+      {/* Per-agent status dots — hidden on mobile */}
       {gatewayData && gatewayData.agentStates.length > 0 && (
-        <span className="flex items-center gap-2 shrink-0">
+        <span className="hidden md:flex items-center gap-2 shrink-0">
           {gatewayData.agentStates.map((agent) => (
             <span
               key={agent.agentId}
@@ -163,9 +164,9 @@ export function StatusStrip(): React.JSX.Element {
         </span>
       )}
 
-      {/* Month-to-date spend */}
+      {/* Month-to-date spend — hidden on mobile */}
       {thisMonthSpend !== null && (
-        <span className="shrink-0">
+        <span className="hidden md:inline shrink-0">
           {hideSensitive ? '[redacted]' : `$${thisMonthSpend.toFixed(2)} MTD`}
         </span>
       )}
@@ -173,10 +174,10 @@ export function StatusStrip(): React.JSX.Element {
       {/* Spacer */}
       <span className="flex-1" />
 
-      {/* Hide-sensitive toggle */}
+      {/* Hide-sensitive toggle — hidden on mobile */}
       <button
         onClick={toggleHideSensitive}
-        className={`shrink-0 px-1.5 py-0.5 rounded text-[10px] border transition-colors ${
+        className={`hidden md:inline shrink-0 px-1.5 py-0.5 rounded text-[10px] border transition-colors ${
           hideSensitive
             ? 'border-orange-800 text-orange-400 bg-orange-950/30'
             : 'border-[#2a2a3e] text-[#4b5563] hover:text-[#6b7280]'
@@ -186,7 +187,7 @@ export function StatusStrip(): React.JSX.Element {
         {hideSensitive ? 'HIDDEN' : 'HIDE'}
       </button>
 
-      {/* CT clock */}
+      {/* CT clock — visible on all breakpoints */}
       <span className="font-mono shrink-0">{clock} CT</span>
     </div>
   );

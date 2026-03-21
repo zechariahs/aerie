@@ -1,6 +1,7 @@
 // Copyright (c) 2026 Zack Schwenk
 // SPDX-License-Identifier: MIT
 
+import { ErrorBoundary } from '@/components/ui/error-boundary';
 import { KanbanBoard } from '@/components/modules/tasks/kanban-board';
 
 export default function TasksPage(): React.JSX.Element {
@@ -16,7 +17,9 @@ export default function TasksPage(): React.JSX.Element {
       </div>
 
       <div className="flex-1 min-h-0">
-        <KanbanBoard />
+        <ErrorBoundary label="Task Board">
+          <KanbanBoard />
+        </ErrorBoundary>
       </div>
     </div>
   );

@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MIT
 
 import { getCronJobs } from '@/lib/openclaw';
+import { ErrorBoundary } from '@/components/ui/error-boundary';
 import CronManager from '@/components/modules/crons/cron-manager';
 
 /**
@@ -33,7 +34,9 @@ export default function CronsPage(): React.JSX.Element {
           </p>
         </div>
       ) : (
-        <CronManager initialJobs={jobs} />
+        <ErrorBoundary label="Cron Manager">
+          <CronManager initialJobs={jobs} />
+        </ErrorBoundary>
       )}
     </div>
   );
