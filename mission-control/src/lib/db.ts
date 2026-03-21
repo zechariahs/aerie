@@ -84,6 +84,23 @@ function runMigrations(database: Database.Database): void {
     );
 
     CREATE INDEX IF NOT EXISTS idx_cron_runs_cron_id ON cron_runs (cron_id, started_at DESC);
+
+    CREATE TABLE IF NOT EXISTS task_comments (
+      id         INTEGER PRIMARY KEY AUTOINCREMENT,
+      task_id    TEXT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+      body       TEXT NOT NULL,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS task_status_changes (
+      id          INTEGER PRIMARY KEY AUTOINCREMENT,
+      task_id     TEXT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+      from_status TEXT,
+      to_status   TEXT NOT NULL,
+      changed_at  TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_task_status_changes_task_id ON task_status_changes (task_id, changed_at DESC);
   `);
 }
 

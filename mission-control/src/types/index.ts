@@ -269,3 +269,33 @@ export interface WorkspaceFile {
   /** File extension without dot (md, json, txt, …) */
   ext: string;
 }
+
+// ── Task Board (Module 4) ─────────────────────────────────────────────────────
+
+/** A comment on a task, stored locally in SQLite. */
+export interface TaskComment {
+  id: number;
+  task_id: string;
+  body: string;
+  created_at: string;
+}
+
+/** A status change event in the task history timeline. */
+export interface TaskStatusChange {
+  id: number;
+  task_id: string;
+  from_status: TaskStatus | undefined;
+  to_status: TaskStatus;
+  changed_at: string;
+}
+
+// ── Drive (Module 5 & 4) ─────────────────────────────────────────────────────
+
+/** A file or document in a Google Drive folder. */
+export interface DriveFile {
+  id: string;
+  name: string;
+  mimeType: string;
+  createdTime: string;
+  webViewLink: string;
+}
