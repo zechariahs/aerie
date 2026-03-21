@@ -70,6 +70,20 @@ function runMigrations(database: Database.Database): void {
       drive_url  TEXT NOT NULL,
       created_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
+
+    CREATE TABLE IF NOT EXISTS cron_runs (
+      id             TEXT PRIMARY KEY,
+      cron_id        TEXT NOT NULL,
+      status         TEXT NOT NULL DEFAULT 'running',
+      started_at     TEXT NOT NULL DEFAULT (datetime('now')),
+      finished_at    TEXT,
+      duration_ms    INTEGER,
+      output_excerpt TEXT,
+      drive_url      TEXT,
+      error_message  TEXT
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_cron_runs_cron_id ON cron_runs (cron_id, started_at DESC);
   `);
 }
 

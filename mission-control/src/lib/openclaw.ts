@@ -3,12 +3,18 @@
 
 import fs from 'fs';
 import path from 'path';
+import type { CronJob, AgentDescriptor } from '@/types';
+import { getDb } from './db';
+
+// ── Raw config types ─────────────────────────────────────────────────────────
 
 /** Cron descriptor parsed from openclaw.json. */
 export interface OpenClawCron {
   id: string;
   name: string;
   schedule: string;
+  enabled: boolean;
+  modelOverride?: string;
 }
 
 /** Agent descriptor parsed from openclaw.json. */
@@ -23,6 +29,8 @@ export interface OpenClawConfig {
   agents: OpenClawAgent[];
   crons: OpenClawCron[];
 }
+
+// ── Core parser ──────────────────────────────────────────────────────────────
 
 /**
  * Reads and parses openclaw.json from the mounted /openclaw directory.
@@ -68,11 +76,13 @@ function parseAgents(obj: Record<string, unknown>): OpenClawAgent[] {
     });
   }
 
-  // Single-agent format
-  if (typeof obj['id'] === 'string' && typeof obj['name'] === 'string') {
+  // Single-agent format: top-level agent_id + name
+  const agentId = obj['agent_id'] ?? obj['id'];
+  const agentName = obj['agent_name'] ?? obj['name'];
+  if (typeof agentId === 'string' && typeof agentName === 'string') {
     return [{
-      id: obj['id'],
-      name: obj['name'],
+      id: agentId,
+      name: agentName,
       model: typeof obj['model'] === 'string' ? obj['model'] : '',
     }];
   }
@@ -93,6 +103,111 @@ function parseCrons(obj: Record<string, unknown>): OpenClawCron[] {
       id: cron['id'],
       name: cron['name'],
       schedule: typeof cron['schedule'] === 'string' ? cron['schedule'] : '',
+      enabled: cron['enabled'] !== false, // default true if absent
+      modelOverride: typeof cron['model_override'] === 'string' ? cron['model_override'] : undefined,
     }];
   });
+}
+
+// ── Higher-level helpers (session-3: Cron Manager) ───────────────────────────
+
+/**
+ * Returns all cron jobs from openclaw.json, enriched with the latest run
+ * status from mc.db. Falls back to fixture data in dev mode.
+ */
+export function getCronJobs(): CronJob[] {
+  if (process.env['USE_FIXTURES'] === 'true') {
+    return loadCronFixtures();
+  }
+
+  const config = readOpenClawConfig();
+  if (config.crons.length === 0) return [];
+
+  const agentId = config.agents[0]?.id ?? 'unknown';
+  const db = getDb();
+
+  return config.crons.map((raw): CronJob => {
+    const lastRunRow = db
+      .prepare(
+        `SELECT id, status, started_at, duration_ms
+         FROM cron_runs
+         WHERE cron_id = ?
+         ORDER BY started_at DESC
+         LIMIT 1`,
+      )
+      .get(raw.id) as
+      | { id: string; status: string; started_at: string; duration_ms: number | null }
+      | undefined;
+
+    let derivedStatus: CronJob['status'] = raw.enabled ? 'active' : 'disabled';
+    if (lastRunRow?.status === 'running') derivedStatus = 'running';
+
+    return {
+      id: raw.id,
+      name: raw.name,
+      schedule: raw.schedule,
+      enabled: raw.enabled,
+      agentId,
+      modelOverride: raw.modelOverride,
+      status: derivedStatus,
+      lastRun: lastRunRow
+        ? {
+            runId: lastRunRow.id,
+            status: lastRunRow.status as 'success' | 'failure' | 'running',
+            startedAt: lastRunRow.started_at,
+            durationMs: lastRunRow.duration_ms ?? undefined,
+          }
+        : undefined,
+    };
+  });
+}
+
+/**
+ * Returns the primary agent descriptor from openclaw.json,
+ * or a default stub if the config is unavailable.
+ */
+export function getAgentDescriptor(): AgentDescriptor {
+  if (process.env['USE_FIXTURES'] === 'true') {
+    return {
+      id: 'wintermute',
+      name: process.env['NEXT_PUBLIC_AGENT_NAME'] ?? 'WintermuteTuring',
+      model: 'openrouter/moonshotai/kimi-k2-0905',
+      status: 'IDLE',
+    };
+  }
+
+  const config = readOpenClawConfig();
+  const agent = config.agents[0];
+  if (!agent) {
+    return {
+      id: 'unknown',
+      name: process.env['NEXT_PUBLIC_AGENT_NAME'] ?? 'Agent',
+      model: 'unknown',
+      status: 'OFFLINE',
+    };
+  }
+
+  return {
+    id: agent.id,
+    name: agent.name,
+    model: agent.model,
+    status: 'IDLE',
+  };
+}
+
+// ── Fixture helpers ───────────────────────────────────────────────────────────
+
+interface CronFixtureFile {
+  jobs: CronJob[];
+}
+
+function loadCronFixtures(): CronJob[] {
+  try {
+    const fixturePath = path.join(process.cwd(), 'fixtures', 'crons.json');
+    const raw = fs.readFileSync(fixturePath, 'utf-8');
+    const parsed = JSON.parse(raw) as CronFixtureFile;
+    return parsed.jobs;
+  } catch {
+    return [];
+  }
 }
