@@ -1,12 +1,38 @@
 // Copyright (c) 2026 Zack Schwenk
 // SPDX-License-Identifier: MIT
 
-// TODO(session-7): Replace with Module 1 — Command Center (agent cards + activity feed)
-export default function CommandCenterPage(): React.JSX.Element {
+/**
+ * Command Center — Module 1.
+ *
+ * Server component: fetches agents and initial gateway status, then passes
+ * them to client components for live updates. Agent cards and the activity
+ * feed are each wrapped in an error boundary.
+ */
+
+import { getAgents } from '@/lib/openclaw';
+import { getCostSummary } from '@/lib/cost';
+import { ErrorBoundary } from '@/components/ui/error-boundary';
+import { CommandCenterClient } from '@/components/modules/command-center/command-center-client';
+
+export default async function CommandCenterPage(): Promise<React.JSX.Element> {
+  const [agents, costSummary] = await Promise.allSettled([
+    Promise.resolve(getAgents()),
+    getCostSummary(),
+  ]);
+
+  const agentList = agents.status === 'fulfilled' ? agents.value : [];
+  const summary = costSummary.status === 'fulfilled' ? costSummary.value : null;
+
   return (
-    <div>
-      <h1 className="text-xl font-semibold text-white mb-2">Command Center</h1>
-      <p className="text-sm text-[#6b7280]">Coming soon.</p>
+    <div className="flex flex-col gap-6">
+      <div>
+        <h1 className="text-xl font-semibold text-white">Command Center</h1>
+        <p className="text-sm text-[#4b5563] mt-0.5">Agent status and live activity feed</p>
+      </div>
+
+      <ErrorBoundary label="Command Center">
+        <CommandCenterClient agents={agentList} initialCostSummary={summary} />
+      </ErrorBoundary>
     </div>
   );
 }
