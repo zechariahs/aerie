@@ -510,15 +510,15 @@ server {
 
 ## Acceptance Criteria (v1 complete when all pass)
 
-- [ ] Login page loads; password + TOTP auth flow works end-to-end
-- [ ] All 6 crons visible in timeline; manual trigger fires successfully
-- [ ] Cost charts render with real OpenRouter data
-- [ ] Task card created, persists across reload, can be sent to Telegram
-- [ ] Claude Brief generated and written to Drive as native Google Doc
-- [ ] SESSION-STATE.md editable and exportable from UI
-- [ ] VPS metrics panel shows live CPU/RAM/disk
-- [ ] Agent cards update in real time when Wintermute runs a session
-- [ ] `pnpm typecheck && pnpm lint` pass with zero errors
-- [ ] All write operations require TOTP
-- [ ] One module failing does not crash others (error boundaries)
+- [x] Login page loads; password + TOTP auth flow works end-to-end
+- [x] All 6 crons visible in timeline; manual trigger fires successfully
+- [x] Cost charts render with real OpenRouter data
+- [x] Task card created, persists across reload, can be sent to Telegram
+- [x] Claude Brief generated and written to Drive as native Google Doc
+- [x] SESSION-STATE.md editable and exportable from UI
+- [x] VPS metrics panel shows live CPU/RAM/disk
+- [x] Agent cards update in real time when Wintermute runs a session
+- [x] `pnpm typecheck && pnpm lint` pass with zero errors
+- [x] All write operations require TOTP
+- [x] One module failing does not crash others (error boundaries)
 - [ ] Docker Compose stack starts cleanly from `docker compose -f docker-compose.yml -f docker-compose.sidecar.yml up -d`

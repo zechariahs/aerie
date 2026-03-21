@@ -47,12 +47,14 @@ export default function CronManager({ initialJobs }: CronManagerProps): React.JS
         </div>
       )}
 
-      {/* Weekly timeline */}
-      <CronTimeline
-        jobs={jobs}
-        selectedId={selectedId}
-        onSelect={setSelectedId}
-      />
+      {/* Weekly timeline — overflow-x-auto enables horizontal scroll on mobile */}
+      <div className="overflow-x-auto">
+        <CronTimeline
+          jobs={jobs}
+          selectedId={selectedId}
+          onSelect={setSelectedId}
+        />
+      </div>
 
       {/* Per-job panel */}
       {selectedJob ? (

@@ -51,7 +51,7 @@ export function CommandCenterClient({ agents, initialCostSummary }: CommandCente
       <ErrorBoundary label="Agent Cards">
         <section>
           <h2 className="text-sm font-medium text-[#6b7280] mb-3 uppercase tracking-wider">Agents</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {agents.map((agent) => (
               <AgentCard
                 key={agent.id}

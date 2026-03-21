@@ -5,6 +5,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { marked } from 'marked';
+import { ErrorBoundary } from '@/components/ui/error-boundary';
 import type { BriefHistory, DriveFile } from '@/types';
 
 // ---------------------------------------------------------------------------
@@ -737,10 +738,18 @@ export default function ClaudeLoopPage(): React.JSX.Element {
         </p>
       </div>
 
-      <BriefGenerator />
-      <SessionStateEditor />
-      <DeliverablesBrowser />
-      <TaskSpecsWriter />
+      <ErrorBoundary label="Brief Generator">
+        <BriefGenerator />
+      </ErrorBoundary>
+      <ErrorBoundary label="Session State Editor">
+        <SessionStateEditor />
+      </ErrorBoundary>
+      <ErrorBoundary label="Deliverables Browser">
+        <DeliverablesBrowser />
+      </ErrorBoundary>
+      <ErrorBoundary label="Task Specs Writer">
+        <TaskSpecsWriter />
+      </ErrorBoundary>
     </div>
   );
 }

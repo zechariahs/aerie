@@ -5,6 +5,7 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { marked } from 'marked';
+import { ErrorBoundary } from '@/components/ui/error-boundary';
 import type {
   WorkspaceTreeData,
   WorkspaceTreeNode,
@@ -514,6 +515,9 @@ export default function WorkspacePage(): React.JSX.Element {
   const [searchLoading, setSearchLoading] = useState(false);
   const searchDebounce = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
+  // Mobile file tree drawer state
+  const [mobileTreeOpen, setMobileTreeOpen] = useState(false);
+
   // Fetch file tree on mount
   useEffect(() => {
     void (async () => {
@@ -633,7 +637,16 @@ export default function WorkspacePage(): React.JSX.Element {
   return (
     <div className="flex flex-col h-full">
       <div className="flex-shrink-0 mb-3">
-        <h1 className="text-xl font-semibold text-white mb-3">Workspace &amp; Memory</h1>
+        <div className="flex items-center gap-3 mb-3">
+          <h1 className="text-xl font-semibold text-white flex-1">Workspace &amp; Memory</h1>
+          {/* Files button — only visible on mobile */}
+          <button
+            onClick={() => setMobileTreeOpen(true)}
+            className="md:hidden px-3 py-1.5 text-xs bg-[#1e1e2e] border border-[#2a2a3e] rounded text-[#c9d1d9] hover:text-white transition-colors"
+          >
+            Files
+          </button>
+        </div>
 
         {/* Search bar */}
         <div className="relative">
@@ -675,10 +688,53 @@ export default function WorkspacePage(): React.JSX.Element {
         </div>
       </div>
 
+      {/* Mobile file tree overlay */}
+      {mobileTreeOpen && (
+        <>
+          <div
+            className="md:hidden fixed inset-0 z-40 bg-black/60"
+            onClick={() => setMobileTreeOpen(false)}
+          />
+          <div className="md:hidden fixed top-0 left-0 z-50 h-full w-64 bg-[#0f0f17] border-r border-[#1e1e2e] overflow-y-auto shadow-2xl">
+            <div className="flex items-center justify-between px-3 py-2 border-b border-[#1e1e2e]">
+              <span className="text-xs font-semibold text-[#6b7280] uppercase tracking-widest">Files</span>
+              <button onClick={() => setMobileTreeOpen(false)} className="text-[#6b7280] hover:text-white p-1">
+                <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+                  <path d="M3.293 3.293a1 1 0 011.414 0L8 6.586l3.293-3.293a1 1 0 011.414 1.414L9.414 8l3.293 3.293a1 1 0 01-1.414 1.414L8 9.414l-3.293 3.293a1 1 0 01-1.414-1.414L6.586 8 3.293 4.707a1 1 0 010-1.414z" />
+                </svg>
+              </button>
+            </div>
+            {/* Reuse same tree content */}
+            {treeLoading ? (
+              <div className="p-3 text-xs text-[#6b7280]">Loading…</div>
+            ) : treeError ? (
+              <div className="p-3 text-xs text-red-400">{treeError}</div>
+            ) : (
+              treeData?.pinned.concat(treeData.tree).map((node) => (
+                <button
+                  key={node.path}
+                  onClick={() => { handleSelectFile(node.path); setMobileTreeOpen(false); }}
+                  className={[
+                    'w-full text-left px-3 py-2 text-xs flex items-center gap-1.5 transition-colors border-b border-[#1a1a27]',
+                    selectedPath === node.path
+                      ? 'text-white bg-[#1e1e2e]'
+                      : 'text-[#9ca3af] hover:text-white hover:bg-[#1a1a27]',
+                  ].join(' ')}
+                >
+                  <FileIcon name={node.name} />
+                  {node.name}
+                </button>
+              ))
+            )}
+          </div>
+        </>
+      )}
+
       {/* Two-pane layout */}
+      <ErrorBoundary label="File Browser">
       <div className="flex-1 flex min-h-0 border border-[#1e1e2e] rounded overflow-hidden">
-        {/* Left: file tree */}
-        <div className="w-56 flex-shrink-0 border-r border-[#1e1e2e] overflow-y-auto bg-[#0f0f17]">
+        {/* Left: file tree — hidden on mobile, visible on md+ */}
+        <div className="hidden md:block w-56 flex-shrink-0 border-r border-[#1e1e2e] overflow-y-auto bg-[#0f0f17]">
           {treeLoading ? (
             <div className="p-3 text-xs text-[#6b7280]">Loading…</div>
           ) : treeError ? (
@@ -748,11 +804,14 @@ export default function WorkspacePage(): React.JSX.Element {
           />
         </div>
       </div>
+      </ErrorBoundary>
 
       {/* Terminal panel */}
-      <div className="flex-shrink-0 mt-3 border border-[#1e1e2e] rounded overflow-hidden bg-[#0f0f17]">
-        <TerminalPanel />
-      </div>
+      <ErrorBoundary label="Terminal">
+        <div className="flex-shrink-0 mt-3 border border-[#1e1e2e] rounded overflow-hidden bg-[#0f0f17]">
+          <TerminalPanel />
+        </div>
+      </ErrorBoundary>
     </div>
   );
 }
