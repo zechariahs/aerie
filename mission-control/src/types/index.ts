@@ -299,3 +299,50 @@ export interface DriveFile {
   createdTime: string;
   webViewLink: string;
 }
+
+// ── Command Center / Activity Feed (Module 1) ─────────────────────────────────
+
+/** Event types emitted by the Gateway and broadcast to SSE clients. */
+export type ActivityEventType =
+  | 'cron.start'
+  | 'cron.end'
+  | 'cron.error'
+  | 'session.start'
+  | 'session.end'
+  | 'tool.call'
+  | 'message.sent'
+  | 'error';
+
+/** A single activity event broadcast over the SSE stream. */
+export interface ActivityEvent {
+  id: string;
+  type: ActivityEventType;
+  agentId: string;
+  /** Human-readable summary. May be redacted when hide-sensitive is enabled. */
+  summary: string;
+  /** Additional metadata — schema varies by event type. */
+  meta: Record<string, unknown>;
+  timestamp: string; // ISO 8601
+}
+
+/** Gateway connection status values. */
+export type GatewayStatus =
+  | 'connected'
+  | 'disconnected'
+  | 'reconnecting'
+  | 'pairing-required';
+
+/** Live state of a single agent as tracked by the Gateway bridge. */
+export interface AgentState {
+  agentId: string;
+  status: AgentStatus;
+  lastActiveAt: string | null; // ISO 8601
+  currentSessionId: string | null;
+}
+
+/** Response shape for GET /api/gateway/status. */
+export interface GatewayStatusResponse {
+  status: GatewayStatus;
+  lastEventAt: number | null;
+  agentStates: AgentState[];
+}

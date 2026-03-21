@@ -163,6 +163,44 @@ export function getCronJobs(): CronJob[] {
 }
 
 /**
+ * Returns all agent descriptors from openclaw.json.
+ * Falls back to a single default stub if the config is unavailable.
+ * Supports multi-agent layouts from day one.
+ */
+export function getAgents(): AgentDescriptor[] {
+  if (process.env['USE_FIXTURES'] === 'true') {
+    return [
+      {
+        id: 'wintermute',
+        name: process.env['NEXT_PUBLIC_AGENT_NAME'] ?? 'WintermuteTuring',
+        model: 'openrouter/moonshotai/kimi-k2-0905',
+        status: 'IDLE',
+      },
+    ];
+  }
+
+  const config = readOpenClawConfig();
+  if (config.agents.length === 0) {
+    return [
+      {
+        id: 'unknown',
+        name: process.env['NEXT_PUBLIC_AGENT_NAME'] ?? 'Agent',
+        model: 'unknown',
+        status: 'OFFLINE',
+      },
+    ];
+  }
+
+  return config.agents.map((agent): AgentDescriptor => ({
+    id: agent.id,
+    name: agent.name,
+    model: agent.model,
+    // status is overlaid from live Gateway state at render time
+    status: 'IDLE',
+  }));
+}
+
+/**
  * Returns the primary agent descriptor from openclaw.json,
  * or a default stub if the config is unavailable.
  */
