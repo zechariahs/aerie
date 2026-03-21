@@ -1,0 +1,122 @@
+[
+  {
+    "id": "evt-001",
+    "type": "session.start",
+    "agentId": "primary-agent",
+    "summary": "Session started — model: kimi-k2-0905",
+    "meta": { "sessionId": "sess-abc123", "model": "openrouter/moonshotai/kimi-k2-0905" },
+    "timestamp": "2026-03-21T11:00:00.000Z"
+  },
+  {
+    "id": "evt-002",
+    "type": "cron.start",
+    "agentId": "primary-agent",
+    "summary": "Cron started: reddit-signal-scan",
+    "meta": { "cronId": "76114cf6", "cronName": "reddit-signal-scan" },
+    "timestamp": "2026-03-21T11:00:05.000Z"
+  },
+  {
+    "id": "evt-003",
+    "type": "tool.call",
+    "agentId": "primary-agent",
+    "summary": "Tool call: web_search — r/SaaS signal scan",
+    "meta": { "tool": "web_search", "query": "r/SaaS signal scan" },
+    "timestamp": "2026-03-21T11:00:12.000Z"
+  },
+  {
+    "id": "evt-004",
+    "type": "tool.call",
+    "agentId": "primary-agent",
+    "summary": "Tool call: web_search — r/entrepreneur weekly digest",
+    "meta": { "tool": "web_search", "query": "r/entrepreneur weekly digest" },
+    "timestamp": "2026-03-21T11:00:28.000Z"
+  },
+  {
+    "id": "evt-005",
+    "type": "message.sent",
+    "agentId": "primary-agent",
+    "summary": "Telegram delivery: reddit-signal-scan report",
+    "meta": { "channel": "telegram", "cronId": "76114cf6" },
+    "timestamp": "2026-03-21T11:01:45.000Z"
+  },
+  {
+    "id": "evt-006",
+    "type": "cron.end",
+    "agentId": "primary-agent",
+    "summary": "Cron finished: reddit-signal-scan (success, 105s)",
+    "meta": { "cronId": "76114cf6", "cronName": "reddit-signal-scan", "durationMs": 105000, "status": "success" },
+    "timestamp": "2026-03-21T11:01:45.000Z"
+  },
+  {
+    "id": "evt-007",
+    "type": "cron.start",
+    "agentId": "primary-agent",
+    "summary": "Cron started: reddit-engagement-brief",
+    "meta": { "cronId": "bb9599ba", "cronName": "reddit-engagement-brief" },
+    "timestamp": "2026-03-21T12:00:01.000Z"
+  },
+  {
+    "id": "evt-008",
+    "type": "tool.call",
+    "agentId": "primary-agent",
+    "summary": "Tool call: google_drive_write — engagement-brief-2026-03-21.md",
+    "meta": { "tool": "google_drive_write", "filename": "engagement-brief-2026-03-21.md" },
+    "timestamp": "2026-03-21T12:02:10.000Z"
+  },
+  {
+    "id": "evt-009",
+    "type": "cron.end",
+    "agentId": "primary-agent",
+    "summary": "Cron finished: reddit-engagement-brief (success, 192s)",
+    "meta": { "cronId": "bb9599ba", "cronName": "reddit-engagement-brief", "durationMs": 192000, "status": "success" },
+    "timestamp": "2026-03-21T12:03:13.000Z"
+  },
+  {
+    "id": "evt-010",
+    "type": "cron.start",
+    "agentId": "primary-agent",
+    "summary": "Cron started: heartbeat",
+    "meta": { "cronId": "51d8a322", "cronName": "heartbeat" },
+    "timestamp": "2026-03-21T05:00:00.000Z"
+  },
+  {
+    "id": "evt-011",
+    "type": "cron.end",
+    "agentId": "primary-agent",
+    "summary": "Cron finished: heartbeat (success, 8s)",
+    "meta": { "cronId": "51d8a322", "cronName": "heartbeat", "durationMs": 8000, "status": "success" },
+    "timestamp": "2026-03-21T05:00:08.000Z"
+  },
+  {
+    "id": "evt-012",
+    "type": "error",
+    "agentId": "primary-agent",
+    "summary": "Tool error: web_search — rate limit exceeded",
+    "meta": { "tool": "web_search", "error": "rate limit exceeded", "cronId": "76114cf6" },
+    "timestamp": "2026-03-21T06:01:03.000Z"
+  },
+  {
+    "id": "evt-013",
+    "type": "session.end",
+    "agentId": "primary-agent",
+    "summary": "Session ended — 3 tool calls, $0.0014",
+    "meta": { "sessionId": "sess-abc123", "toolCalls": 3, "costUsd": 0.0014 },
+    "timestamp": "2026-03-21T12:03:15.000Z"
+  },
+  {
+    "id": "evt-014",
+    "type": "cron.error",
+    "agentId": "primary-agent",
+    "summary": "Cron failed: competitor-changelog-monitor (timeout after 300s)",
+    "meta": { "cronId": "63530884", "cronName": "competitor-changelog-monitor", "error": "timeout", "durationMs": 300000 },
+    "timestamp": "2026-03-20T07:05:00.000Z"
+  },
+  {
+    "id": "evt-015",
+    "type": "message.sent",
+    "agentId": "primary-agent",
+    "summary": "Telegram delivery: heartbeat check-in",
+    "meta": { "channel": "telegram", "cronId": "51d8a322" },
+    "timestamp": "2026-03-21T05:00:07.000Z"
+  }
+]

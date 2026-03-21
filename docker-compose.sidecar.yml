@@ -1,40 +1,40 @@
 # docker-compose.sidecar.yml
 #
-# Mission Control sidecar for openclaw-v5t3 stack.
+# Aerie sidecar for the OpenClaw stack.
 #
 # Usage:
 #   docker compose \
-#     -f /docker/openclaw-v5t3/docker-compose.yml \
-#     -f /docker/openclaw-v5t3/mission-control/docker-compose.sidecar.yml \
+#     -f /path/to/openclaw/docker-compose.yml \
+#     -f /path/to/aerie/docker-compose.sidecar.yml \
 #     up -d
 #
 # Or add an include: directive to the main docker-compose.yml.
 
 services:
-  mission-control:
+  aerie:
     build:
-      context: ./mission-control
+      context: ./app
       dockerfile: Dockerfile
-    image: mc-wintermute:latest
-    container_name: mc-wintermute
+    image: aerie:latest
+    container_name: aerie
     restart: unless-stopped
     ports:
       - "127.0.0.1:3100:3100"
     volumes:
       # OpenClaw data — READ ONLY. Never write to this mount.
-      - /docker/openclaw-v5t3/data/.openclaw:/openclaw:ro
-      # Mission Control's own persistent data (tasks, audit log, brief history)
-      - mc_data:/app/data
+      - ${OPENCLAW_DATA_PATH}:/openclaw:ro
+      # Aerie's own persistent data (tasks, audit log, brief history)
+      - aerie_data:/app/data
     env_file:
-      - ./mission-control/.env.production
+      - ./app/.env.production
     environment:
       - NODE_ENV=production
       - OPENCLAW_DIR=/openclaw
-      - OPENCLAW_GATEWAY_URL=ws://openclaw-v5t3-openclaw-1:18789
+      - OPENCLAW_GATEWAY_URL=${OPENCLAW_GATEWAY_URL}
       # HOST_AGENT_URL uses host.docker.internal to reach the host-level agent
       - HOST_AGENT_URL=http://host.docker.internal:3101
     networks:
-      - openclaw-v5t3_default
+      - openclaw_network
     extra_hosts:
       # Required for host.docker.internal on Linux
       - "host.docker.internal:host-gateway"
@@ -46,9 +46,10 @@ services:
       start_period: 15s
 
 volumes:
-  mc_data:
-    name: mc_wintermute_data
+  aerie_data:
+    name: aerie_data
 
 networks:
-  openclaw-v5t3_default:
+  openclaw_network:
     external: true
+    name: ${OPENCLAW_NETWORK_NAME}

@@ -1,0 +1,23 @@
+[Unit]
+Description=Aerie Host Agent
+After=network.target docker.service
+Wants=docker.service
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/host-agent
+EnvironmentFile=-/opt/host-agent/.env
+ExecStart=/usr/bin/node /opt/host-agent/dist/index.js
+Restart=on-failure
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=host-agent
+
+# Security hardening
+NoNewPrivileges=yes
+PrivateTmp=yes
+
+[Install]
+WantedBy=multi-user.target

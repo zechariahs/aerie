@@ -1,0 +1,50 @@
+{
+  "name": "aerie",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@hello-pangea/dnd": "^18.0.1",
+    "argon2": "0.43.0",
+    "better-sqlite3": "11.9.1",
+    "cron-parser": "^5.5.0",
+    "cronstrue": "^3.14.0",
+    "googleapis": "^144.0.0",
+    "jose": "5.10.0",
+    "marked": "^15.0.0",
+    "next": "^15.3.0",
+    "otplib": "12.0.1",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "recharts": "^2.15.3",
+    "ws": "^8.18.0"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "argon2",
+      "better-sqlite3",
+      "esbuild",
+      "sharp",
+      "unrs-resolver"
+    ]
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4.1.0",
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/node": "^22.0.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "@types/ws": "^8.5.14",
+    "eslint": "^9.17.0",
+    "eslint-config-next": "^15.3.0",
+    "tailwindcss": "^4.1.0",
+    "tsx": "^4.19.2",
+    "typescript": "^5.8.3"
+  }
+}
