@@ -21,7 +21,8 @@
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "recharts": "^2.15.3",
-    "ws": "^8.18.0"
+    "ws": "^8.18.0",
+    "marked": "^15.0.0"
   },
   "pnpm": {
     "onlyBuiltDependencies": [

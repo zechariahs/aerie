@@ -1,0 +1,16 @@
+{
+  "SOUL.md": "# Soul\n\nCore values and operating principles for this agent.\n\n## Purpose\n\nProvide reliable, thoughtful assistance within defined ethical boundaries.\n\n## Values\n\n- Accuracy over speed\n- Transparency about limitations\n- Minimal footprint\n",
+  "MEMORY.md": "# Memory\n\nPersistent context across sessions.\n\n## Active Tasks\n\n- Weekly research digest scheduled for Sunday\n- Competitor monitoring active on Monday\n\n## Key Decisions\n\n- Model: moonshotai/kimi-k2 for default tasks\n- Heartbeat model: claude-haiku-4-5 for cost efficiency\n",
+  "IDENTITY.md": "# Identity\n\nAgent identity and persona configuration.\n\n## Name\n\nWintermuteTuring\n\n## Role\n\nAutonomous research and intelligence agent.\n",
+  "TOOLS.md": "# Tools\n\nAvailable tool definitions and usage patterns.\n\n## Web Search\n\nUsed for real-time information retrieval.\n\n## File System\n\nRead/write to workspace directory.\n",
+  "AGENTS.md": "# Agents\n\nMulti-agent coordination configuration.\n\n## Primary\n\n- wintermute: main research agent\n",
+  "SESSION-STATE.md": "# Session State\n\nCurrent operational state — updated each session.\n\n## Last Session\n\n2026-03-20 — Ran weekly research digest, 3 signals captured.\n\n## Pending\n\n- None\n\n## Notes\n\nThis is a fixture file for development. Real content lives on the VPS.\n",
+  "heartbeat-state.json": "{\n  \"last_heartbeat\": \"2026-03-20T05:00:00Z\",\n  \"status\": \"ok\",\n  \"model\": \"openrouter/anthropic/claude-haiku-4-5\",\n  \"tokens_used\": 847,\n  \"cost_usd\": 0.00021,\n  \"message\": \"Heartbeat check completed successfully.\",\n  \"next_run\": \"2026-03-21T05:00:00Z\"\n}",
+  "intel/weekly-summary-2026-03-17.md": "# Weekly Summary — 2026-03-17\n\nSynthetic fixture data. Real summaries live on the VPS.\n\n## Signals\n\n- 3 relevant threads identified\n- 1 competitor update detected\n",
+  "intel/signals-2026-03-18.json": "{\n  \"date\": \"2026-03-18\",\n  \"signals\": [\n    { \"source\": \"fixture\", \"relevance\": 0.8, \"summary\": \"Synthetic signal for dev mode\" }\n  ]\n}",
+  "intel/competitor-brief-2026-03-17.md": "# Competitor Brief — 2026-03-17\n\nSynthetic fixture data.\n\n## Activity\n\nNo significant changes detected this week.\n",
+  "research/topic-overview.md": "# Topic Overview\n\nSynthetic fixture data.\n\n## Summary\n\nThis file exists to populate the fixture file tree.\n",
+  "research/sources.json": "{\n  \"sources\": [\n    { \"url\": \"https://example.com\", \"title\": \"Fixture Source\", \"accessed\": \"2026-03-18\" }\n  ]\n}",
+  "scratch/notes.md": "# Scratch Notes\n\nTemporary working notes.\n\n- TODO: revisit topic-overview next week\n",
+  "scratch/draft-2026-03-19.md": "# Draft — 2026-03-19\n\nWork in progress.\n"
+}
