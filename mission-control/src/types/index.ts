@@ -235,3 +235,37 @@ export interface CronRun {
   driveUrl?: string;
   errorMessage?: string;
 }
+
+// ── Workspace & Memory (Module 6) ────────────────────────────────────────────
+
+/** Node in the workspace file tree. */
+export interface WorkspaceTreeNode {
+  name: string;
+  /** Relative path from workspace root. */
+  path: string;
+  type: 'file' | 'directory';
+  children?: WorkspaceTreeNode[];
+}
+
+/** Top-level shape returned by GET /api/workspace/tree. */
+export interface WorkspaceTreeData {
+  /** Pinned files shown at top of tree (SOUL.md, MEMORY.md, etc.) */
+  pinned: WorkspaceTreeNode[];
+  /** Remaining file tree */
+  tree: WorkspaceTreeNode[];
+}
+
+/** Single result from workspace full-text search. */
+export interface WorkspaceSearchResult {
+  path: string;
+  matchCount: number;
+  excerpt: string;
+}
+
+/** Shape returned by GET /api/workspace/file. */
+export interface WorkspaceFile {
+  path: string;
+  content: string;
+  /** File extension without dot (md, json, txt, …) */
+  ext: string;
+}
