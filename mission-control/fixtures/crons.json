@@ -1,0 +1,206 @@
+{
+  "jobs": [
+    {
+      "id": "aaaaaaaa",
+      "name": "heartbeat",
+      "schedule": "0 5 * * *",
+      "enabled": true,
+      "agentId": "demo-agent",
+      "modelOverride": "openrouter/anthropic/claude-haiku-4-5",
+      "status": "active",
+      "lastRun": {
+        "runId": "run-hb-001",
+        "status": "success",
+        "startedAt": "2026-03-20T11:00:00.000Z",
+        "durationMs": 42000
+      }
+    },
+    {
+      "id": "bbbbbbbb",
+      "name": "reddit-signal-scan",
+      "schedule": "0 6 * * *",
+      "enabled": true,
+      "agentId": "demo-agent",
+      "status": "active",
+      "lastRun": {
+        "runId": "run-rss-001",
+        "status": "success",
+        "startedAt": "2026-03-20T12:00:00.000Z",
+        "durationMs": 185000
+      }
+    },
+    {
+      "id": "cccccccc",
+      "name": "reddit-engagement-brief",
+      "schedule": "0 7 * * *",
+      "enabled": true,
+      "agentId": "demo-agent",
+      "status": "active",
+      "lastRun": {
+        "runId": "run-reb-001",
+        "status": "failure",
+        "startedAt": "2026-03-20T13:00:00.000Z",
+        "durationMs": 12000
+      }
+    },
+    {
+      "id": "dddddddd",
+      "name": "weekly-research-digest",
+      "schedule": "0 17 * * 0",
+      "enabled": true,
+      "agentId": "demo-agent",
+      "status": "active",
+      "lastRun": {
+        "runId": "run-wrd-001",
+        "status": "success",
+        "startedAt": "2026-03-15T23:00:00.000Z",
+        "durationMs": 437000
+      }
+    },
+    {
+      "id": "eeeeeeee",
+      "name": "competitor-changelog-monitor",
+      "schedule": "0 7 * * 1",
+      "enabled": false,
+      "agentId": "demo-agent",
+      "status": "disabled"
+    },
+    {
+      "id": "ffffffff",
+      "name": "competitor-review-scrape",
+      "schedule": "0 8 1,15 * *",
+      "enabled": true,
+      "agentId": "demo-agent",
+      "status": "active",
+      "lastRun": {
+        "runId": "run-crs-001",
+        "status": "success",
+        "startedAt": "2026-03-15T14:00:00.000Z",
+        "durationMs": 220000
+      }
+    }
+  ],
+  "runs": {
+    "aaaaaaaa": [
+      {
+        "id": "run-hb-001",
+        "cronId": "aaaaaaaa",
+        "status": "success",
+        "startedAt": "2026-03-20T11:00:00.000Z",
+        "finishedAt": "2026-03-20T11:00:42.000Z",
+        "durationMs": 42000,
+        "outputExcerpt": "Heartbeat check complete. Agent operational. Memory within bounds.",
+        "driveUrl": null,
+        "errorMessage": null
+      },
+      {
+        "id": "run-hb-002",
+        "cronId": "aaaaaaaa",
+        "status": "success",
+        "startedAt": "2026-03-19T11:00:00.000Z",
+        "finishedAt": "2026-03-19T11:00:38.000Z",
+        "durationMs": 38000,
+        "outputExcerpt": "Heartbeat check complete. Agent operational.",
+        "driveUrl": null,
+        "errorMessage": null
+      },
+      {
+        "id": "run-hb-003",
+        "cronId": "aaaaaaaa",
+        "status": "success",
+        "startedAt": "2026-03-18T11:00:00.000Z",
+        "finishedAt": "2026-03-18T11:00:45.000Z",
+        "durationMs": 45000,
+        "outputExcerpt": "Heartbeat check complete. Agent operational.",
+        "driveUrl": null,
+        "errorMessage": null
+      }
+    ],
+    "bbbbbbbb": [
+      {
+        "id": "run-rss-001",
+        "cronId": "bbbbbbbb",
+        "status": "success",
+        "startedAt": "2026-03-20T12:00:00.000Z",
+        "finishedAt": "2026-03-20T12:03:05.000Z",
+        "durationMs": 185000,
+        "outputExcerpt": "Scanned 47 subreddits. Found 3 high-signal posts. Brief written to STG-Intelligence.",
+        "driveUrl": "https://drive.google.com/file/d/fixture-link-1",
+        "errorMessage": null
+      },
+      {
+        "id": "run-rss-002",
+        "cronId": "bbbbbbbb",
+        "status": "failure",
+        "startedAt": "2026-03-19T12:00:00.000Z",
+        "finishedAt": "2026-03-19T12:00:15.000Z",
+        "durationMs": 15000,
+        "outputExcerpt": null,
+        "driveUrl": null,
+        "errorMessage": "RateLimitError: Reddit API returned 429. Retry after 3600s."
+      }
+    ],
+    "cccccccc": [
+      {
+        "id": "run-reb-001",
+        "cronId": "cccccccc",
+        "status": "failure",
+        "startedAt": "2026-03-20T13:00:00.000Z",
+        "finishedAt": "2026-03-20T13:00:12.000Z",
+        "durationMs": 12000,
+        "outputExcerpt": null,
+        "driveUrl": null,
+        "errorMessage": "Error: No posts found matching engagement criteria. Skipped brief generation."
+      },
+      {
+        "id": "run-reb-002",
+        "cronId": "cccccccc",
+        "status": "success",
+        "startedAt": "2026-03-19T13:00:00.000Z",
+        "finishedAt": "2026-03-19T13:04:22.000Z",
+        "durationMs": 262000,
+        "outputExcerpt": "Engagement brief generated. 5 threads selected for response. Delivered to Personal folder.",
+        "driveUrl": "https://drive.google.com/file/d/fixture-link-2",
+        "errorMessage": null
+      }
+    ],
+    "dddddddd": [
+      {
+        "id": "run-wrd-001",
+        "cronId": "dddddddd",
+        "status": "success",
+        "startedAt": "2026-03-15T23:00:00.000Z",
+        "finishedAt": "2026-03-15T23:07:17.000Z",
+        "durationMs": 437000,
+        "outputExcerpt": "Weekly research digest complete. 12 topics analyzed. 4 action items identified.",
+        "driveUrl": "https://drive.google.com/file/d/fixture-link-3",
+        "errorMessage": null
+      }
+    ],
+    "eeeeeeee": [],
+    "ffffffff": [
+      {
+        "id": "run-crs-001",
+        "cronId": "ffffffff",
+        "status": "success",
+        "startedAt": "2026-03-15T14:00:00.000Z",
+        "finishedAt": "2026-03-15T14:03:40.000Z",
+        "durationMs": 220000,
+        "outputExcerpt": "Scraped 3 competitor review pages. 47 new reviews ingested. Sentiment summary written.",
+        "driveUrl": "https://drive.google.com/file/d/fixture-link-4",
+        "errorMessage": null
+      },
+      {
+        "id": "run-crs-002",
+        "cronId": "ffffffff",
+        "status": "success",
+        "startedAt": "2026-03-01T14:00:00.000Z",
+        "finishedAt": "2026-03-01T14:04:02.000Z",
+        "durationMs": 242000,
+        "outputExcerpt": "Scraped 3 competitor review pages. 31 new reviews ingested.",
+        "driveUrl": "https://drive.google.com/file/d/fixture-link-5",
+        "errorMessage": null
+      }
+    ]
+  }
+}
