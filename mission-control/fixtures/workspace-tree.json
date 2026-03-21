@@ -1,0 +1,69 @@
+{
+  "pinned": [
+    { "name": "SOUL.md", "path": "SOUL.md", "type": "file" },
+    { "name": "MEMORY.md", "path": "MEMORY.md", "type": "file" },
+    { "name": "IDENTITY.md", "path": "IDENTITY.md", "type": "file" },
+    { "name": "TOOLS.md", "path": "TOOLS.md", "type": "file" },
+    { "name": "AGENTS.md", "path": "AGENTS.md", "type": "file" },
+    { "name": "SESSION-STATE.md", "path": "SESSION-STATE.md", "type": "file" },
+    { "name": "heartbeat-state.json", "path": "heartbeat-state.json", "type": "file" }
+  ],
+  "tree": [
+    {
+      "name": "intel",
+      "path": "intel",
+      "type": "directory",
+      "children": [
+        {
+          "name": "weekly-summary-2026-03-17.md",
+          "path": "intel/weekly-summary-2026-03-17.md",
+          "type": "file"
+        },
+        {
+          "name": "signals-2026-03-18.json",
+          "path": "intel/signals-2026-03-18.json",
+          "type": "file"
+        },
+        {
+          "name": "competitor-brief-2026-03-17.md",
+          "path": "intel/competitor-brief-2026-03-17.md",
+          "type": "file"
+        }
+      ]
+    },
+    {
+      "name": "research",
+      "path": "research",
+      "type": "directory",
+      "children": [
+        {
+          "name": "topic-overview.md",
+          "path": "research/topic-overview.md",
+          "type": "file"
+        },
+        {
+          "name": "sources.json",
+          "path": "research/sources.json",
+          "type": "file"
+        }
+      ]
+    },
+    {
+      "name": "scratch",
+      "path": "scratch",
+      "type": "directory",
+      "children": [
+        {
+          "name": "notes.md",
+          "path": "scratch/notes.md",
+          "type": "file"
+        },
+        {
+          "name": "draft-2026-03-19.md",
+          "path": "scratch/draft-2026-03-19.md",
+          "type": "file"
+        }
+      ]
+    }
+  ]
+}
