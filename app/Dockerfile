@@ -36,7 +36,7 @@ RUN addgroup --system --gid 1001 nodejs && \
 # Standalone output copies only what's needed
 COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
-COPY --from=builder /app/public ./public 2>/dev/null || true
+COPY --from=builder /app/public ./public
 
 # Data directory for SQLite — mounted as volume in production
 RUN mkdir -p /app/data && chown nextjs:nodejs /app/data
