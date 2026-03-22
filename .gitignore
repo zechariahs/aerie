@@ -32,3 +32,4 @@ host-agent/dist/
 # OS
 .DS_Store
 Thumbs.db
+.DS_Store
