@@ -6,16 +6,6 @@ import { getDb, writeAuditLog } from '@/lib/db';
 import { errorResponse, successResponse } from '@/lib/api-response';
 import type { Task, TaskPriority, TaskStatus, TaskTag } from '@/types';
 
-/** Columns in display order. */
-export const TASK_COLUMNS: TaskStatus[] = [
-  'inbox',
-  'assigned',
-  'in_progress',
-  'review',
-  'done',
-  'archived',
-];
-
 interface TaskRow {
   id: string;
   title: string;
