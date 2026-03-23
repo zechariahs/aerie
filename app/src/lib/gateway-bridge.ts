@@ -225,6 +225,16 @@ function connect(): void {
       return;
     }
 
+    // Handle connect challenge — Gateway sends this immediately after open;
+    // respond with token + nonce to complete authentication.
+    if (msg['type'] === 'event' && msg['event'] === 'connect.challenge') {
+      const payload = msg['payload'] as Record<string, unknown> | undefined;
+      const nonce = typeof payload?.['nonce'] === 'string' ? payload['nonce'] : '';
+      console.log('[gateway-bridge] received connect.challenge, responding with auth');
+      ws?.send(JSON.stringify({ type: 'auth', nonce, token }));
+      return;
+    }
+
     // Handle pairing-required response
     if (msg['type'] === 'pairing-required') {
       gatewayStatus = 'pairing-required';
