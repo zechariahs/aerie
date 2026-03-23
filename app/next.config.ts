@@ -6,6 +6,7 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   output: "standalone",
   basePath: "/aerie",
+  serverExternalPackages: ['better-sqlite3', 'argon2', 'ws'],
   async headers() {
     return [
       {
