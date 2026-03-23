@@ -199,8 +199,10 @@ function connect(): void {
   const url = gatewayUrl();
   const token = gatewayToken();
 
+  const origin = process.env['AERIE_ORIGIN'] ?? 'https://srv1398517.hstgr.cloud';
+
   try {
-    ws = new WebSocket(url);
+    ws = new WebSocket(url, { headers: { Origin: origin } });
   } catch (err) {
     console.error('[gateway-bridge] failed to create WebSocket:', err);
     scheduleReconnect();
@@ -236,10 +238,10 @@ function connect(): void {
           minProtocol: 3,
           maxProtocol: 3,
           client: {
-            id: 'cli',
+            id: 'webchat',
             version: '1.0.0',
             platform: 'linux',
-            mode: 'operator',
+            mode: 'webchat',
           },
           role: 'operator',
           scopes: ['operator.read', 'operator.write'],
@@ -248,11 +250,7 @@ function connect(): void {
           permissions: {},
           auth: { token },
           locale: 'en-US',
-          userAgent: 'openclaw-cli/1.0.0',
-          device: {
-            id: 'aerie-dashboard-node',
-            nonce,
-          },
+          userAgent: 'aerie/1.0.0',
         },
       }));
       return;
@@ -262,7 +260,7 @@ function connect(): void {
     if (msg['type'] === 'res') {
       const payload = msg['payload'] as Record<string, unknown> | undefined;
       if (msg['ok'] === true && payload?.['type'] === 'hello-ok') {
-        console.log('[gateway-bridge] authenticated');
+        console.log('[gateway-bridge] authenticated as operator');
       } else if (msg['ok'] === false) {
         console.error('[gateway-bridge] connect request rejected:', JSON.stringify(msg).slice(0, 200));
       }
