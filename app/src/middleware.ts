@@ -42,7 +42,8 @@ export async function middleware(request: NextRequest): Promise<NextResponse> {
   if (!isPublicPath(pathname)) {
     const session = await getSession(request);
     if (!session) {
-      const loginUrl = new URL('/login', request.url);
+      const loginUrl = request.nextUrl.clone();
+      loginUrl.pathname = '/login';
       const response = NextResponse.redirect(loginUrl);
       response.headers.set('Content-Security-Policy', csp);
       return response;
