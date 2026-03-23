@@ -2,14 +2,12 @@
 // SPDX-License-Identifier: MIT
 
 /**
- * Google Drive API client using a service account.
+ * Google Drive API client using OAuth2 with a refresh token.
  *
- * Decodes GOOGLE_SERVICE_ACCOUNT_JSON_B64, parses the JSON, and initialises
- * a googleapis auth client. All functions return a typed error shape rather
- * than throwing — callers must check { ok } before using the result.
- *
- * TODO(session-6): Expand this module with brief assembly and full deliverables
- * browser support when the Claude Integration Loop module is built.
+ * Reads GOOGLE_OAUTH_CLIENT_ID, GOOGLE_OAUTH_CLIENT_SECRET, and
+ * GOOGLE_OAUTH_REFRESH_TOKEN to initialise a googleapis OAuth2 client.
+ * All functions return a typed error shape rather than throwing — callers
+ * must check { ok } before using the result.
  *
  * REQUIRES_GATEWAY — returns error shapes when Drive env vars are absent.
  */
@@ -22,43 +20,25 @@ import type { DriveFile } from '@/types';
 
 function isConfigured(): boolean {
   return (
-    !!process.env['GOOGLE_SERVICE_ACCOUNT_JSON_B64'] &&
-    process.env['GOOGLE_SERVICE_ACCOUNT_JSON_B64'] !== ''
+    !!process.env['GOOGLE_OAUTH_CLIENT_ID'] &&
+    !!process.env['GOOGLE_OAUTH_CLIENT_SECRET'] &&
+    !!process.env['GOOGLE_OAUTH_REFRESH_TOKEN']
   );
 }
 
-async function getAuthClient(): Promise<import('googleapis').Auth.GoogleAuth> {
-  const b64 = process.env['GOOGLE_SERVICE_ACCOUNT_JSON_B64'];
-  if (!b64) throw new Error('GOOGLE_SERVICE_ACCOUNT_JSON_B64 not set');
-
-  const json = Buffer.from(b64, 'base64').toString('utf-8');
-  const credentials: unknown = JSON.parse(json);
-
-  const { google } = await import('googleapis');
-  // The service-account JSON shape is accepted by GoogleAuth as credentials.
-  // We narrow from unknown via a structural assertion rather than using any.
-  type ServiceAccountKey = {
-    type: string;
-    project_id: string;
-    private_key_id: string;
-    private_key: string;
-    client_email: string;
-    client_id: string;
-  };
-  const key = credentials as ServiceAccountKey;
-  return new google.auth.GoogleAuth({
-    credentials: {
-      client_email: key.client_email,
-      private_key: key.private_key,
-    },
-    scopes: ['https://www.googleapis.com/auth/drive'],
-  });
-}
-
 async function getDriveClient(): Promise<import('googleapis').drive_v3.Drive> {
-  const auth = await getAuthClient();
+  const clientId = process.env['GOOGLE_OAUTH_CLIENT_ID'];
+  const clientSecret = process.env['GOOGLE_OAUTH_CLIENT_SECRET'];
+  const refreshToken = process.env['GOOGLE_OAUTH_REFRESH_TOKEN'];
+
+  if (!clientId || !clientSecret || !refreshToken) {
+    throw new Error('Google OAuth credentials not configured');
+  }
+
   const { google } = await import('googleapis');
-  return google.drive({ version: 'v3', auth });
+  const oauth2Client = new google.auth.OAuth2(clientId, clientSecret);
+  oauth2Client.setCredentials({ refresh_token: refreshToken });
+  return google.drive({ version: 'v3', auth: oauth2Client });
 }
 
 // ---------------------------------------------------------------------------
@@ -67,7 +47,7 @@ async function getDriveClient(): Promise<import('googleapis').drive_v3.Drive> {
 
 /**
  * Lists files in a Drive folder, returning metadata only (no content).
- * Returns an empty array when Drive is not configured.
+ * Returns an error shape when Drive is not configured.
  */
 export async function listFolder(
   folderId: string,
