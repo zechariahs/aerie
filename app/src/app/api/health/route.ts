@@ -56,18 +56,12 @@ export async function GET(): Promise<Response> {
     // unreachable or timeout — leave false
   }
 
-  // driveConfigured — validate b64 JSON locally, no network
-  let driveConfigured = false;
-  const b64 = process.env['GOOGLE_SERVICE_ACCOUNT_JSON_B64'] ?? '';
-  if (b64) {
-    try {
-      const decoded = Buffer.from(b64, 'base64').toString('utf8');
-      const parsed = JSON.parse(decoded) as Record<string, unknown>;
-      driveConfigured = parsed['type'] === 'service_account';
-    } catch {
-      // malformed — leave false
-    }
-  }
+  // driveConfigured — check OAuth2 credentials are present
+  const driveConfigured = !!(
+    process.env['GOOGLE_OAUTH_CLIENT_ID'] &&
+    process.env['GOOGLE_OAUTH_CLIENT_SECRET'] &&
+    process.env['GOOGLE_OAUTH_REFRESH_TOKEN']
+  );
 
   // fixtureMode
   const fixtureMode = process.env['USE_FIXTURES'] === 'true';
