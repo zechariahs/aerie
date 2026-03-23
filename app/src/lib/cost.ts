@@ -19,19 +19,19 @@ const DEFAULT_AGENT_ID = 'primary-agent';
 
 const DEFAULT_PRICE_TABLE: ModelPrice[] = [
   {
-    modelId: 'openrouter/moonshotai/kimi-k2-0905',
+    modelId: 'moonshotai/kimi-k2-0905',
     inputPer1MTokens: 0.15,
     outputPer1MTokens: 2.0,
     updatedAt: new Date().toISOString(),
   },
   {
-    modelId: 'openrouter/anthropic/claude-haiku-4-5',
+    modelId: 'anthropic/claude-haiku-4-5',
     inputPer1MTokens: 0.8,
     outputPer1MTokens: 4.0,
     updatedAt: new Date().toISOString(),
   },
   {
-    modelId: 'openrouter/anthropic/claude-sonnet-4-5',
+    modelId: 'anthropic/claude-sonnet-4-5',
     inputPer1MTokens: 3.0,
     outputPer1MTokens: 15.0,
     updatedAt: new Date().toISOString(),
@@ -82,7 +82,13 @@ export function computeCost(
   modelId: string,
   priceTable: ModelPrice[],
 ): number {
-  const row = priceTable.find((r) => r.modelId === modelId);
+  const unprefixed = modelId.replace(/^openrouter\//, '');
+  const row = priceTable.find(
+    (r) =>
+      r.modelId === modelId ||
+      r.modelId === `openrouter/${modelId}` ||
+      r.modelId === unprefixed,
+  );
   if (!row) return 0;
   return (
     (inputTokens / 1_000_000) * row.inputPer1MTokens +
