@@ -12,6 +12,7 @@ import { execFile } from 'child_process';
 import fs from 'fs';
 
 const PORT = parseInt(process.env['HOST_AGENT_PORT'] ?? '3101', 10);
+const BIND_ADDRESS = process.env['HOST_AGENT_BIND'] ?? '127.0.0.1';
 const HOST_AGENT_TOKEN = process.env['HOST_AGENT_TOKEN'];
 
 // Allowlist of container names the agent may restart.
@@ -229,6 +230,13 @@ function getServiceStatus(): Promise<{ nginx: string; openclaw_gateway: boolean 
   });
 }
 
+function isAllowedIp(ip: string): boolean {
+  if (ip === '127.0.0.1' || ip === '::1' || ip === '::ffff:127.0.0.1') return true;
+  // Allow Docker bridge networks (172.16.0.0/12)
+  const match = ip.match(/^(?:::ffff:)?172\.(1[6-9]|2[0-9]|3[0-1])\./);
+  return match !== null;
+}
+
 function requireBearerAuth(req: http.IncomingMessage): boolean {
   if (!HOST_AGENT_TOKEN) return false;
   const auth = req.headers['authorization'];
@@ -242,9 +250,9 @@ function sendJson(res: http.ServerResponse, status: number, body: unknown): void
 }
 
 const server = http.createServer(async (req, res) => {
-  // Only accept connections from localhost
+  // Only accept connections from localhost or Docker bridge networks
   const remoteAddr = req.socket.remoteAddress ?? '';
-  if (remoteAddr !== '127.0.0.1' && remoteAddr !== '::1' && remoteAddr !== '::ffff:127.0.0.1') {
+  if (!isAllowedIp(remoteAddr)) {
     sendJson(res, 403, { error: 'Forbidden' });
     return;
   }
@@ -315,8 +323,8 @@ const server = http.createServer(async (req, res) => {
   sendJson(res, 404, { error: 'Not found' });
 });
 
-server.listen(PORT, '127.0.0.1', () => {
-  console.log(`[host-agent] listening on 127.0.0.1:${PORT}`);
+server.listen(PORT, BIND_ADDRESS, () => {
+  console.log(`[host-agent] listening on ${BIND_ADDRESS}:${PORT}`);
   if (ALLOWED_CONTAINERS.size === 0) {
     console.warn('[host-agent] ALLOWED_RESTART_CONTAINERS is not set — docker restart endpoint will reject all requests');
   }
