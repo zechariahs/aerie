@@ -8,6 +8,7 @@ import { AgentCard } from './agent-card';
 import { ActivityFeed } from './activity-feed';
 import { ErrorBoundary } from '@/components/ui/error-boundary';
 import type { AgentDescriptor, CostSummary, GatewayStatusResponse, GatewayStatus, AgentState } from '@/types';
+import { basePath } from '@/lib/client-url';
 
 interface CommandCenterClientProps {
   agents: AgentDescriptor[];
@@ -24,7 +25,7 @@ export function CommandCenterClient({ agents, initialCostSummary }: CommandCente
 
   const fetchGatewayStatus = useCallback(async () => {
     try {
-      const res = await fetch('/api/gateway/status');
+      const res = await fetch(basePath + '/api/gateway/status');
       if (!res.ok) return;
       const json = (await res.json()) as ApiGatewayStatus;
       const data = json.data;

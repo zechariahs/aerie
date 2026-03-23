@@ -12,6 +12,7 @@ import type {
   WorkspaceSearchResult,
   WorkspaceFile,
 } from '@/types';
+import { basePath } from '@/lib/client-url';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -262,7 +263,7 @@ function SessionStateEditor({ content, onClose, onSaved }: SessionStateEditorPro
     setStatus('saving');
     setErrorMsg('');
     try {
-      const res = await fetch('/api/workspace/session-state', {
+      const res = await fetch(basePath + '/api/workspace/session-state', {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -434,7 +435,7 @@ function TerminalPanel(): React.JSX.Element {
     try {
       const params = new URLSearchParams({ cmd });
       if (cmd === 'openclaw-cron-runs') params.set('cronId', cronId);
-      const res = await fetch(`/api/workspace/terminal?${params.toString()}`);
+      const res = await fetch(`${basePath}/api/workspace/terminal?${params.toString()}`);
       const json = (await res.json()) as { data?: { output: string }; error?: string };
       if (!res.ok) {
         setOutput(`Error: ${json.error ?? 'unknown'}`);
@@ -522,7 +523,7 @@ export default function WorkspacePage(): React.JSX.Element {
   useEffect(() => {
     void (async () => {
       try {
-        const res = await fetch('/api/workspace/tree');
+        const res = await fetch(basePath + '/api/workspace/tree');
         if (!res.ok) throw new Error('Failed to load file tree');
         const json = (await res.json()) as { data: WorkspaceTreeData; error?: string };
         setTreeData(json.data);
@@ -540,7 +541,7 @@ export default function WorkspacePage(): React.JSX.Element {
     setFileError(null);
     setIsEditing(false);
     try {
-      const res = await fetch(`/api/workspace/file?path=${encodeURIComponent(filePath)}`);
+      const res = await fetch(`${basePath}/api/workspace/file?path=${encodeURIComponent(filePath)}`);
       if (!res.ok) {
         const json = (await res.json()) as { error?: string };
         throw new Error(json.error ?? 'Failed to load file');
@@ -588,7 +589,7 @@ export default function WorkspacePage(): React.JSX.Element {
         setSearchLoading(true);
         try {
           const res = await fetch(
-            `/api/workspace/search?q=${encodeURIComponent(searchQuery.trim())}`,
+            `${basePath}/api/workspace/search?q=${encodeURIComponent(searchQuery.trim())}`,
           );
           if (!res.ok) throw new Error('Search failed');
           const json = (await res.json()) as { data: WorkspaceSearchResult[] };

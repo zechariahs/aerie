@@ -9,6 +9,7 @@ import type { CronJob } from '@/types';
 import CronTimeline from './cron-timeline';
 import CronJobPanel from './cron-job-panel';
 import CronHistoryDrawer from './cron-history-drawer';
+import { basePath } from '@/lib/client-url';
 
 interface CronManagerProps {
   initialJobs: CronJob[];
@@ -29,7 +30,7 @@ export default function CronManager({ initialJobs }: CronManagerProps): React.JS
    */
   const refreshJobs = useCallback(async (): Promise<void> => {
     try {
-      const res = await fetch('/api/crons');
+      const res = await fetch(basePath + '/api/crons');
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const json = (await res.json()) as { data: CronJob[] };
       setJobs(json.data);

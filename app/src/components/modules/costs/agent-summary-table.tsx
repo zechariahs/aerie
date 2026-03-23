@@ -7,6 +7,7 @@
 import React, { useEffect, useState } from 'react';
 import { LineChart, Line, ResponsiveContainer } from 'recharts';
 import type { DailyAgentCost, AgentCostSummaryRow } from '@/types';
+import { basePath } from '@/lib/client-url';
 
 function buildSummaryRows(daily: DailyAgentCost[]): AgentCostSummaryRow[] {
   const agentIds = [...new Set(daily.map((d) => d.agentId))];
@@ -71,7 +72,7 @@ export default function AgentSummaryTable({
   const [error, setError] = useState<string | undefined>();
 
   useEffect(() => {
-    fetch('/api/costs/daily?days=30')
+    fetch(basePath + '/api/costs/daily?days=30')
       .then(async (r) => {
         if (!r.ok) throw new Error(`HTTP ${r.status}`);
         const json = (await r.json()) as { data: DailyAgentCost[] };

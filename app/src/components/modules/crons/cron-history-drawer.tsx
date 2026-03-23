@@ -6,6 +6,7 @@
 
 import { useState, useEffect } from 'react';
 import type { CronRun } from '@/types';
+import { basePath } from '@/lib/client-url';
 
 interface CronHistoryDrawerProps {
   cronId: string;
@@ -48,7 +49,7 @@ export default function CronHistoryDrawer({ cronId, cronName, onClose }: CronHis
       setLoading(true);
       setError('');
       try {
-        const res = await fetch(`/api/crons/${cronId}/runs?limit=20`);
+        const res = await fetch(`${basePath}/api/crons/${cronId}/runs?limit=20`);
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const json = (await res.json()) as { data: CronRun[] };
         if (!cancelled) setRuns(json.data);

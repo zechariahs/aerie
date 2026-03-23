@@ -5,6 +5,7 @@
 
 import React, { useEffect, useState, useCallback } from 'react';
 import { ErrorBoundary } from '@/components/ui/error-boundary';
+import { basePath } from '@/lib/client-url';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -68,7 +69,7 @@ function AuditTable(): React.JSX.Element {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`/api/security/audit?page=${p}&limit=50`);
+      const res = await fetch(`${basePath}/api/security/audit?page=${p}&limit=50`);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const json = (await res.json()) as AuditResponse;
       setEntries(json.data.entries);

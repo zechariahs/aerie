@@ -5,6 +5,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import type { Task, TaskPriority, TaskStatus, TaskTag, TaskStatusChange, TaskComment } from '@/types';
+import { basePath } from '@/lib/client-url';
 
 interface TaskDetailData {
   task: Task;
@@ -64,7 +65,7 @@ export function TaskDetailPanel({
     setLoading(true);
     setError('');
     try {
-      const res = await fetch(`/api/tasks/${taskId}`);
+      const res = await fetch(`${basePath}/api/tasks/${taskId}`);
       if (!res.ok) {
         setError('Failed to load task');
         return;
@@ -92,7 +93,7 @@ export function TaskDetailPanel({
     if (!data) return;
     setSaving(true);
     try {
-      const res = await fetch(`/api/tasks/${taskId}`, {
+      const res = await fetch(`${basePath}/api/tasks/${taskId}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -127,7 +128,7 @@ export function TaskDetailPanel({
     if (!comment.trim()) return;
     setSaving(true);
     try {
-      const res = await fetch(`/api/tasks/${taskId}`, {
+      const res = await fetch(`${basePath}/api/tasks/${taskId}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -150,7 +151,7 @@ export function TaskDetailPanel({
   }
 
   async function sendTelegram(token: string): Promise<void> {
-    const res = await fetch(`/api/tasks/${taskId}/send-telegram`, {
+    const res = await fetch(`${basePath}/api/tasks/${taskId}/send-telegram`, {
       method: 'POST',
       headers: { 'X-TOTP-Token': token },
     });
@@ -163,7 +164,7 @@ export function TaskDetailPanel({
   }
 
   async function sendDrive(token: string): Promise<void> {
-    const res = await fetch(`/api/tasks/${taskId}/send-drive`, {
+    const res = await fetch(`${basePath}/api/tasks/${taskId}/send-drive`, {
       method: 'POST',
       headers: { 'X-TOTP-Token': token },
     });
@@ -177,7 +178,7 @@ export function TaskDetailPanel({
   }
 
   async function handleDelete(token: string): Promise<void> {
-    const res = await fetch(`/api/tasks/${taskId}`, {
+    const res = await fetch(`${basePath}/api/tasks/${taskId}`, {
       method: 'DELETE',
       headers: { 'X-TOTP-Token': token },
     });
@@ -189,7 +190,7 @@ export function TaskDetailPanel({
   }
 
   async function handleQuickStatus(newStatus: TaskStatus, token: string): Promise<void> {
-    const res = await fetch(`/api/tasks/${taskId}`, {
+    const res = await fetch(`${basePath}/api/tasks/${taskId}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json', 'X-TOTP-Token': token },
       body: JSON.stringify({ status: newStatus }),

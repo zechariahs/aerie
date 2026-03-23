@@ -5,6 +5,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import type { DriveFile, Task } from '@/types';
+import { basePath } from '@/lib/client-url';
 
 interface TaskSpecsResponse {
   files: DriveFile[];
@@ -30,7 +31,7 @@ export function TaskSpecsInbox({ totpToken, onImported, onRequestTotp }: TaskSpe
 
   const fetchSpecs = useCallback(async () => {
     try {
-      const res = await fetch('/api/tasks/task-specs');
+      const res = await fetch(basePath + '/api/tasks/task-specs');
       const json = (await res.json()) as { data: TaskSpecsResponse };
       setData(json.data);
     } catch {
@@ -47,7 +48,7 @@ export function TaskSpecsInbox({ totpToken, onImported, onRequestTotp }: TaskSpe
   async function doImport(file: DriveFile, token: string): Promise<void> {
     setImporting(file.id);
     try {
-      const res = await fetch('/api/tasks/import-spec', {
+      const res = await fetch(basePath + '/api/tasks/import-spec', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

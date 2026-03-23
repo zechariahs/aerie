@@ -5,6 +5,7 @@
 
 import { useState } from 'react';
 import type { Task, TaskPriority, TaskTag } from '@/types';
+import { basePath } from '@/lib/client-url';
 
 interface NewTaskFormProps {
   totpToken: string;
@@ -35,7 +36,7 @@ export function NewTaskForm({ totpToken, onCreated, onCancel, onRequestTotp }: N
     setSaving(true);
     setError('');
     try {
-      const res = await fetch('/api/tasks', {
+      const res = await fetch(basePath + '/api/tasks', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

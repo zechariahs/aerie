@@ -6,6 +6,7 @@
 
 import React, { useEffect, useState } from 'react';
 import type { CostSummary } from '@/types';
+import { basePath } from '@/lib/client-url';
 
 function usd(n: number): string {
   return `$${n.toFixed(2)}`;
@@ -17,7 +18,7 @@ export default function MonthlyProjection(): React.JSX.Element {
   const [error, setError] = useState<string | undefined>();
 
   useEffect(() => {
-    fetch('/api/costs/summary')
+    fetch(basePath + '/api/costs/summary')
       .then(async (r) => {
         if (!r.ok) throw new Error(`HTTP ${r.status}`);
         const json = (await r.json()) as { data: CostSummary };

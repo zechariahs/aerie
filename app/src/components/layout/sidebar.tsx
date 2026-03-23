@@ -6,6 +6,7 @@
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useState } from 'react';
+import { basePath } from '@/lib/client-url';
 
 const navItems = [
   { href: '/', label: 'Command Center' },
@@ -27,7 +28,7 @@ function NavList({ onNavClick }: NavListProps): React.JSX.Element {
   const router = useRouter();
 
   async function handleLogout(): Promise<void> {
-    await fetch('/api/auth/logout', { method: 'POST' });
+    await fetch(basePath + '/api/auth/logout', { method: 'POST' });
     router.replace('/login');
   }
 

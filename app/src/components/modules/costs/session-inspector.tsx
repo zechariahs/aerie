@@ -6,6 +6,7 @@
 
 import React, { useEffect, useState } from 'react';
 import type { PaginatedSessionCosts, SessionCost } from '@/types';
+import { basePath } from '@/lib/client-url';
 
 function usd(n: number): string {
   return `$${n.toFixed(5)}`;
@@ -72,7 +73,7 @@ export default function SessionInspector({ agentFilter }: SessionInspectorProps)
     });
     if (agentFilter) params.set('agentId', agentFilter);
 
-    fetch(`/api/costs/sessions?${params.toString()}`)
+    fetch(`${basePath}/api/costs/sessions?${params.toString()}`)
       .then(async (r) => {
         if (!r.ok) throw new Error(`HTTP ${r.status}`);
         const json = (await r.json()) as { data: PaginatedSessionCosts };
