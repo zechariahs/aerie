@@ -13,6 +13,7 @@ import type {
   CronCostSummaryRow,
   PaginatedSessionCosts,
 } from '@/types';
+import { getCronJobs, readCronRuns } from './openclaw';
 
 const DEFAULT_AGENT_ID = 'primary-agent';
 
@@ -36,12 +37,6 @@ const DEFAULT_PRICE_TABLE: ModelPrice[] = [
     updatedAt: new Date().toISOString(),
   },
 ];
-
-/** In-memory cache for OpenRouter API responses. */
-const openRouterCache: { data: DailyAgentCost[]; expiresAt: number } | undefined = undefined;
-// Use a module-level mutable variable instead of const for cache mutation
-let _openRouterCache: { data: DailyAgentCost[]; expiresAt: number } | undefined =
-  openRouterCache;
 
 const CACHE_TTL_MS = 15 * 60 * 1000; // 15 minutes
 
@@ -96,56 +91,79 @@ export function computeCost(
 }
 
 /**
- * Fetches daily cost data from the OpenRouter usage API.
- * Caches results for 15 minutes to avoid hammering the API on every page load.
- * Falls back to an empty array on 401/403 — treat as "not configured" not error.
- * REQUIRES_GATEWAY — returns empty array in dev/fixture mode
+ * OpenRouter /api/v1/usage returns an HTML page, not JSON — this is a no-op stub.
+ * @deprecated Use getCostsFromCronRuns() instead.
  */
-export async function getOpenRouterDailyCosts(days: number): Promise<DailyAgentCost[]> {
+export async function getOpenRouterDailyCosts(_days: number): Promise<DailyAgentCost[]> {
+  return [];
+}
+
+/** In-memory cache for cron-run cost data. */
+let _cronRunsCache: { data: DailyAgentCost[]; expiresAt: number } | undefined;
+
+/**
+ * Builds daily cost data by reading token usage from each cron's JSONL run files.
+ * Groups results by date + agentId + model, tagged source: 'estimated'.
+ */
+export function getCostsFromCronRuns(days: number): DailyAgentCost[] {
   if (process.env['USE_FIXTURES'] === 'true') return [];
 
   const now = Date.now();
-  if (_openRouterCache && _openRouterCache.expiresAt > now) {
-    return _openRouterCache.data.filter((d) => {
-      const cutoff = new Date();
-      cutoff.setDate(cutoff.getDate() - days);
-      return new Date(d.date) >= cutoff;
-    });
+  if (_cronRunsCache && _cronRunsCache.expiresAt > now) {
+    const cutoff = toDateString(daysAgo(days));
+    return _cronRunsCache.data.filter((d) => d.date >= cutoff);
   }
 
-  const apiKey = process.env['OPENROUTER_API_KEY'];
-  if (!apiKey) return [];
+  const priceTable = loadPriceTable();
+  const jobs = getCronJobs();
+  const map = new Map<string, DailyAgentCost>();
 
-  const endDate = toDateString(new Date());
-  const startDate = toDateString(daysAgo(days));
+  for (const job of jobs) {
+    const runs = readCronRuns(job.id, 1000);
+    for (const run of runs) {
+      if (!run.usage) continue;
 
-  let response: Response;
-  try {
-    response = await fetch(
-      `https://openrouter.ai/api/v1/usage?startDate=${startDate}&endDate=${endDate}`,
-      {
-        headers: { Authorization: `Bearer ${apiKey}` },
-        // next.js fetch cache: no-store because we manage our own 15-min cache
-        cache: 'no-store',
-      },
-    );
-  } catch {
-    return [];
+      // Derive date from runAtMs if present, else startedAt
+      const dateStr = run.runAtMs
+        ? toDateString(new Date(run.runAtMs))
+        : run.startedAt.slice(0, 10);
+
+      // Prefix model with provider if not already namespaced
+      const rawModel = run.model ?? '';
+      const modelId =
+        run.provider && rawModel && !rawModel.includes('/')
+          ? `${run.provider}/${rawModel}`
+          : rawModel || 'unknown';
+
+      const inputTokens = run.usage.input_tokens;
+      const outputTokens = run.usage.output_tokens;
+      const costUsd = computeCost(inputTokens, outputTokens, modelId, priceTable);
+
+      const key = `${dateStr}::${job.agentId}::${modelId}`;
+      const existing = map.get(key);
+      if (existing) {
+        existing.inputTokens += inputTokens;
+        existing.outputTokens += outputTokens;
+        existing.costUsd += costUsd;
+      } else {
+        map.set(key, {
+          date: dateStr,
+          agentId: job.agentId,
+          modelId,
+          inputTokens,
+          outputTokens,
+          costUsd,
+          source: 'estimated',
+        });
+      }
+    }
   }
 
-  if (response.status === 401 || response.status === 403) return [];
-  if (!response.ok) return [];
+  const all = [...map.values()].sort((a, b) => a.date.localeCompare(b.date));
+  _cronRunsCache = { data: all, expiresAt: now + CACHE_TTL_MS };
 
-  let body: unknown;
-  try {
-    body = await response.json();
-  } catch {
-    return [];
-  }
-
-  const costs = parseOpenRouterResponse(body);
-  _openRouterCache = { data: costs, expiresAt: now + CACHE_TTL_MS };
-  return costs;
+  const cutoff = toDateString(daysAgo(days));
+  return all.filter((d) => d.date >= cutoff);
 }
 
 /**
@@ -243,7 +261,7 @@ export function getSessionCostsFromSqlite(days: number): SessionCost[] {
 }
 
 /**
- * Returns merged daily costs. OpenRouter API results take priority;
+ * Returns merged daily costs. Cron JSONL run files are the primary source;
  * SQLite sessions aggregated with the price table fill any gaps.
  */
 export async function getMergedCosts(days: number): Promise<DailyAgentCost[]> {
@@ -251,8 +269,8 @@ export async function getMergedCosts(days: number): Promise<DailyAgentCost[]> {
     return loadFixtureDailyCosts();
   }
 
-  const orCosts = await getOpenRouterDailyCosts(days);
-  if (orCosts.length > 0) return orCosts;
+  const cronCosts = getCostsFromCronRuns(days);
+  if (cronCosts.length > 0) return cronCosts;
 
   // Fall back: aggregate SQLite sessions into daily buckets
   const sessions = getSessionCostsFromSqlite(days);
@@ -313,8 +331,6 @@ export async function getCostSummary(): Promise<CostSummary> {
     return loadFixtureSummary();
   }
 
-  const sessions = getSessionCostsFromSqlite(62); // 2 months
-
   const now = new Date();
   const todayStr = toDateString(now);
   const weekStart = toDateString(daysAgo(7));
@@ -322,21 +338,27 @@ export async function getCostSummary(): Promise<CostSummary> {
   const lastMonthStart = toDateString(new Date(now.getFullYear(), now.getMonth() - 1, 1));
   const lastMonthEnd = toDateString(new Date(now.getFullYear(), now.getMonth(), 0));
 
-  const today = sessions
-    .filter((s) => s.startedAt.startsWith(todayStr))
-    .reduce((sum, s) => sum + s.costUsd, 0);
+  // Primary: cron JSONL run files; fallback: SQLite sessions
+  const daily = getCostsFromCronRuns(62);
+  const useDailySource = daily.length > 0;
 
-  const thisWeek = sessions
-    .filter((s) => s.startedAt >= weekStart)
-    .reduce((sum, s) => sum + s.costUsd, 0);
+  const today = useDailySource
+    ? daily.filter((d) => d.date === todayStr).reduce((sum, d) => sum + d.costUsd, 0)
+    : getSessionCostsFromSqlite(1).filter((s) => s.startedAt.startsWith(todayStr)).reduce((sum, s) => sum + s.costUsd, 0);
 
-  const thisMonth = sessions
-    .filter((s) => s.startedAt >= monthStart)
-    .reduce((sum, s) => sum + s.costUsd, 0);
+  const thisWeek = useDailySource
+    ? daily.filter((d) => d.date >= weekStart).reduce((sum, d) => sum + d.costUsd, 0)
+    : getSessionCostsFromSqlite(7).filter((s) => s.startedAt >= weekStart).reduce((sum, s) => sum + s.costUsd, 0);
 
-  const lastMonth = sessions
-    .filter((s) => s.startedAt >= lastMonthStart && s.startedAt <= lastMonthEnd)
-    .reduce((sum, s) => sum + s.costUsd, 0);
+  const allDaily = useDailySource ? daily : aggregateSessionsToDaily(getSessionCostsFromSqlite(62));
+
+  const thisMonth = allDaily
+    .filter((d) => d.date >= monthStart)
+    .reduce((sum, d) => sum + d.costUsd, 0);
+
+  const lastMonth = allDaily
+    .filter((d) => d.date >= lastMonthStart && d.date <= lastMonthEnd)
+    .reduce((sum, d) => sum + d.costUsd, 0);
 
   // Projection: scale current month's spend by fraction of month elapsed
   const dayOfMonth = now.getDate();
@@ -472,40 +494,6 @@ function aggregateSessionsToDaily(sessions: SessionCost[]): DailyAgentCost[] {
   return [...map.values()].sort((a, b) => a.date.localeCompare(b.date));
 }
 
-/** Parses the OpenRouter /api/v1/usage response into DailyAgentCost[]. */
-function parseOpenRouterResponse(body: unknown): DailyAgentCost[] {
-  if (typeof body !== 'object' || body === null) return [];
-  const obj = body as Record<string, unknown>;
-  const data = Array.isArray(obj['data']) ? (obj['data'] as unknown[]) : [];
-
-  return data.flatMap((item): DailyAgentCost[] => {
-    if (typeof item !== 'object' || item === null) return [];
-    const row = item as Record<string, unknown>;
-
-    const date = typeof row['date'] === 'string' ? row['date'].slice(0, 10) : '';
-    if (!date) return [];
-
-    const modelId = typeof row['model'] === 'string' ? row['model'] : '';
-    const usage =
-      typeof row['usage'] === 'object' && row['usage'] !== null
-        ? (row['usage'] as Record<string, unknown>)
-        : {};
-
-    const inputTokens = Number(usage['prompt_tokens'] ?? 0);
-    const outputTokens = Number(usage['completion_tokens'] ?? 0);
-    const costUsd = Number(usage['total_cost'] ?? row['total_cost'] ?? 0);
-
-    return [{
-      date,
-      agentId: DEFAULT_AGENT_ID,
-      modelId,
-      inputTokens,
-      outputTokens,
-      costUsd,
-      source: 'openrouter',
-    }];
-  });
-}
 
 function isModelPrice(v: unknown): v is ModelPrice {
   if (typeof v !== 'object' || v === null) return false;
