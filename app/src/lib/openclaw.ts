@@ -3,7 +3,7 @@
 
 import fs from 'fs';
 import path from 'path';
-import type { CronJob, AgentDescriptor } from '@/types';
+import type { CronJob, CronRun, AgentDescriptor } from '@/types';
 import { getDb } from './db';
 
 // ── Raw config types ─────────────────────────────────────────────────────────
@@ -15,6 +15,41 @@ export interface OpenClawCron {
   schedule: string;
   enabled: boolean;
   modelOverride?: string;
+}
+
+// ── Raw cron/jobs.json types ──────────────────────────────────────────────────
+
+interface RawCronSchedule {
+  kind: string;
+  expr: string;
+  tz?: string;
+}
+
+interface RawCronPayload {
+  kind: string;
+  model?: string;
+}
+
+interface RawCronState {
+  lastRunStatus?: string;
+  lastRunAtMs?: number;
+  consecutiveErrors?: number;
+  lastError?: string;
+}
+
+interface RawCronJob {
+  id: string;
+  agentId: string;
+  name: string;
+  enabled: boolean;
+  schedule: RawCronSchedule;
+  payload?: RawCronPayload;
+  state?: RawCronState;
+}
+
+interface RawCronJobsFile {
+  version: number;
+  jobs: RawCronJob[];
 }
 
 /** Agent descriptor parsed from openclaw.json. */
@@ -112,7 +147,29 @@ function parseCrons(obj: Record<string, unknown>): OpenClawCron[] {
 // ── Higher-level helpers (session-3: Cron Manager) ───────────────────────────
 
 /**
- * Returns all cron jobs from openclaw.json, enriched with the latest run
+ * Reads cron job definitions from OPENCLAW_DIR/cron/jobs.json.
+ * Returns an empty array if the file is absent or malformed.
+ */
+function readCronJobsFile(): RawCronJob[] {
+  const clawDir = process.env['OPENCLAW_DIR'] ?? '/openclaw';
+  const jobsPath = path.join(clawDir, 'cron', 'jobs.json');
+
+  let raw: unknown;
+  try {
+    const text = fs.readFileSync(jobsPath, 'utf8');
+    raw = JSON.parse(text) as unknown;
+  } catch {
+    console.error('[openclaw] Could not read cron/jobs.json');
+    return [];
+  }
+
+  if (typeof raw !== 'object' || raw === null) return [];
+  const file = raw as RawCronJobsFile;
+  return Array.isArray(file.jobs) ? file.jobs : [];
+}
+
+/**
+ * Returns all cron jobs from cron/jobs.json, enriched with the latest run
  * status from mc.db. Falls back to fixture data in dev mode.
  */
 export function getCronJobs(): CronJob[] {
@@ -120,13 +177,12 @@ export function getCronJobs(): CronJob[] {
     return loadCronFixtures();
   }
 
-  const config = readOpenClawConfig();
-  if (config.crons.length === 0) return [];
+  const rawJobs = readCronJobsFile();
+  if (rawJobs.length === 0) return [];
 
-  const agentId = config.agents[0]?.id ?? 'unknown';
   const db = getDb();
 
-  return config.crons.map((raw): CronJob => {
+  return rawJobs.map((raw): CronJob => {
     const lastRunRow = db
       .prepare(
         `SELECT id, status, started_at, duration_ms
@@ -145,10 +201,10 @@ export function getCronJobs(): CronJob[] {
     return {
       id: raw.id,
       name: raw.name,
-      schedule: raw.schedule,
+      schedule: raw.schedule.expr,
       enabled: raw.enabled,
-      agentId,
-      modelOverride: raw.modelOverride,
+      agentId: raw.agentId,
+      modelOverride: raw.payload?.model,
       status: derivedStatus,
       lastRun: lastRunRow
         ? {
@@ -159,6 +215,62 @@ export function getCronJobs(): CronJob[] {
           }
         : undefined,
     };
+  });
+}
+
+/**
+ * Reads the last N run entries for a cron job from
+ * OPENCLAW_DIR/cron/runs/<cronId>.jsonl, newest-first.
+ */
+export function readCronRuns(cronId: string, limit: number): CronRun[] {
+  const clawDir = process.env['OPENCLAW_DIR'] ?? '/openclaw';
+  const runsPath = path.join(clawDir, 'cron', 'runs', `${cronId}.jsonl`);
+
+  let text: string;
+  try {
+    text = fs.readFileSync(runsPath, 'utf8');
+  } catch {
+    return [];
+  }
+
+  const lines = text.split('\n').filter((l) => l.trim() !== '');
+  const tail = lines.slice(-limit).reverse();
+
+  return tail.flatMap((line): CronRun[] => {
+    let obj: Record<string, unknown>;
+    try {
+      obj = JSON.parse(line) as Record<string, unknown>;
+    } catch {
+      return [];
+    }
+
+    const id = typeof obj['id'] === 'string' ? obj['id'] : crypto.randomUUID();
+    const rawStatus = typeof obj['status'] === 'string' ? obj['status'] : 'failure';
+    const status: CronRun['status'] =
+      rawStatus === 'success' || rawStatus === 'running' ? rawStatus : 'failure';
+
+    return [{
+      id,
+      cronId,
+      status,
+      startedAt:
+        typeof obj['startedAt'] === 'string'
+          ? obj['startedAt']
+          : typeof obj['started_at'] === 'string'
+          ? obj['started_at']
+          : new Date().toISOString(),
+      finishedAt:
+        typeof obj['finishedAt'] === 'string' ? obj['finishedAt'] :
+        typeof obj['finished_at'] === 'string' ? obj['finished_at'] : undefined,
+      durationMs:
+        typeof obj['durationMs'] === 'number' ? obj['durationMs'] :
+        typeof obj['duration_ms'] === 'number' ? obj['duration_ms'] : undefined,
+      outputExcerpt: typeof obj['outputExcerpt'] === 'string' ? obj['outputExcerpt'] : undefined,
+      driveUrl: typeof obj['driveUrl'] === 'string' ? obj['driveUrl'] : undefined,
+      errorMessage:
+        typeof obj['errorMessage'] === 'string' ? obj['errorMessage'] :
+        typeof obj['error'] === 'string' ? obj['error'] : undefined,
+    }];
   });
 }
 
