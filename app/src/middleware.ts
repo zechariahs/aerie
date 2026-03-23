@@ -65,6 +65,8 @@ export async function middleware(request: NextRequest): Promise<NextResponse> {
 }
 
 export const config = {
-  // Run on all paths except Next.js internals and static files
-  matcher: ['/((?!_next/static|_next/image|favicon.ico).*)'],
+  // Run on all paths except Next.js internals and static files.
+  // '/' explicitly covers the basePath root (/aerie and /aerie/);
+  // the second pattern uses .+ so it only applies to non-empty sub-paths.
+  matcher: ['/', '/((?!_next/static|_next/image|favicon.ico).+)'],
 };
