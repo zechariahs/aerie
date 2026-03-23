@@ -50,10 +50,16 @@ export function clearRateLimit(ip: string): void {
 
 /**
  * Verifies a plain-text password against the stored argon2 hash.
- * The hash is read from MC_ADMIN_PASSWORD_HASH env var.
+ *
+ * Reads MC_ADMIN_PASSWORD_HASH_B64 first (base64-encoded hash, safe from
+ * Docker Compose $ interpolation), falling back to MC_ADMIN_PASSWORD_HASH
+ * for local dev environments that set the hash directly.
  */
 export async function verifyPassword(password: string): Promise<boolean> {
-  const hash = process.env['MC_ADMIN_PASSWORD_HASH'];
+  const b64 = process.env['MC_ADMIN_PASSWORD_HASH_B64'];
+  const hash = b64
+    ? Buffer.from(b64, 'base64').toString('utf8')
+    : process.env['MC_ADMIN_PASSWORD_HASH'];
   if (!hash) return false;
 
   // Dynamic import keeps argon2 (native module) isolated — avoids issues if
