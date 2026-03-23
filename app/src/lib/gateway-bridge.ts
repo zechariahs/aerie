@@ -200,9 +200,7 @@ function connect(): void {
   const token = gatewayToken();
 
   try {
-    ws = new WebSocket(url, {
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
-    });
+    ws = new WebSocket(url);
   } catch (err) {
     console.error('[gateway-bridge] failed to create WebSocket:', err);
     scheduleReconnect();
@@ -225,13 +223,49 @@ function connect(): void {
       return;
     }
 
-    // Handle connect challenge — Gateway sends this immediately after open;
-    // respond with token + nonce to complete authentication.
+    // Handle connect challenge — respond with the full connect request.
     if (msg['type'] === 'event' && msg['event'] === 'connect.challenge') {
       const payload = msg['payload'] as Record<string, unknown> | undefined;
       const nonce = typeof payload?.['nonce'] === 'string' ? payload['nonce'] : '';
-      console.log('[gateway-bridge] received connect.challenge, responding with auth');
-      ws?.send(JSON.stringify({ type: 'auth', nonce, token }));
+      console.log('[gateway-bridge] received connect.challenge, sending connect request');
+      ws?.send(JSON.stringify({
+        type: 'req',
+        id: crypto.randomUUID(),
+        method: 'connect',
+        params: {
+          minProtocol: 3,
+          maxProtocol: 3,
+          client: {
+            id: 'aerie-dashboard',
+            version: '1.0.0',
+            platform: 'linux',
+            mode: 'operator',
+          },
+          role: 'operator',
+          scopes: ['operator.read', 'operator.write'],
+          caps: [],
+          commands: [],
+          permissions: {},
+          auth: { token },
+          locale: 'en-US',
+          userAgent: 'aerie/1.0.0',
+          device: {
+            id: 'aerie-dashboard-node',
+            nonce,
+          },
+        },
+      }));
+      return;
+    }
+
+    // Handle connect response — confirm authentication.
+    if (msg['type'] === 'res') {
+      const payload = msg['payload'] as Record<string, unknown> | undefined;
+      if (msg['ok'] === true && payload?.['type'] === 'hello-ok') {
+        console.log('[gateway-bridge] authenticated');
+      } else if (msg['ok'] === false) {
+        console.error('[gateway-bridge] connect request rejected:', JSON.stringify(msg).slice(0, 200));
+      }
       return;
     }
 
