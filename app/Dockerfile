@@ -15,6 +15,8 @@ RUN pnpm install --frozen-lockfile
 # ── builder: compile Next.js app ──────────────────────────────────────────────
 FROM base AS builder
 WORKDIR /app
+ARG NEXT_PUBLIC_BASE_PATH=/aerie
+ENV NEXT_PUBLIC_BASE_PATH=$NEXT_PUBLIC_BASE_PATH
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 ENV NEXT_TELEMETRY_DISABLED=1
