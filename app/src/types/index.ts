@@ -223,7 +223,7 @@ export interface CronJob {
   lastRun?: CronRunSummary;
 }
 
-/** Full cron run record as stored in mc.db cron_runs table. */
+/** Full cron run record as stored in mc.db cron_runs table or parsed from JSONL. */
 export interface CronRun {
   id: string;
   cronId: string;
@@ -234,6 +234,14 @@ export interface CronRun {
   outputExcerpt?: string;
   driveUrl?: string;
   errorMessage?: string;
+  /** Epoch ms timestamp from JSONL run files (runAtMs field). */
+  runAtMs?: number;
+  /** Model used for this run (from JSONL). */
+  model?: string;
+  /** Provider for this run, e.g. "openrouter" (from JSONL). */
+  provider?: string;
+  /** Token usage for this run (from JSONL). */
+  usage?: { input_tokens: number; output_tokens: number };
 }
 
 // ── Workspace & Memory (Module 6) ────────────────────────────────────────────

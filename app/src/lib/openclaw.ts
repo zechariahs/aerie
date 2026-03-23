@@ -249,6 +249,10 @@ export function readCronRuns(cronId: string, limit: number): CronRun[] {
     const status: CronRun['status'] =
       rawStatus === 'success' || rawStatus === 'running' ? rawStatus : 'failure';
 
+    const rawUsage = typeof obj['usage'] === 'object' && obj['usage'] !== null
+      ? obj['usage'] as Record<string, unknown>
+      : null;
+
     return [{
       id,
       cronId,
@@ -270,6 +274,15 @@ export function readCronRuns(cronId: string, limit: number): CronRun[] {
       errorMessage:
         typeof obj['errorMessage'] === 'string' ? obj['errorMessage'] :
         typeof obj['error'] === 'string' ? obj['error'] : undefined,
+      runAtMs: typeof obj['runAtMs'] === 'number' ? obj['runAtMs'] : undefined,
+      model: typeof obj['model'] === 'string' ? obj['model'] : undefined,
+      provider: typeof obj['provider'] === 'string' ? obj['provider'] : undefined,
+      usage: rawUsage
+        ? {
+            input_tokens: typeof rawUsage['input_tokens'] === 'number' ? rawUsage['input_tokens'] : 0,
+            output_tokens: typeof rawUsage['output_tokens'] === 'number' ? rawUsage['output_tokens'] : 0,
+          }
+        : undefined,
     }];
   });
 }
