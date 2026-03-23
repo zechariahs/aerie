@@ -236,7 +236,7 @@ function connect(): void {
           minProtocol: 3,
           maxProtocol: 3,
           client: {
-            id: 'aerie-dashboard',
+            id: 'cli',
             version: '1.0.0',
             platform: 'linux',
             mode: 'operator',
@@ -248,7 +248,7 @@ function connect(): void {
           permissions: {},
           auth: { token },
           locale: 'en-US',
-          userAgent: 'aerie/1.0.0',
+          userAgent: 'openclaw-cli/1.0.0',
           device: {
             id: 'aerie-dashboard-node',
             nonce,
