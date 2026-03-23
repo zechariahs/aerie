@@ -11,6 +11,7 @@ import { NewTaskForm } from './new-task-form';
 import { TotpDialog } from './totp-dialog';
 import { TaskSpecsInbox } from './task-specs-inbox';
 import type { Task, TaskStatus } from '@/types';
+import { basePath } from '@/lib/client-url';
 
 type TasksByColumn = Record<TaskStatus, Task[]>;
 
@@ -49,7 +50,7 @@ export function KanbanBoard(): React.JSX.Element {
     setLoading(true);
     setError('');
     try {
-      const res = await fetch(`/api/tasks?showArchived=${showArchived ? '1' : '0'}`);
+      const res = await fetch(`${basePath}/api/tasks?showArchived=${showArchived ? '1' : '0'}`);
       if (!res.ok) {
         setError('Failed to load tasks');
         return;
@@ -88,7 +89,7 @@ export function KanbanBoard(): React.JSX.Element {
   }
 
   async function doMove(taskId: string, newStatus: TaskStatus, token: string): Promise<void> {
-    const res = await fetch(`/api/tasks/${taskId}`, {
+    const res = await fetch(`${basePath}/api/tasks/${taskId}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json', 'X-TOTP-Token': token },
       body: JSON.stringify({ status: newStatus }),

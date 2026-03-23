@@ -5,6 +5,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import type { VpsServiceStatus } from '@/types/index';
+import { basePath } from '@/lib/client-url';
 
 interface ServicesPanelState {
   services: VpsServiceStatus | undefined;
@@ -53,7 +54,7 @@ export function ServicesPanel(): React.JSX.Element {
 
   async function fetchServices(): Promise<void> {
     try {
-      const res = await fetch('/api/vps/services');
+      const res = await fetch(basePath + '/api/vps/services');
       if (!res.ok) {
         const err = await res.json().catch(() => ({ error: 'Failed to fetch services' })) as { error?: string };
         setState({ services: undefined, error: err.error ?? 'Failed to fetch services', loading: false });

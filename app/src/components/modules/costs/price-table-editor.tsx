@@ -6,6 +6,7 @@
 
 import React, { useEffect, useState } from 'react';
 import type { ModelPrice } from '@/types';
+import { basePath } from '@/lib/client-url';
 
 function nowIso(): string {
   return new Date().toISOString();
@@ -21,7 +22,7 @@ export default function PriceTableEditor(): React.JSX.Element {
   const [totpToken, setTotpToken] = useState('');
 
   useEffect(() => {
-    fetch('/api/costs/price-table')
+    fetch(basePath + '/api/costs/price-table')
       .then(async (r) => {
         if (!r.ok) throw new Error(`HTTP ${r.status}`);
         const json = (await r.json()) as { data: ModelPrice[] };
@@ -71,7 +72,7 @@ export default function PriceTableEditor(): React.JSX.Element {
     setSaveError(undefined);
 
     try {
-      const r = await fetch('/api/costs/price-table', {
+      const r = await fetch(basePath + '/api/costs/price-table', {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',

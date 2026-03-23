@@ -6,6 +6,7 @@
 
 import React, { useEffect, useState } from 'react';
 import type { CronCostSummaryRow } from '@/types';
+import { basePath } from '@/lib/client-url';
 
 function usd(n: number): string {
   return `$${n.toFixed(4)}`;
@@ -29,7 +30,7 @@ export default function CronSummaryTable(): React.JSX.Element {
     // Real cron attribution requires openclaw.json — in dev/fixture mode the data
     // will show placeholder rows for the 6 known crons.
     Promise.all([
-      fetch('/api/costs/sessions?days=30&limit=200').then(async (r) => {
+      fetch(basePath + '/api/costs/sessions?days=30&limit=200').then(async (r) => {
         if (!r.ok) throw new Error(`HTTP ${r.status}`);
         return r.json() as Promise<{ data: { items: Array<{ sessionId: string; costUsd: number; inputTokens: number; outputTokens: number; startedAt: string }> } }>;
       }),

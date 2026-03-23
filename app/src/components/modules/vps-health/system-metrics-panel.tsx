@@ -6,6 +6,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { AreaChart, Area, ResponsiveContainer } from 'recharts';
 import type { VpsMetrics } from '@/types/index';
+import { basePath } from '@/lib/client-url';
 
 interface SparkSample {
   value: number;
@@ -114,7 +115,7 @@ export function SystemMetricsPanel(): React.JSX.Element {
 
   async function fetchMetrics(): Promise<void> {
     try {
-      const res = await fetch('/api/vps/metrics');
+      const res = await fetch(basePath + '/api/vps/metrics');
       if (!res.ok) {
         const err = await res.json().catch(() => ({ error: 'Failed to fetch metrics' })) as { error?: string };
         setState({ metrics: undefined, error: err.error ?? 'Failed to fetch metrics', loading: false });

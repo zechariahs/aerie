@@ -5,6 +5,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import type { GatewayStatusResponse, AgentStatus, GatewayStatus, CostSummary } from '@/types';
+import { basePath } from '@/lib/client-url';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -98,7 +99,7 @@ export function StatusStrip(): React.JSX.Element {
   // Poll /api/gateway/status every 10s
   const fetchGatewayStatus = useCallback(async () => {
     try {
-      const res = await fetch('/api/gateway/status');
+      const res = await fetch(basePath + '/api/gateway/status');
       if (!res.ok) return;
       const json = (await res.json()) as ApiGatewayStatus;
       setGatewayData(json.data);
@@ -116,7 +117,7 @@ export function StatusStrip(): React.JSX.Element {
   // Poll /api/costs/summary every 15min
   const fetchCostSummary = useCallback(async () => {
     try {
-      const res = await fetch('/api/costs/summary');
+      const res = await fetch(basePath + '/api/costs/summary');
       if (!res.ok) return;
       const json = (await res.json()) as ApiCostSummary;
       setThisMonthSpend(json.data.thisMonth);

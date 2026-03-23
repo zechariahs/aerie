@@ -9,6 +9,7 @@ import cronstrue from 'cronstrue';
 import { CronExpressionParser } from 'cron-parser';
 import type { CronJob } from '@/types';
 import TotpDialog from './totp-dialog';
+import { basePath } from '@/lib/client-url';
 
 const TZ = 'America/Chicago';
 
@@ -90,7 +91,7 @@ export default function CronJobPanel({ job, onShowHistory, onJobUpdated }: CronJ
     setTriggerState('loading');
     setTriggerError('');
     try {
-      const res = await fetch(`/api/crons/${job.id}/trigger`, {
+      const res = await fetch(`${basePath}/api/crons/${job.id}/trigger`, {
         method: 'POST',
         headers: { 'X-TOTP-Token': totpToken },
       });
@@ -113,7 +114,7 @@ export default function CronJobPanel({ job, onShowHistory, onJobUpdated }: CronJ
   async function handleSetEnabled(totpToken: string, enabled: boolean): Promise<void> {
     setPendingAction(undefined);
     try {
-      const res = await fetch(`/api/crons/${job.id}`, {
+      const res = await fetch(`${basePath}/api/crons/${job.id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -141,7 +142,7 @@ export default function CronJobPanel({ job, onShowHistory, onJobUpdated }: CronJ
       return;
     }
     try {
-      const res = await fetch(`/api/crons/${job.id}`, {
+      const res = await fetch(`${basePath}/api/crons/${job.id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',

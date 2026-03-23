@@ -7,6 +7,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { marked } from 'marked';
 import { ErrorBoundary } from '@/components/ui/error-boundary';
 import type { BriefHistory, DriveFile } from '@/types';
+import { basePath } from '@/lib/client-url';
 
 // ---------------------------------------------------------------------------
 // Shared UI primitives
@@ -75,7 +76,7 @@ function BriefGenerator(): React.JSX.Element {
   useEffect(() => {
     void (async () => {
       try {
-        const res = await fetch('/api/drive/briefs');
+        const res = await fetch(basePath + '/api/drive/briefs');
         if (!res.ok) throw new Error('Failed to load brief history');
         const json = (await res.json()) as { data: BriefHistory[] };
         setHistory(json.data);
@@ -95,7 +96,7 @@ function BriefGenerator(): React.JSX.Element {
     setStatus('generating');
     setErrorMsg('');
     try {
-      const res = await fetch('/api/drive/briefs', {
+      const res = await fetch(basePath + '/api/drive/briefs', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -273,7 +274,7 @@ function SessionStateEditor(): React.JSX.Element {
   useEffect(() => {
     void (async () => {
       try {
-        const res = await fetch('/api/workspace/file?path=SESSION-STATE.md');
+        const res = await fetch(basePath + '/api/workspace/file?path=SESSION-STATE.md');
         if (!res.ok) {
           const json = (await res.json()) as { error?: string };
           setLoadError(json.error ?? 'Failed to load SESSION-STATE.md');
@@ -297,7 +298,7 @@ function SessionStateEditor(): React.JSX.Element {
     setSaveStatus('saving');
     setErrorMsg('');
     try {
-      const res = await fetch('/api/workspace/session-state', {
+      const res = await fetch(basePath + '/api/workspace/session-state', {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -491,7 +492,7 @@ function DeliverablesBrowser(): React.JSX.Element {
   useEffect(() => {
     void (async () => {
       try {
-        const res = await fetch('/api/drive/deliverables');
+        const res = await fetch(basePath + '/api/drive/deliverables');
         if (!res.ok) throw new Error('Failed to load deliverables');
         const json = (await res.json()) as { data: DeliverablesData };
         setData(json.data);
@@ -620,7 +621,7 @@ function TaskSpecsWriter(): React.JSX.Element {
     setDriveUrl('');
 
     try {
-      const res = await fetch('/api/drive/task-specs', {
+      const res = await fetch(basePath + '/api/drive/task-specs', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

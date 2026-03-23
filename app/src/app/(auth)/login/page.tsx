@@ -5,6 +5,7 @@
 
 import { useState, FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
+import { basePath } from '@/lib/client-url';
 
 type LoginStep = 'password' | 'totp';
 
@@ -43,7 +44,7 @@ export default function LoginPage(): React.JSX.Element {
     setPwState((s) => ({ ...s, loading: true, error: '' }));
 
     try {
-      const res = await fetch('/api/auth/login', {
+      const res = await fetch(basePath + '/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ step: 'password', password: pwState.password }),
@@ -69,7 +70,7 @@ export default function LoginPage(): React.JSX.Element {
     setTotpState((s) => ({ ...s, loading: true, error: '' }));
 
     try {
-      const res = await fetch('/api/auth/login', {
+      const res = await fetch(basePath + '/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

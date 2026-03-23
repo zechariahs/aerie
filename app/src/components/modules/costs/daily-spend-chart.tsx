@@ -15,6 +15,7 @@ import {
   ResponsiveContainer,
 } from 'recharts';
 import type { DailyAgentCost } from '@/types';
+import { basePath } from '@/lib/client-url';
 
 const MODEL_COLORS: Record<string, string> = {
   'openrouter/moonshotai/kimi-k2-0905': '#6366f1',
@@ -55,7 +56,7 @@ export default function DailySpendChart({ days = 30 }: DailySpendChartProps): Re
   useEffect(() => {
     setLoading(true);
     setError(undefined);
-    fetch(`/api/costs/daily?days=${days}`)
+    fetch(`${basePath}/api/costs/daily?days=${days}`)
       .then(async (r) => {
         if (!r.ok) throw new Error(`HTTP ${r.status}`);
         const json = (await r.json()) as { data: DailyAgentCost[] };
