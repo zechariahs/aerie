@@ -214,10 +214,6 @@ function connect(): void {
     gatewayStatus = 'connected';
     reconnectDelay = 2000; // reset backoff on successful connect
 
-    // Send auth envelope — Gateway expects this immediately after open
-    if (token) {
-      ws?.send(JSON.stringify({ type: 'auth', token }));
-    }
   });
 
   ws.on('message', (data) => {
