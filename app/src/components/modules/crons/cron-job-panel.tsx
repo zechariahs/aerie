@@ -106,7 +106,6 @@ export default function CronJobPanel({ job, onShowHistory, onJobUpdated }: CronJ
       }
       setTriggerState('success');
       showToast('Cron triggered successfully');
-      onJobUpdated();
       setTimeout(() => setTriggerState('idle'), 4000);
     } catch {
       setTriggerState('error');

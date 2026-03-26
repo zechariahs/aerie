@@ -20,15 +20,17 @@ export default function CronManager({ initialJobs }: CronManagerProps): React.JS
   const [selectedId, setSelectedId] = useState<string | undefined>(initialJobs[0]?.id);
   const [showHistory, setShowHistory] = useState(false);
   const [loadError, setLoadError] = useState('');
+  const [refreshing, setRefreshing] = useState(false);
 
   const selectedJob = jobs.find((j) => j.id === selectedId);
 
   /**
    * Re-fetches the cron list from the API.
-   * Called after any mutation (trigger, enable/disable, schedule update)
-   * so the panel reflects updated status.
+   * Called after any mutation (enable/disable, schedule update, prompt update)
+   * so the panel reflects updated status, and by the manual refresh button.
    */
   const refreshJobs = useCallback(async (): Promise<void> => {
+    setRefreshing(true);
     try {
       const res = await fetch(basePath + '/api/crons');
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -37,6 +39,8 @@ export default function CronManager({ initialJobs }: CronManagerProps): React.JS
       setLoadError('');
     } catch (err) {
       setLoadError(err instanceof Error ? err.message : 'Failed to refresh');
+    } finally {
+      setRefreshing(false);
     }
   }, []);
 
@@ -47,6 +51,18 @@ export default function CronManager({ initialJobs }: CronManagerProps): React.JS
           Refresh error: {loadError}
         </div>
       )}
+
+      {/* Timeline header with refresh button */}
+      <div className="flex items-center justify-end">
+        <button
+          onClick={() => void refreshJobs()}
+          disabled={refreshing}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs border border-[#1e1e2e] text-[#6b7280] hover:text-white hover:border-[#3f3f5a] transition-colors disabled:opacity-40 disabled:cursor-wait"
+        >
+          <span className={refreshing ? 'animate-spin inline-block' : ''}>↻</span>
+          {refreshing ? 'Refreshing…' : 'Refresh'}
+        </button>
+      </div>
 
       {/* Weekly timeline — overflow-x-auto enables horizontal scroll on mobile */}
       <div className="overflow-x-auto">
