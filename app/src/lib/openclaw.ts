@@ -4,7 +4,6 @@
 import fs from 'fs';
 import path from 'path';
 import type { CronJob, CronRun, AgentDescriptor } from '@/types';
-import { getDb } from './db';
 
 // ── Raw config types ─────────────────────────────────────────────────────────
 
@@ -182,23 +181,12 @@ export function getCronJobs(): CronJob[] {
   const rawJobs = readCronJobsFile();
   if (rawJobs.length === 0) return [];
 
-  const db = getDb();
-
   return rawJobs.map((raw): CronJob => {
-    const lastRunRow = db
-      .prepare(
-        `SELECT id, status, started_at, duration_ms
-         FROM cron_runs
-         WHERE cron_id = ?
-         ORDER BY started_at DESC
-         LIMIT 1`,
-      )
-      .get(raw.id) as
-      | { id: string; status: string; started_at: string; duration_ms: number | null }
-      | undefined;
+    const lastRuns = readCronRuns(raw.id, 1);
+    const lastRunEntry = lastRuns[0];
 
     let derivedStatus: CronJob['status'] = raw.enabled ? 'active' : 'disabled';
-    if (lastRunRow?.status === 'running') derivedStatus = 'running';
+    if (lastRunEntry?.status === 'running') derivedStatus = 'running';
 
     return {
       id: raw.id,
@@ -210,12 +198,12 @@ export function getCronJobs(): CronJob[] {
       modelOverride: raw.payload?.model,
       prompt: raw.payload?.message,
       status: derivedStatus,
-      lastRun: lastRunRow
+      lastRun: lastRunEntry
         ? {
-            runId: lastRunRow.id,
-            status: lastRunRow.status as 'success' | 'failure' | 'running',
-            startedAt: lastRunRow.started_at,
-            durationMs: lastRunRow.duration_ms ?? undefined,
+            runId: lastRunEntry.id,
+            status: lastRunEntry.status,
+            startedAt: lastRunEntry.startedAt,
+            durationMs: lastRunEntry.durationMs,
           }
         : undefined,
     };
@@ -248,10 +236,29 @@ export function readCronRuns(cronId: string, limit: number): CronRun[] {
       return [];
     }
 
-    const id = typeof obj['id'] === 'string' ? obj['id'] : crypto.randomUUID();
+    const id =
+      typeof obj['sessionId'] === 'string' ? obj['sessionId'] :
+      typeof obj['id'] === 'string' ? obj['id'] :
+      crypto.randomUUID();
     const rawStatus = typeof obj['status'] === 'string' ? obj['status'] : 'failure';
     const status: CronRun['status'] =
       rawStatus === 'success' || rawStatus === 'running' ? rawStatus : 'failure';
+
+    const runAtMs = typeof obj['runAtMs'] === 'number' ? obj['runAtMs'] : null;
+    const durationMs =
+      typeof obj['durationMs'] === 'number' ? obj['durationMs'] :
+      typeof obj['duration_ms'] === 'number' ? obj['duration_ms'] : null;
+
+    const startedAt =
+      runAtMs != null ? new Date(runAtMs).toISOString() :
+      typeof obj['startedAt'] === 'string' ? obj['startedAt'] :
+      typeof obj['started_at'] === 'string' ? obj['started_at'] :
+      new Date().toISOString();
+
+    const finishedAt =
+      runAtMs != null && durationMs != null ? new Date(runAtMs + durationMs).toISOString() :
+      typeof obj['finishedAt'] === 'string' ? obj['finishedAt'] :
+      typeof obj['finished_at'] === 'string' ? obj['finished_at'] : undefined;
 
     const rawUsage = typeof obj['usage'] === 'object' && obj['usage'] !== null
       ? obj['usage'] as Record<string, unknown>
@@ -261,19 +268,13 @@ export function readCronRuns(cronId: string, limit: number): CronRun[] {
       id,
       cronId,
       status,
-      startedAt:
-        typeof obj['startedAt'] === 'string'
-          ? obj['startedAt']
-          : typeof obj['started_at'] === 'string'
-          ? obj['started_at']
-          : new Date().toISOString(),
-      finishedAt:
-        typeof obj['finishedAt'] === 'string' ? obj['finishedAt'] :
-        typeof obj['finished_at'] === 'string' ? obj['finished_at'] : undefined,
-      durationMs:
-        typeof obj['durationMs'] === 'number' ? obj['durationMs'] :
-        typeof obj['duration_ms'] === 'number' ? obj['duration_ms'] : undefined,
-      outputExcerpt: typeof obj['outputExcerpt'] === 'string' ? obj['outputExcerpt'] : undefined,
+      startedAt,
+      finishedAt,
+      durationMs: durationMs ?? undefined,
+      outputExcerpt:
+        typeof obj['summary'] === 'string' ? obj['summary'] :
+        typeof obj['outputExcerpt'] === 'string' ? obj['outputExcerpt'] :
+        typeof obj['output_excerpt'] === 'string' ? obj['output_excerpt'] : undefined,
       driveUrl: typeof obj['driveUrl'] === 'string' ? obj['driveUrl'] : undefined,
       errorMessage:
         typeof obj['errorMessage'] === 'string' ? obj['errorMessage'] :
