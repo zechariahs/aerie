@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 
 import { getSession } from '@/lib/auth';
-import { getCronRuns } from '@/lib/gateway';
+import { readCronRuns } from '@/lib/openclaw';
 import { errorResponse, successResponse } from '@/lib/api-response';
 
 interface RouteContext {
@@ -28,6 +28,6 @@ export async function GET(request: Request, { params }: RouteContext): Promise<R
     return errorResponse('limit must be an integer between 1 and 100', 400);
   }
 
-  const runs = getCronRuns(id, limit);
+  const runs = readCronRuns(id, limit);
   return successResponse(runs);
 }
