@@ -19,7 +19,7 @@ interface CronJobPanelProps {
   onJobUpdated: () => void;
 }
 
-type DialogAction = 'trigger' | 'enable' | 'disable' | 'schedule';
+type DialogAction = 'trigger' | 'enable' | 'disable' | 'schedule' | 'prompt';
 
 interface ApiError {
   error: string;
@@ -73,12 +73,15 @@ const RUN_STATUS_BADGE: Record<string, string> = {
 };
 
 export default function CronJobPanel({ job, onShowHistory, onJobUpdated }: CronJobPanelProps): React.JSX.Element {
+  const scheduleTz = job.scheduleTz ?? 'America/Chicago';
   const [pendingAction, setPendingAction] = useState<DialogAction | undefined>();
   const [triggerState, setTriggerState] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
   const [triggerError, setTriggerError] = useState('');
   const [editingSchedule, setEditingSchedule] = useState(false);
   const [scheduleInput, setScheduleInput] = useState(job.schedule);
   const [scheduleError, setScheduleError] = useState('');
+  const [editingPrompt, setEditingPrompt] = useState(false);
+  const [promptInput, setPromptInput] = useState(job.prompt?.trim() ?? '');
   const [toast, setToast] = useState('');
 
   function showToast(msg: string): void {
@@ -148,7 +151,7 @@ export default function CronJobPanel({ job, onShowHistory, onJobUpdated }: CronJ
           'Content-Type': 'application/json',
           'X-TOTP-Token': totpToken,
         },
-        body: JSON.stringify({ schedule: trimmed }),
+        body: JSON.stringify({ schedule: trimmed, scheduleTz }),
       });
       if (!res.ok) {
         const err = (await res.json()) as ApiError;
@@ -164,11 +167,37 @@ export default function CronJobPanel({ job, onShowHistory, onJobUpdated }: CronJ
     }
   }
 
+  async function handleSavePrompt(totpToken: string): Promise<void> {
+    setPendingAction(undefined);
+    const trimmed = promptInput.trim();
+    try {
+      const res = await fetch(`${basePath}/api/crons/${job.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-TOTP-Token': totpToken,
+        },
+        body: JSON.stringify({ prompt: trimmed }),
+      });
+      if (!res.ok) {
+        const err = (await res.json()) as ApiError;
+        showToast(`Error: ${err.error ?? 'Update failed'}`);
+        return;
+      }
+      setEditingPrompt(false);
+      showToast('Prompt updated');
+      onJobUpdated();
+    } catch {
+      showToast('Network error');
+    }
+  }
+
   function handleDialogConfirm(totpToken: string): void {
     if (pendingAction === 'trigger') void handleTrigger(totpToken);
     else if (pendingAction === 'enable') void handleSetEnabled(totpToken, true);
     else if (pendingAction === 'disable') void handleSetEnabled(totpToken, false);
     else if (pendingAction === 'schedule') void handleSaveSchedule(totpToken);
+    else if (pendingAction === 'prompt') void handleSavePrompt(totpToken);
   }
 
   return (
@@ -187,12 +216,14 @@ export default function CronJobPanel({ job, onShowHistory, onJobUpdated }: CronJ
             pendingAction === 'trigger' ? 'Confirm Trigger' :
             pendingAction === 'enable' ? 'Confirm Enable' :
             pendingAction === 'disable' ? 'Confirm Disable' :
+            pendingAction === 'prompt' ? 'Confirm Prompt Change' :
             'Confirm Schedule Change'
           }
           description={
             pendingAction === 'trigger' ? `Run "${job.name}" now?` :
             pendingAction === 'enable' ? `Enable "${job.name}"?` :
             pendingAction === 'disable' ? `Disable "${job.name}"?` :
+            pendingAction === 'prompt' ? `Update the prompt for "${job.name}"?` :
             `Change schedule to: ${scheduleInput.trim()}`
           }
           onConfirm={handleDialogConfirm}
@@ -277,6 +308,52 @@ export default function CronJobPanel({ job, onShowHistory, onJobUpdated }: CronJ
             <div className="text-white text-sm font-mono truncate" title={job.modelOverride}>
               {job.modelOverride.replace('openrouter/', '')}
             </div>
+          </div>
+        )}
+      </div>
+
+      {/* Prompt */}
+      <div className="space-y-1.5">
+        <div className="text-[#6b7280] text-xs uppercase tracking-wide">Prompt</div>
+        {editingPrompt ? (
+          <div className="space-y-2">
+            <textarea
+              value={promptInput}
+              onChange={(e) => setPromptInput(e.target.value)}
+              rows={6}
+              className="w-full bg-[#0a0a0f] border border-[#1e1e2e] rounded px-3 py-1.5 text-white font-mono text-sm focus:outline-none focus:border-[#6366f1] resize-y"
+            />
+            <div className="flex gap-2">
+              <button
+                disabled={promptInput.trim() === (job.prompt ?? '')}
+                onClick={() => setPendingAction('prompt')}
+                className="px-3 py-1 bg-[#6366f1] text-white text-xs rounded hover:bg-[#4f52c9] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                Save
+              </button>
+              <button
+                onClick={() => { setEditingPrompt(false); setPromptInput(job.prompt?.trim() ?? ''); }}
+                className="px-3 py-1 border border-[#1e1e2e] text-[#6b7280] text-xs rounded hover:text-white hover:border-[#3f3f5a] transition-colors"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="flex items-start gap-3">
+            {job.prompt ? (
+              <pre className="flex-1 whitespace-pre-wrap overflow-auto max-h-48 text-white text-sm font-mono leading-relaxed">
+                {job.prompt}
+              </pre>
+            ) : (
+              <span className="text-[#4b5563] text-sm">No prompt set</span>
+            )}
+            <button
+              onClick={() => { setEditingPrompt(true); setPromptInput(job.prompt?.trim() ?? ''); }}
+              className="shrink-0 text-[#6b7280] text-xs hover:text-[#6366f1] transition-colors"
+            >
+              Edit
+            </button>
           </div>
         )}
       </div>

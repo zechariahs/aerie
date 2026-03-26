@@ -275,6 +275,11 @@ function SessionStateEditor(): React.JSX.Element {
     void (async () => {
       try {
         const res = await fetch(basePath + '/api/workspace/file?path=SESSION-STATE.md');
+        if (res.status === 404) {
+          // File doesn't exist yet — open editor blank so user can create it
+          setLoaded(true);
+          return;
+        }
         if (!res.ok) {
           const json = (await res.json()) as { error?: string };
           setLoadError(json.error ?? 'Failed to load SESSION-STATE.md');
@@ -390,6 +395,15 @@ function SessionStateEditor(): React.JSX.Element {
           </div>
 
           {saveStatus === 'error' && errorMsg && <ErrorBanner message={errorMsg} />}
+
+          {/* Char count — helps verify content was received from the server */}
+          {loaded && (
+            <div className="text-[10px] text-[#4b5563] text-right">
+              {content.length > 0
+                ? `${content.length.toLocaleString()} chars`
+                : 'File is empty — type to populate'}
+            </div>
+          )}
 
           {/* Editor / Preview */}
           {showPreview ? (

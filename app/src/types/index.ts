@@ -215,9 +215,13 @@ export interface CronJob {
   name: string;
   /** Standard cron expression, e.g. "0 5 * * *" */
   schedule: string;
+  /** IANA timezone for the schedule, e.g. "America/Chicago". */
+  scheduleTz?: string;
   enabled: boolean;
   agentId: string;
   modelOverride?: string;
+  /** The prompt/instructions sent to the agent on each run. */
+  prompt?: string;
   /** Derived from the most recent cron_runs entry, if any. */
   status: 'active' | 'disabled' | 'running';
   lastRun?: CronRunSummary;

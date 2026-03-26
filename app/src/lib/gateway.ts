@@ -113,7 +113,7 @@ export async function triggerCron(cronId: string): Promise<{ ok: boolean; error?
   }
 
   try {
-    const res = await rpcCall('cron.run', { cronId });
+    const res = await rpcCall('cron.run', { jobId: cronId });
     if (res.error) return { ok: false, error: res.error };
     return { ok: true };
   } catch (err) {
@@ -132,7 +132,7 @@ export async function setCronEnabled(cronId: string, enabled: boolean): Promise<
   }
 
   try {
-    const res = await rpcCall('cron.setEnabled', { cronId, enabled });
+    const res = await rpcCall('cron.update', { jobId: cronId, patch: { enabled } });
     if (res.error) return { ok: false, error: res.error };
     return { ok: true };
   } catch (err) {
@@ -145,13 +145,43 @@ export async function setCronEnabled(cronId: string, enabled: boolean): Promise<
  * Sends a schedule update request to the Gateway.
  * REQUIRES_GATEWAY — returns { ok: false, error } if Gateway is unavailable.
  */
-export async function updateCronSchedule(cronId: string, schedule: string): Promise<{ ok: boolean; error?: string }> {
+export async function updateCronSchedule(cronId: string, schedule: string, tz: string): Promise<{ ok: boolean; error?: string }> {
   if (process.env['USE_FIXTURES'] === 'true') {
     return { ok: true };
   }
 
   try {
-    const res = await rpcCall('cron.setSchedule', { cronId, schedule });
+    const res = await rpcCall('cron.update', {
+      jobId: cronId,
+      patch: { schedule: { kind: 'cron', expr: schedule, tz } },
+    });
+    if (res.error) return { ok: false, error: res.error };
+    return { ok: true };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Unknown error';
+    return { ok: false, error: `Gateway unavailable: ${message}` };
+  }
+}
+
+/**
+ * Updates the prompt (payload.message) for a cron job via the Gateway.
+ * Spreads the existing payload to preserve model, timeoutSeconds, etc.
+ * REQUIRES_GATEWAY — returns { ok: false, error } if Gateway is unavailable.
+ */
+export async function updateCronPrompt(
+  cronId: string,
+  prompt: string,
+  currentPayload: Record<string, unknown>,
+): Promise<{ ok: boolean; error?: string }> {
+  if (process.env['USE_FIXTURES'] === 'true') {
+    return { ok: true };
+  }
+
+  try {
+    const res = await rpcCall('cron.update', {
+      jobId: cronId,
+      patch: { payload: { ...currentPayload, message: prompt } },
+    });
     if (res.error) return { ok: false, error: res.error };
     return { ok: true };
   } catch (err) {
