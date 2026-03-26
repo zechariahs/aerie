@@ -28,6 +28,8 @@ interface RawCronSchedule {
 interface RawCronPayload {
   kind: string;
   model?: string;
+  message?: string;
+  timeoutSeconds?: number;
 }
 
 interface RawCronState {
@@ -202,9 +204,11 @@ export function getCronJobs(): CronJob[] {
       id: raw.id,
       name: raw.name,
       schedule: raw.schedule.expr,
+      scheduleTz: raw.schedule.tz,
       enabled: raw.enabled,
       agentId: raw.agentId,
       modelOverride: raw.payload?.model,
+      prompt: raw.payload?.message,
       status: derivedStatus,
       lastRun: lastRunRow
         ? {
@@ -356,6 +360,18 @@ export function getAgentDescriptor(): AgentDescriptor {
     model: agent.model,
     status: 'IDLE',
   };
+}
+
+/**
+ * Returns the raw payload object for a cron job by ID, used by the API route
+ * to spread existing payload fields when updating the prompt via cron.update.
+ * Returns an empty object if the job is not found or running in fixture mode.
+ */
+export function getRawCronPayload(cronId: string): Record<string, unknown> {
+  if (process.env['USE_FIXTURES'] === 'true') return {};
+  const jobs = readCronJobsFile();
+  const job = jobs.find((j) => j.id === cronId);
+  return (job?.payload ?? {}) as Record<string, unknown>;
 }
 
 // ── Fixture helpers ───────────────────────────────────────────────────────────

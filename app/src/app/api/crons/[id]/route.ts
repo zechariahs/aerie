@@ -2,7 +2,8 @@
 // SPDX-License-Identifier: MIT
 
 import { getSession, validateTotpFromRequest } from '@/lib/auth';
-import { setCronEnabled, updateCronSchedule } from '@/lib/gateway';
+import { setCronEnabled, updateCronSchedule, updateCronPrompt } from '@/lib/gateway';
+import { getRawCronPayload } from '@/lib/openclaw';
 import { writeAuditLog } from '@/lib/db';
 import { errorResponse, successResponse } from '@/lib/api-response';
 
@@ -13,13 +14,15 @@ interface RouteContext {
 interface CronUpdateBody {
   enabled?: boolean;
   schedule?: string;
+  scheduleTz?: string;
+  prompt?: string;
 }
 
 /**
  * PUT /api/crons/[id]
- * Updates the enabled state or schedule for a cron job via the Gateway.
+ * Updates the enabled state, schedule, or prompt for a cron job via the Gateway.
  * Requires session cookie + valid X-TOTP-Token header.
- * Accepts: { enabled?: boolean, schedule?: string }
+ * Accepts: { enabled?: boolean, schedule?: string, scheduleTz?: string, prompt?: string }
  */
 export async function PUT(request: Request, { params }: RouteContext): Promise<Response> {
   const session = await getSession();
@@ -38,11 +41,6 @@ export async function PUT(request: Request, { params }: RouteContext): Promise<R
 
   const { id } = await params;
 
-  // Validate cron ID format: 8 hex characters
-  if (!/^[0-9a-f]{8}$/i.test(id)) {
-    return errorResponse('Invalid cron ID', 400);
-  }
-
   let body: CronUpdateBody;
   try {
     body = (await request.json()) as CronUpdateBody;
@@ -50,10 +48,10 @@ export async function PUT(request: Request, { params }: RouteContext): Promise<R
     return errorResponse('Invalid JSON body', 400);
   }
 
-  const { enabled, schedule } = body;
+  const { enabled, schedule, scheduleTz, prompt } = body;
 
-  if (enabled === undefined && schedule === undefined) {
-    return errorResponse('Provide at least one of: enabled, schedule', 400);
+  if (enabled === undefined && schedule === undefined && prompt === undefined) {
+    return errorResponse('Provide at least one of: enabled, schedule, prompt', 400);
   }
 
   const ip = request.headers.get('x-forwarded-for') ?? 'unknown';
@@ -73,8 +71,19 @@ export async function PUT(request: Request, { params }: RouteContext): Promise<R
     if (typeof schedule !== 'string' || !/^\S+(\s+\S+){4}$/.test(schedule.trim())) {
       return errorResponse('schedule must be a valid 5-field cron expression', 400);
     }
-    const result = await updateCronSchedule(id, schedule.trim());
+    const tz = typeof scheduleTz === 'string' && scheduleTz.trim() ? scheduleTz.trim() : 'America/Chicago';
+    const result = await updateCronSchedule(id, schedule.trim(), tz);
     writeAuditLog({ action: 'cron.setSchedule', resource: `cron:${id}`, result: result.ok ? 'success' : 'failure', ip, userAgent });
+    if (!result.ok) return errorResponse(result.error ?? 'Update failed', 503);
+  }
+
+  if (prompt !== undefined) {
+    if (typeof prompt !== 'string') {
+      return errorResponse('prompt must be a string', 400);
+    }
+    const currentPayload = getRawCronPayload(id);
+    const result = await updateCronPrompt(id, prompt.trim(), currentPayload);
+    writeAuditLog({ action: `cron.setPrompt:len=${prompt.trim().length}`, resource: `cron:${id}`, result: result.ok ? 'success' : 'failure', ip, userAgent });
     if (!result.ok) return errorResponse(result.error ?? 'Update failed', 503);
   }
 

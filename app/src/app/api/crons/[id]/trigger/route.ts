@@ -32,11 +32,6 @@ export async function POST(request: Request, { params }: RouteContext): Promise<
 
   const { id } = await params;
 
-  // Validate cron ID format: 8 hex characters
-  if (!/^[0-9a-f]{8}$/i.test(id)) {
-    return errorResponse('Invalid cron ID', 400);
-  }
-
   const result = await triggerCron(id);
 
   writeAuditLog({
