@@ -18,86 +18,11 @@
  * to cron_runs in mc.db rather than relying on manual ingest.
  */
 
-import WebSocket from 'ws';
 import type { CronRun } from '@/types';
 import { getDb } from './db';
 import path from 'path';
 import fs from 'fs';
-
-const WS_TIMEOUT_MS = 8000;
-
-interface GatewayRpcRequest {
-  id: string;
-  method: string;
-  params: Record<string, unknown>;
-}
-
-interface GatewayRpcResponse {
-  id: string;
-  result?: Record<string, unknown>;
-  error?: string;
-}
-
-// ---------------------------------------------------------------------------
-// Internal helpers
-// ---------------------------------------------------------------------------
-
-function gatewayUrl(): string {
-  return process.env['OPENCLAW_GATEWAY_URL'] ?? 'ws://localhost:18789';
-}
-
-function gatewayToken(): string {
-  return process.env['OPENCLAW_GATEWAY_TOKEN'] ?? '';
-}
-
-/**
- * Opens a short-lived WebSocket connection to the Gateway, sends a single RPC
- * request, waits for the matching response, then closes the socket.
- * REQUIRES_GATEWAY — throws if Gateway is unreachable within WS_TIMEOUT_MS.
- */
-async function rpcCall(method: string, params: Record<string, unknown>): Promise<GatewayRpcResponse> {
-  return new Promise((resolve, reject) => {
-    const correlationId = crypto.randomUUID();
-    const ws = new WebSocket(gatewayUrl(), {
-      headers: { Authorization: `Bearer ${gatewayToken()}` },
-    });
-
-    const timer = setTimeout(() => {
-      ws.terminate();
-      reject(new Error('Gateway RPC timeout'));
-    }, WS_TIMEOUT_MS);
-
-    ws.on('open', () => {
-      const req: GatewayRpcRequest = { id: correlationId, method, params };
-      ws.send(JSON.stringify(req));
-    });
-
-    ws.on('message', (data) => {
-      try {
-        const msg = JSON.parse(data.toString()) as GatewayRpcResponse;
-        if (msg.id === correlationId) {
-          clearTimeout(timer);
-          ws.close();
-          resolve(msg);
-        }
-      } catch {
-        // Ignore non-JSON messages (e.g. heartbeat pings)
-      }
-    });
-
-    ws.on('error', (err) => {
-      clearTimeout(timer);
-      reject(err);
-    });
-
-    ws.on('close', (code) => {
-      if (code !== 1000) {
-        clearTimeout(timer);
-        reject(new Error(`Gateway closed unexpectedly: ${code}`));
-      }
-    });
-  });
-}
+import { sendRequest, type GatewayRpcResponse } from './gateway-bridge';
 
 // ---------------------------------------------------------------------------
 // Public API
@@ -113,7 +38,7 @@ export async function triggerCron(cronId: string): Promise<{ ok: boolean; error?
   }
 
   try {
-    const res = await rpcCall('cron.run', { jobId: cronId });
+    const res = await sendRequest('cron.run', { jobId: cronId });
     if (res.error) return { ok: false, error: res.error };
     return { ok: true };
   } catch (err) {
@@ -132,7 +57,7 @@ export async function setCronEnabled(cronId: string, enabled: boolean): Promise<
   }
 
   try {
-    const res = await rpcCall('cron.update', { jobId: cronId, patch: { enabled } });
+    const res = await sendRequest('cron.update', { jobId: cronId, patch: { enabled } });
     if (res.error) return { ok: false, error: res.error };
     return { ok: true };
   } catch (err) {
@@ -151,7 +76,7 @@ export async function updateCronSchedule(cronId: string, schedule: string, tz: s
   }
 
   try {
-    const res = await rpcCall('cron.update', {
+    const res = await sendRequest('cron.update', {
       jobId: cronId,
       patch: { schedule: { kind: 'cron', expr: schedule, tz } },
     });
@@ -178,7 +103,7 @@ export async function updateCronPrompt(
   }
 
   try {
-    const res = await rpcCall('cron.update', {
+    const res = await sendRequest('cron.update', {
       jobId: cronId,
       patch: { payload: { ...currentPayload, message: prompt } },
     });

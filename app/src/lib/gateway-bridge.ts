@@ -50,6 +50,25 @@ const MAX_RECONNECT_DELAY = 60_000;
 let bridgeStarted = false;
 
 // ---------------------------------------------------------------------------
+// RPC over the authenticated connection
+// ---------------------------------------------------------------------------
+
+export interface GatewayRpcResponse {
+  id: string;
+  result?: Record<string, unknown>;
+  error?: string;
+}
+
+type PendingRequest = {
+  resolve: (r: GatewayRpcResponse) => void;
+  reject: (e: Error) => void;
+  timer: ReturnType<typeof setTimeout>;
+};
+
+const pendingRequests = new Map<string, PendingRequest>();
+let connectRequestId: string | null = null; // tracks the auth handshake message ID
+
+// ---------------------------------------------------------------------------
 // Gateway credentials
 // ---------------------------------------------------------------------------
 
@@ -230,9 +249,11 @@ function connect(): void {
       const payload = msg['payload'] as Record<string, unknown> | undefined;
       const nonce = typeof payload?.['nonce'] === 'string' ? payload['nonce'] : '';
       console.log('[gateway-bridge] received connect.challenge, sending connect request');
+      const connectId = crypto.randomUUID();
+      connectRequestId = connectId;
       ws?.send(JSON.stringify({
         type: 'req',
-        id: crypto.randomUUID(),
+        id: connectId,
         method: 'connect',
         params: {
           minProtocol: 3,
@@ -256,14 +277,34 @@ function connect(): void {
       return;
     }
 
-    // Handle connect response — confirm authentication.
+    // Handle RPC responses and auth connect response.
     if (msg['type'] === 'res') {
-      const payload = msg['payload'] as Record<string, unknown> | undefined;
-      if (msg['ok'] === true && payload?.['type'] === 'hello-ok') {
-        console.log('[gateway-bridge] authenticated as operator');
-      } else if (msg['ok'] === false) {
-        console.error('[gateway-bridge] connect request rejected:', JSON.stringify(msg).slice(0, 200));
+      const id = typeof msg['id'] === 'string' ? msg['id'] : null;
+
+      // Pending RPC response
+      if (id && pendingRequests.has(id)) {
+        const pending = pendingRequests.get(id)!;
+        pendingRequests.delete(id);
+        clearTimeout(pending.timer);
+        const error = typeof msg['error'] === 'string' ? msg['error'] : undefined;
+        const payload = msg['payload'] as Record<string, unknown> | undefined;
+        pending.resolve({ id, result: payload, error });
+        return;
       }
+
+      // Auth connect response — match by saved connect ID
+      if (id && id === connectRequestId) {
+        connectRequestId = null;
+        const payload = msg['payload'] as Record<string, unknown> | undefined;
+        if (msg['ok'] === true && payload?.['type'] === 'hello-ok') {
+          console.log('[gateway-bridge] authenticated as operator');
+        } else if (msg['ok'] === false) {
+          console.error('[gateway-bridge] connect request rejected:', JSON.stringify(msg).slice(0, 200));
+        }
+        return;
+      }
+
+      console.debug('[gateway-bridge] unexpected res message:', JSON.stringify(msg).slice(0, 200));
       return;
     }
 
@@ -294,6 +335,12 @@ function connect(): void {
   ws.on('close', (code) => {
     console.warn(`[gateway-bridge] WebSocket closed (code ${code})`);
     ws = null;
+    connectRequestId = null;
+    for (const [id, pending] of pendingRequests) {
+      clearTimeout(pending.timer);
+      pending.reject(new Error(`Gateway connection closed (code ${code})`));
+      pendingRequests.delete(id);
+    }
     if (gatewayStatus !== 'pairing-required') {
       scheduleReconnect();
     }
@@ -384,4 +431,37 @@ export function ensureBridgeStarted(): void {
   }
 
   connect();
+}
+
+// ---------------------------------------------------------------------------
+// sendRequest — send an RPC call over the authenticated connection
+// ---------------------------------------------------------------------------
+
+const SEND_TIMEOUT_MS = 8000;
+
+/**
+ * Sends an RPC request over the existing authenticated Gateway connection.
+ * Rejects immediately if the connection is not in 'connected' state.
+ * Times out after 8 seconds.
+ */
+export function sendRequest(
+  method: string,
+  params: Record<string, unknown>,
+): Promise<GatewayRpcResponse> {
+  ensureBridgeStarted(); // idempotent — safe to call before SSE routes have fired
+  return new Promise((resolve, reject) => {
+    if (gatewayStatus !== 'connected' || !ws) {
+      reject(new Error(`Gateway not connected (status: ${gatewayStatus})`));
+      return;
+    }
+
+    const id = crypto.randomUUID();
+    const timer = setTimeout(() => {
+      pendingRequests.delete(id);
+      reject(new Error('Gateway RPC timeout'));
+    }, SEND_TIMEOUT_MS);
+
+    pendingRequests.set(id, { resolve, reject, timer });
+    ws.send(JSON.stringify({ type: 'req', id, method, params }));
+  });
 }
