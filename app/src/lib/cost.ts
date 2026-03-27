@@ -158,7 +158,7 @@ export function getCostsFromCronRuns(days: number): DailyAgentCost[] {
   };
 
   const rows = getDb()
-    .prepare<[string], Row>(
+    .prepare<[string, string], Row>(
       `SELECT
          substr(started_at, 1, 10) AS date,
          agent_id,
@@ -166,13 +166,19 @@ export function getCostsFromCronRuns(days: number): DailyAgentCost[] {
          CAST(SUM(input_tokens)  AS INTEGER) AS input_tokens,
          CAST(SUM(output_tokens) AS INTEGER) AS output_tokens,
          CAST(SUM(total_tokens)  AS INTEGER) AS total_tokens
-       FROM cron_runs
-       WHERE started_at >= ?
-         AND input_tokens IS NOT NULL
+       FROM (
+         SELECT started_at, agent_id, model, input_tokens, output_tokens, total_tokens
+         FROM cron_runs
+         WHERE started_at >= ? AND input_tokens IS NOT NULL
+         UNION ALL
+         SELECT started_at, agent_id, model, input_tokens, output_tokens, total_tokens
+         FROM agent_sessions
+         WHERE started_at >= ? AND message_count > 0
+       )
        GROUP BY date, agent_id, model
        ORDER BY date ASC`,
     )
-    .all(cutoff);
+    .all(cutoff, cutoff);
 
   return rows.map((row): DailyAgentCost => {
     const modelId = row.model ?? 'unknown';
