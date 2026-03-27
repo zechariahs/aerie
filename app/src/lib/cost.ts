@@ -7,13 +7,14 @@ import Database from 'better-sqlite3';
 import type {
   DailyAgentCost,
   ModelPrice,
+  ProviderModel,
   SessionCost,
   CostSummary,
   AgentCostSummaryRow,
   CronCostSummaryRow,
   PaginatedSessionCosts,
 } from '@/types';
-import { getCronJobs, readCronRuns } from './openclaw';
+import { getCronJobs, readCronRuns, readOpenClawConfig } from './openclaw';
 
 const DEFAULT_AGENT_ID = 'primary-agent';
 
@@ -22,18 +23,21 @@ const DEFAULT_PRICE_TABLE: ModelPrice[] = [
     modelId: 'moonshotai/kimi-k2-0905',
     inputPer1MTokens: 0.15,
     outputPer1MTokens: 2.0,
+    cacheReadPer1MTokens: 0.015, // 10% of input rate
     updatedAt: new Date().toISOString(),
   },
   {
     modelId: 'anthropic/claude-haiku-4-5',
     inputPer1MTokens: 0.8,
     outputPer1MTokens: 4.0,
+    cacheReadPer1MTokens: 0.08, // 10% of input rate
     updatedAt: new Date().toISOString(),
   },
   {
     modelId: 'anthropic/claude-sonnet-4-5',
     inputPer1MTokens: 3.0,
     outputPer1MTokens: 15.0,
+    cacheReadPer1MTokens: 0.30, // 10% of input rate
     updatedAt: new Date().toISOString(),
   },
 ];
@@ -74,14 +78,39 @@ export function savePriceTable(table: ModelPrice[]): void {
 
 /**
  * Computes estimated cost in USD from token counts and the price table.
- * Returns 0 if the model is not found in the table.
+ * If `options.totalTokens` is provided, infers cache-read tokens as
+ * (totalTokens - outputTokens - inputTokens) and prices them at the
+ * cache-read rate (10% of input rate by default).
+ * Checks the provider model registry first for models with explicit cost data
+ * (e.g. Nexos free models), then falls back to the price table.
+ * Returns 0 if the model is not found in either source.
  */
 export function computeCost(
   inputTokens: number,
   outputTokens: number,
   modelId: string,
   priceTable: ModelPrice[],
+  options?: { totalTokens?: number; providerModels?: ProviderModel[] },
 ): number {
+  const cacheReadTokens = options?.totalTokens !== undefined
+    ? Math.max(0, options.totalTokens - outputTokens - inputTokens)
+    : 0;
+
+  // Check provider registry first — models with explicit cost data (e.g. Nexos $0)
+  if (options?.providerModels) {
+    const pm = options.providerModels.find(
+      (m) => `${m.provider}/${m.name}` === modelId,
+    );
+    if (pm?.cost !== undefined) {
+      return (
+        (inputTokens / 1_000_000) * pm.cost.input +
+        (cacheReadTokens / 1_000_000) * pm.cost.cacheRead +
+        (outputTokens / 1_000_000) * pm.cost.output
+      );
+    }
+  }
+
+  // Fall back to price table
   const unprefixed = modelId.replace(/^openrouter\//, '');
   const row = priceTable.find(
     (r) =>
@@ -90,8 +119,11 @@ export function computeCost(
       r.modelId === unprefixed,
   );
   if (!row) return 0;
+
+  const cacheReadRate = row.cacheReadPer1MTokens ?? row.inputPer1MTokens * 0.1;
   return (
     (inputTokens / 1_000_000) * row.inputPer1MTokens +
+    (cacheReadTokens / 1_000_000) * cacheReadRate +
     (outputTokens / 1_000_000) * row.outputPer1MTokens
   );
 }
@@ -121,8 +153,19 @@ export function getCostsFromCronRuns(days: number): DailyAgentCost[] {
   }
 
   const priceTable = loadPriceTable();
+  const { providerModels } = readOpenClawConfig();
   const jobs = getCronJobs();
   const map = new Map<string, DailyAgentCost>();
+
+  // Build UUID → ProviderModel lookup for resolving nexos-style UUID model IDs
+  const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  const uuidModelMap = new Map<string, ProviderModel>();
+  for (const pm of providerModels) {
+    if (UUID_RE.test(pm.id)) {
+      uuidModelMap.set(`${pm.provider}/${pm.id}`, pm);
+      uuidModelMap.set(pm.id, pm);
+    }
+  }
 
   for (const job of jobs) {
     const runs = readCronRuns(job.id, 1000);
@@ -136,14 +179,29 @@ export function getCostsFromCronRuns(days: number): DailyAgentCost[] {
 
       // Prefix model with provider if not already namespaced
       const rawModel = run.model ?? '';
-      const modelId =
+      let modelId =
         run.provider && rawModel && !rawModel.includes('/')
           ? `${run.provider}/${rawModel}`
           : rawModel || 'unknown';
 
+      // Resolve UUID model IDs to human-readable names via provider registry
+      const resolved = uuidModelMap.get(modelId) ?? uuidModelMap.get(rawModel);
+      if (resolved) {
+        modelId = `${resolved.provider}/${resolved.name}`;
+      }
+
+      // Fallback to job payload model if still unknown
+      if (modelId === 'unknown' && job.modelOverride) {
+        modelId = job.modelOverride;
+      }
+
       const inputTokens = run.usage.input_tokens;
       const outputTokens = run.usage.output_tokens;
-      const costUsd = computeCost(inputTokens, outputTokens, modelId, priceTable);
+      const totalTokens = run.usage.total_tokens;
+      const costUsd = computeCost(inputTokens, outputTokens, modelId, priceTable, {
+        totalTokens,
+        providerModels,
+      });
 
       const key = `${dateStr}::${job.agentId}::${modelId}`;
       const existing = map.get(key);

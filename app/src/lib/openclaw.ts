@@ -3,7 +3,7 @@
 
 import fs from 'fs';
 import path from 'path';
-import type { CronJob, CronRun, AgentDescriptor } from '@/types';
+import type { CronJob, CronRun, AgentDescriptor, ProviderModel } from '@/types';
 
 // ── Raw config types ─────────────────────────────────────────────────────────
 
@@ -64,6 +64,7 @@ export interface OpenClawAgent {
 export interface OpenClawConfig {
   agents: OpenClawAgent[];
   crons: OpenClawCron[];
+  providerModels: ProviderModel[];
 }
 
 // ── Core parser ──────────────────────────────────────────────────────────────
@@ -82,19 +83,20 @@ export function readOpenClawConfig(): OpenClawConfig {
     const text = fs.readFileSync(configPath, 'utf8');
     raw = JSON.parse(text) as unknown;
   } catch {
-    return { agents: [], crons: [] };
+    return { agents: [], crons: [], providerModels: [] };
   }
 
   if (typeof raw !== 'object' || raw === null) {
-    return { agents: [], crons: [] };
+    return { agents: [], crons: [], providerModels: [] };
   }
 
   const obj = raw as Record<string, unknown>;
 
   const agents = parseAgents(obj);
   const crons = parseCrons(obj);
+  const providerModels = parseProviderModels(obj);
 
-  return { agents, crons };
+  return { agents, crons, providerModels };
 }
 
 function parseAgents(obj: Record<string, unknown>): OpenClawAgent[] {
@@ -143,6 +145,43 @@ function parseCrons(obj: Record<string, unknown>): OpenClawCron[] {
       modelOverride: typeof cron['model_override'] === 'string' ? cron['model_override'] : undefined,
     }];
   });
+}
+
+function parseProviderModels(obj: Record<string, unknown>): ProviderModel[] {
+  const modelsSection = obj['models'];
+  if (typeof modelsSection !== 'object' || modelsSection === null) return [];
+
+  const providers = (modelsSection as Record<string, unknown>)['providers'];
+  if (typeof providers !== 'object' || providers === null) return [];
+
+  const result: ProviderModel[] = [];
+  for (const [providerKey, providerData] of Object.entries(providers as Record<string, unknown>)) {
+    if (typeof providerData !== 'object' || providerData === null) continue;
+    const pd = providerData as Record<string, unknown>;
+    const models = pd['models'];
+    if (!Array.isArray(models)) continue;
+
+    for (const m of models) {
+      if (typeof m !== 'object' || m === null) continue;
+      const model = m as Record<string, unknown>;
+      if (typeof model['id'] !== 'string' || typeof model['name'] !== 'string') continue;
+
+      let cost: ProviderModel['cost'] | undefined;
+      if (typeof model['cost'] === 'object' && model['cost'] !== null) {
+        const c = model['cost'] as Record<string, unknown>;
+        cost = {
+          input: typeof c['input'] === 'number' ? c['input'] : 0,
+          output: typeof c['output'] === 'number' ? c['output'] : 0,
+          cacheRead: typeof c['cacheRead'] === 'number' ? c['cacheRead'] : 0,
+          cacheWrite: typeof c['cacheWrite'] === 'number' ? c['cacheWrite'] : 0,
+        };
+      }
+
+      result.push({ id: model['id'], name: model['name'], provider: providerKey, cost });
+    }
+  }
+
+  return result;
 }
 
 // ── Higher-level helpers (session-3: Cron Manager) ───────────────────────────
@@ -286,6 +325,7 @@ export function readCronRuns(cronId: string, limit: number): CronRun[] {
         ? {
             input_tokens: typeof rawUsage['input_tokens'] === 'number' ? rawUsage['input_tokens'] : 0,
             output_tokens: typeof rawUsage['output_tokens'] === 'number' ? rawUsage['output_tokens'] : 0,
+            total_tokens: typeof rawUsage['total_tokens'] === 'number' ? rawUsage['total_tokens'] : undefined,
           }
         : undefined,
     }];
