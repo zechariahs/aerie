@@ -73,6 +73,88 @@ function maybeSummary(event: ActivityEvent, hide: boolean): string {
 }
 
 // ---------------------------------------------------------------------------
+// Host-agent envelope → ActivityEvent mapper
+// ---------------------------------------------------------------------------
+
+/** Noisy internal event types that should not appear in the activity feed. */
+const SKIP_ENVELOPE_TYPES = new Set(['thinking_level_change', 'model-snapshot', 'openclaw.cache-ttl']);
+
+/** Direct mapping of raw JSONL types to ActivityEventType. */
+const ENVELOPE_TYPE_MAP: Record<string, ActivityEventType> = {
+  'cron.start':    'cron.start',
+  'cron.end':      'cron.end',
+  'cron.error':    'cron.error',
+  'session.start': 'session.start',
+  'session.end':   'session.end',
+  'tool.call':     'tool.call',
+  'tool_call':     'tool.call',
+  'message':       'message.sent',
+  'message.sent':  'message.sent',
+  'error':         'error',
+};
+
+/**
+ * Converts a raw host-agent SSE envelope (or legacy ActivityEvent) into an
+ * ActivityEvent suitable for the feed. Returns null to skip noisy events.
+ */
+function parseEnvelope(data: Record<string, unknown>): ActivityEvent | null {
+  // Legacy ActivityEvent shape (id + timestamp + summary already present)
+  if (typeof data['id'] === 'string' && typeof data['timestamp'] === 'string' && typeof data['summary'] === 'string') {
+    return data as unknown as ActivityEvent;
+  }
+
+  // Host-agent envelope shape: { ts, source, agentId, sessionId, type, raw }
+  const source = data['source'] as string | undefined;
+  const rawType = typeof data['type'] === 'string' ? data['type'] : 'unknown';
+  const ts = typeof data['ts'] === 'string' ? data['ts'] : new Date().toISOString();
+  const agentId = typeof data['agentId'] === 'string' ? data['agentId'] : 'unknown';
+  const raw = (typeof data['raw'] === 'object' && data['raw'] !== null ? data['raw'] : {}) as Record<string, unknown>;
+
+  // Skip noisy internal types
+  if (SKIP_ENVELOPE_TYPES.has(rawType)) return null;
+  const customType = typeof raw['customType'] === 'string' ? raw['customType'] : null;
+  if (customType && SKIP_ENVELOPE_TYPES.has(customType)) return null;
+
+  // For session message events, only surface assistant messages
+  if (rawType === 'message') {
+    const msg = (typeof raw['message'] === 'object' && raw['message'] !== null ? raw['message'] : null) as Record<string, unknown> | null;
+    if (msg?.['role'] !== 'assistant') return null;
+  }
+
+  const mappedType: ActivityEventType =
+    ENVELOPE_TYPE_MAP[rawType] ??
+    (source === 'cron_run' ? 'cron.end' : null) ??
+    'error';
+
+  // Build a human-readable summary
+  let summary: string;
+  if (source === 'cron_run') {
+    const rawSummary = typeof raw['summary'] === 'string' ? raw['summary'] : null;
+    const status = typeof raw['status'] === 'string' ? raw['status'] : 'ok';
+    summary = rawSummary ? rawSummary : `Cron run completed (${status})`;
+  } else if (rawType === 'message') {
+    const msg = (typeof raw['message'] === 'object' && raw['message'] !== null ? raw['message'] : {}) as Record<string, unknown>;
+    const content = msg['content'];
+    const text = typeof content === 'string' ? content :
+      (Array.isArray(content) && typeof (content[0] as Record<string, unknown>)?.['text'] === 'string')
+        ? (content[0] as Record<string, unknown>)['text'] as string
+        : '';
+    summary = (text.slice(0, 120)) || 'Message';
+  } else {
+    summary = rawType;
+  }
+
+  return {
+    id: `${ts}-${agentId}-${rawType}`,
+    type: mappedType,
+    agentId,
+    summary,
+    meta: raw,
+    timestamp: ts,
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Filter bar
 // ---------------------------------------------------------------------------
 
@@ -184,20 +266,20 @@ export function ActivityFeed({ gatewayStatus, configuredAgentIds }: ActivityFeed
     return () => clearInterval(id);
   }, []);
 
-  // Connect to SSE endpoint
+  // Connect to SSE endpoint — independent of gateway status (source is host agent)
   useEffect(() => {
-    if (gatewayStatus === 'disconnected') return;
-
     const es = new EventSource('/api/events');
 
     es.onmessage = (e) => {
       try {
-        const event = JSON.parse(e.data as string) as ActivityEvent;
-        setEvents((prev) => {
-          const next = [event, ...prev];
-          // Keep only the last MAX_EVENTS events (newest first)
-          return next.slice(0, MAX_EVENTS);
-        });
+        const data = JSON.parse(e.data as string) as Record<string, unknown>;
+        // Ignore disconnect sentinel and heartbeat artifacts
+        if (data['type'] === 'disconnect') return;
+
+        const event = parseEnvelope(data);
+        if (!event) return;
+
+        setEvents((prev) => [event, ...prev].slice(0, MAX_EVENTS));
       } catch {
         // Malformed event — ignore
       }
@@ -208,7 +290,7 @@ export function ActivityFeed({ gatewayStatus, configuredAgentIds }: ActivityFeed
     };
 
     return () => es.close();
-  }, [gatewayStatus]);
+  }, []);
 
   // Merge configured agent IDs with any IDs seen in live events
   const agentIds = useMemo(
@@ -225,17 +307,14 @@ export function ActivityFeed({ gatewayStatus, configuredAgentIds }: ActivityFeed
     });
   }, [events, filter]);
 
-  // Gateway offline state
-  if (gatewayStatus === 'disconnected') {
-    return (
-      <div className="flex items-center justify-center h-48 text-[11px]" style={{ color: 'var(--ae-text3)' }}>
-        Gateway offline — activity feed paused
-      </div>
-    );
-  }
-
   return (
     <div className="flex flex-col gap-3">
+      {/* Gateway offline banner — shown above the feed (does not block SSE) */}
+      {gatewayStatus === 'disconnected' && (
+        <div className="text-[10px] px-3 py-1 text-center" style={{ color: 'var(--ae-text3)', background: 'var(--ae-raised)', border: '1px solid var(--ae-border)' }}>
+          Gateway offline — live commands unavailable
+        </div>
+      )}
       {/* Filter bar */}
       <FilterBar agentIds={agentIds} filter={filter} onChange={setFilter} />
 
