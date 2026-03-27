@@ -37,12 +37,18 @@ interface DockerPanelState {
 export function DockerUnavailable({ onRetry }: { onRetry: () => void }): React.JSX.Element {
   return (
     <div className="flex flex-col items-center justify-center gap-3 py-8 text-center">
-      <p className="text-sm text-[#6b7280]">
+      <p className="text-[11px]" style={{ color: 'var(--ae-text2)' }}>
         Host agent unavailable — is host-agent running on the VPS host?
       </p>
       <button
         onClick={onRetry}
-        className="text-xs px-3 py-1.5 rounded border border-[#1e1e2e] text-[#6b7280] hover:text-white hover:border-[#6366f1] transition-colors"
+        className="text-[10px] uppercase tracking-[0.08em]"
+        style={{
+          padding: '4px 10px',
+          background: 'transparent',
+          border: '1px solid var(--ae-border-hi)',
+          color: 'var(--ae-text2)',
+        }}
       >
         Retry
       </button>
@@ -121,7 +127,7 @@ export function DockerPanel(): React.JSX.Element {
   }
 
   if (state.loading) {
-    return <div className="py-8 text-center text-xs text-[#6b7280] animate-pulse">Loading containers…</div>;
+    return <div className="py-8 text-center text-[11px] animate-pulse" style={{ color: 'var(--ae-text2)' }}>Loading containers…</div>;
   }
 
   if (state.error) {
@@ -131,14 +137,18 @@ export function DockerPanel(): React.JSX.Element {
   return (
     <div className="space-y-4">
       <div className="overflow-x-auto">
-        <table className="w-full text-xs">
+        <table className="w-full">
           <thead>
-            <tr className="text-[#6b7280] border-b border-[#1e1e2e]">
-              <th className="text-left pb-2 pr-4 font-medium">Container</th>
-              <th className="text-left pb-2 pr-4 font-medium">Status</th>
-              <th className="text-right pb-2 pr-4 font-medium">CPU %</th>
-              <th className="text-right pb-2 pr-4 font-medium">Mem MB</th>
-              <th className="text-right pb-2 font-medium">Uptime</th>
+            <tr style={{ borderBottom: '1px solid var(--ae-border)' }}>
+              {['Container', 'Status', 'CPU %', 'Mem MB', 'Uptime'].map((h, i) => (
+                <th
+                  key={h}
+                  className={`pb-2 pr-4 font-normal text-[10px] uppercase tracking-[0.10em]${i >= 2 ? ' text-right' : ' text-left'}`}
+                  style={{ color: 'var(--ae-text3)' }}
+                >
+                  {h}
+                </th>
+              ))}
             </tr>
           </thead>
           <tbody>
@@ -147,29 +157,23 @@ export function DockerPanel(): React.JSX.Element {
               return (
                 <tr
                   key={c.name}
-                  className={[
-                    'border-b border-[#1e1e2e]/50',
-                    isOc ? 'text-[#a5b4fc]' : 'text-[#e2e8f0]',
-                  ].join(' ')}
+                  style={{ borderBottom: '1px solid var(--ae-border)', color: isOc ? 'var(--ae-amber)' : 'var(--ae-text)' }}
                 >
-                  <td className="py-2 pr-4 font-mono">{c.name}</td>
+                  <td className="py-2 pr-4 text-[11px]">{c.name}</td>
                   <td className="py-2 pr-4">
-                    <span className={[
-                      'px-1.5 py-0.5 rounded text-[10px]',
-                      c.status === 'running' ? 'bg-green-900/30 text-green-400' : 'bg-red-900/30 text-red-400',
-                    ].join(' ')}>
+                    <span className={c.status === 'running' ? 'ae-badge ae-badge-ok' : 'ae-badge ae-badge-error'}>
                       {c.status}
                     </span>
                   </td>
-                  <td className="py-2 pr-4 text-right">{c.cpuPct.toFixed(1)}%</td>
-                  <td className="py-2 pr-4 text-right">{c.memMb.toFixed(0)}</td>
-                  <td className="py-2 text-right">{formatUptime(c.uptimeSeconds)}</td>
+                  <td className="py-2 pr-4 text-right text-[11px]">{c.cpuPct.toFixed(1)}%</td>
+                  <td className="py-2 pr-4 text-right text-[11px]">{c.memMb.toFixed(0)}</td>
+                  <td className="py-2 text-right text-[11px]">{formatUptime(c.uptimeSeconds)}</td>
                 </tr>
               );
             })}
             {state.containers.length === 0 && (
               <tr>
-                <td colSpan={5} className="py-4 text-center text-[#6b7280]">No running containers</td>
+                <td colSpan={5} className="py-4 text-center text-[11px]" style={{ color: 'var(--ae-text2)' }}>No running containers</td>
               </tr>
             )}
           </tbody>
@@ -177,8 +181,8 @@ export function DockerPanel(): React.JSX.Element {
       </div>
 
       {/* Restart panel for openclaw container */}
-      <div className="pt-2 border-t border-[#1e1e2e]">
-        <p className="text-xs text-[#6b7280] mb-2">Restart {OPENCLAW_CONTAINER}</p>
+      <div className="pt-2" style={{ borderTop: '1px solid var(--ae-border)' }}>
+        <p className="text-[11px] mb-2" style={{ color: 'var(--ae-text2)' }}>Restart {OPENCLAW_CONTAINER}</p>
         <div className="flex items-center gap-2">
           <input
             type="text"
@@ -187,19 +191,36 @@ export function DockerPanel(): React.JSX.Element {
             value={restart.totpInput}
             onChange={(e) => setRestart((r) => ({ ...r, totpInput: e.target.value, error: undefined }))}
             onKeyDown={(e) => { if (e.key === 'Enter') void handleRestart(); }}
-            className="w-28 px-2 py-1 rounded border border-[#1e1e2e] bg-[#0a0a0f] text-[#e2e8f0] text-xs placeholder:text-[#6b7280] focus:outline-none focus:border-[#6366f1]"
+            style={{
+              width: 100,
+              padding: '3px 6px',
+              background: 'var(--ae-raised)',
+              border: '1px solid var(--ae-border)',
+              color: 'var(--ae-text)',
+              fontFamily: '"IBM Plex Mono", ui-monospace, monospace',
+              fontSize: 11,
+              outline: 'none',
+            }}
             disabled={restart.pending}
             maxLength={6}
+            onFocus={(e) => { (e.currentTarget as HTMLElement).style.borderColor = 'var(--ae-amber)'; }}
+            onBlur={(e) => { (e.currentTarget as HTMLElement).style.borderColor = 'var(--ae-border)'; }}
           />
           <button
             onClick={() => void handleRestart()}
             disabled={restart.pending}
-            className="px-3 py-1 text-xs rounded border border-[#1e1e2e] text-[#6b7280] hover:text-white hover:border-red-500 transition-colors disabled:opacity-40"
+            className="text-[10px] uppercase tracking-[0.08em] disabled:opacity-40"
+            style={{
+              padding: '4px 10px',
+              background: 'transparent',
+              border: '1px solid var(--ae-red-dim)',
+              color: 'var(--ae-red)',
+            }}
           >
             {restart.pending ? 'Restarting…' : 'Restart'}
           </button>
-          {restart.success && <span className="text-xs text-green-400">Restarted</span>}
-          {restart.error && <span className="text-xs text-red-400">{restart.error}</span>}
+          {restart.success && <span className="text-[11px]" style={{ color: 'var(--ae-green)' }}>Restarted</span>}
+          {restart.error && <span className="text-[11px]" style={{ color: 'var(--ae-red)' }}>{restart.error}</span>}
         </div>
       </div>
     </div>

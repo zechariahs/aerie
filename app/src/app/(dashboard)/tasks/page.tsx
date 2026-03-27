@@ -9,8 +9,8 @@ export default function TasksPage(): React.JSX.Element {
     <div className="flex flex-col h-full gap-4">
       <div className="flex items-center justify-between flex-shrink-0">
         <div>
-          <h1 className="text-xl font-semibold text-white">Task Board</h1>
-          <p className="text-xs text-[#6b7280] mt-0.5">
+          <h1 className="text-[14px] font-medium" style={{ color: 'var(--ae-text)' }}>Task Board</h1>
+          <p className="text-[11px] mt-0.5" style={{ color: 'var(--ae-text2)', letterSpacing: '0.04em' }}>
             Kanban board for dispatching work to agents
           </p>
         </div>

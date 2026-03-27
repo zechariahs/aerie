@@ -73,71 +73,87 @@ export function TaskSpecsInbox({ totpToken, onImported, onRequestTotp }: TaskSpe
   }
 
   return (
-    <div className="border border-[#1e1e2e] rounded-lg overflow-hidden">
+    <div style={{ border: '1px solid var(--ae-border)' }}>
       {/* Header */}
       <button
         onClick={() => setCollapsed((c) => !c)}
-        className="w-full flex items-center justify-between px-4 py-3 bg-[#0d0d14] hover:bg-[#12121a] transition-colors"
+        className="w-full flex items-center justify-between px-4 py-3"
+        style={{ background: 'var(--ae-void)' }}
+        onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = 'var(--ae-surface)'; }}
+        onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = 'var(--ae-void)'; }}
       >
-        <span className="text-xs font-semibold text-[#6b7280] uppercase tracking-widest">
-          Task-Specs/ Inbox
+        <span className="ae-section-label">
+          ── Task-Specs/ Inbox
           {data?.files.length ? (
-            <span className="ml-2 text-[#3b82f6]">({data.files.length})</span>
+            <span className="ml-2" style={{ color: 'var(--ae-amber)' }}>({data.files.length})</span>
           ) : null}
         </span>
-        <span className="text-[#6b7280] text-xs">{collapsed ? '▼' : '▲'}</span>
+        <span className="text-[11px]" style={{ color: 'var(--ae-text3)' }}>{collapsed ? '▼' : '▲'}</span>
       </button>
 
       {!collapsed && (
-        <div className="bg-[#0a0a11] border-t border-[#1e1e2e]">
+        <div style={{ background: 'var(--ae-void)', borderTop: '1px solid var(--ae-border)' }}>
           {!data && (
-            <p className="px-4 py-3 text-xs text-[#6b7280]">Loading…</p>
+            <p className="px-4 py-3 text-[11px]" style={{ color: 'var(--ae-text2)' }}>Loading…</p>
           )}
 
           {data && !data.configured && (
-            <p className="px-4 py-3 text-xs text-[#6b7280]">
+            <p className="px-4 py-3 text-[11px]" style={{ color: 'var(--ae-text2)' }}>
               Drive not configured — set GOOGLE_DRIVE_TASK_SPECS_FOLDER_ID to enable.
             </p>
           )}
 
           {data?.configured && data.error && (
-            <p className="px-4 py-3 text-xs text-red-400">Drive error: {data.error}</p>
+            <p className="px-4 py-3 text-[11px]" style={{ color: 'var(--ae-red)' }}>Drive error: {data.error}</p>
           )}
 
           {data?.configured && !data.error && data.files.length === 0 && (
-            <p className="px-4 py-3 text-xs text-[#6b7280]">No unimported specs.</p>
+            <p className="px-4 py-3 text-[11px]" style={{ color: 'var(--ae-text2)' }}>No unimported specs.</p>
           )}
 
           {data?.configured && !data.error && data.files.length > 0 && (
-            <table className="w-full text-xs">
+            <table className="w-full">
               <thead>
-                <tr className="border-b border-[#1e1e2e]">
-                  <th className="px-4 py-2 text-left text-[10px] text-[#6b7280] uppercase tracking-widest font-medium">Title</th>
-                  <th className="px-4 py-2 text-left text-[10px] text-[#6b7280] uppercase tracking-widest font-medium">Created</th>
-                  <th className="px-4 py-2 text-right text-[10px] text-[#6b7280] uppercase tracking-widest font-medium">Action</th>
+                <tr style={{ borderBottom: '1px solid var(--ae-border)' }}>
+                  {['Title', 'Created', 'Action'].map((h, i) => (
+                    <th
+                      key={h}
+                      className={`px-4 py-2 font-normal text-[10px] uppercase tracking-[0.10em]${i === 2 ? ' text-right' : ' text-left'}`}
+                      style={{ color: 'var(--ae-text3)' }}
+                    >
+                      {h}
+                    </th>
+                  ))}
                 </tr>
               </thead>
               <tbody>
                 {data.files.map((file) => (
-                  <tr key={file.id} className="border-b border-[#1e1e2e] last:border-0">
+                  <tr key={file.id} style={{ borderBottom: '1px solid var(--ae-border)' }}>
                     <td className="px-4 py-2">
                       <a
                         href={file.webViewLink}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-[#3b82f6] hover:underline"
+                        className="text-[11px] no-underline hover:underline"
+                        style={{ color: 'var(--ae-cyan)' }}
                       >
                         {file.name}
                       </a>
                     </td>
-                    <td className="px-4 py-2 text-[#4b5563]">
+                    <td className="px-4 py-2 text-[10px]" style={{ color: 'var(--ae-text3)' }}>
                       {new Date(file.createdTime).toLocaleDateString()}
                     </td>
                     <td className="px-4 py-2 text-right">
                       <button
                         disabled={importing === file.id}
                         onClick={() => onRequestTotp(() => { void doImport(file, totpToken); })}
-                        className="text-[10px] px-2 py-1 border border-[#1e1e2e] rounded text-[#6b7280] hover:text-white disabled:opacity-40 transition-colors"
+                        className="text-[10px] uppercase tracking-[0.08em] disabled:opacity-40"
+                        style={{
+                          padding: '3px 8px',
+                          background: 'transparent',
+                          border: '1px solid var(--ae-border-hi)',
+                          color: 'var(--ae-text2)',
+                        }}
                       >
                         {importing === file.id ? 'Importing…' : 'Import as Task'}
                       </button>

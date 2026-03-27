@@ -12,6 +12,16 @@ function nowIso(): string {
   return new Date().toISOString();
 }
 
+const inputStyle: React.CSSProperties = {
+  background: 'var(--ae-raised)',
+  border: '1px solid var(--ae-border)',
+  color: 'var(--ae-text)',
+  fontFamily: '"IBM Plex Mono", ui-monospace, monospace',
+  fontSize: 11,
+  padding: '3px 6px',
+  outline: 'none',
+};
+
 export default function PriceTableEditor(): React.JSX.Element {
   const [rows, setRows] = useState<ModelPrice[]>([]);
   const [loading, setLoading] = useState(true);
@@ -98,34 +108,42 @@ export default function PriceTableEditor(): React.JSX.Element {
     }
   }
 
-  if (loading) return <div className="h-40 animate-pulse rounded bg-[#1e1e2e]" />;
-  if (error) return <p className="text-sm text-red-400">Failed to load price table: {error}</p>;
+  if (loading) return <div className="h-40 animate-pulse" style={{ background: 'var(--ae-raised)', border: '1px solid var(--ae-border)' }} />;
+  if (error) return <p className="text-[11px]" style={{ color: 'var(--ae-red)' }}>Failed to load price table: {error}</p>;
 
   return (
     <div className="space-y-4">
-      <p className="text-xs text-[#6b7280]">
+      <p className="text-[11px]" style={{ color: 'var(--ae-text2)' }}>
         Used as fallback when OpenRouter data is unavailable. Prices are USD per 1M tokens.
       </p>
 
       <div className="overflow-x-auto">
-        <table className="w-full text-sm">
+        <table className="w-full">
           <thead>
-            <tr className="border-b border-[#1e1e2e] text-left text-xs text-[#6b7280]">
-              <th className="pb-2 pr-3">Model ID</th>
-              <th className="pb-2 pr-3 text-right">Input $/1M</th>
-              <th className="pb-2 pr-3 text-right">Output $/1M</th>
-              <th className="pb-2 text-right">Last Updated</th>
+            <tr style={{ borderBottom: '1px solid var(--ae-border)' }}>
+              {['Model ID', 'Input $/1M', 'Output $/1M', 'Last Updated'].map((h, i) => (
+                <th
+                  key={h}
+                  className={`pb-2 pr-3 font-normal text-[10px] uppercase tracking-[0.10em]${i >= 1 ? ' text-right' : ' text-left'}`}
+                  style={{ color: 'var(--ae-text3)' }}
+                >
+                  {h}
+                </th>
+              ))}
             </tr>
           </thead>
           <tbody>
             {rows.map((row, idx) => (
-              <tr key={idx} className="border-b border-[#1e1e2e]/50">
+              <tr key={idx} style={{ borderBottom: '1px solid var(--ae-border)' }}>
                 <td className="py-1.5 pr-3">
                   <input
                     type="text"
                     value={row.modelId}
                     onChange={(e) => updateRow(idx, 'modelId', e.target.value)}
-                    className="w-full rounded border border-[#1e1e2e] bg-[#12121a] px-2 py-1 font-mono text-xs text-[#c9d1d9] focus:border-[#6366f1] focus:outline-none"
+                    className="w-full"
+                    style={inputStyle}
+                    onFocus={(e) => { (e.currentTarget as HTMLElement).style.borderColor = 'var(--ae-amber)'; }}
+                    onBlur={(e) => { (e.currentTarget as HTMLElement).style.borderColor = 'var(--ae-border)'; }}
                   />
                 </td>
                 <td className="py-1.5 pr-3">
@@ -135,7 +153,10 @@ export default function PriceTableEditor(): React.JSX.Element {
                     min="0"
                     value={row.inputPer1MTokens}
                     onChange={(e) => updateRow(idx, 'inputPer1MTokens', e.target.value)}
-                    className="w-24 rounded border border-[#1e1e2e] bg-[#12121a] px-2 py-1 text-right text-xs text-[#c9d1d9] focus:border-[#6366f1] focus:outline-none"
+                    className="w-24 text-right"
+                    style={inputStyle}
+                    onFocus={(e) => { (e.currentTarget as HTMLElement).style.borderColor = 'var(--ae-amber)'; }}
+                    onBlur={(e) => { (e.currentTarget as HTMLElement).style.borderColor = 'var(--ae-border)'; }}
                   />
                 </td>
                 <td className="py-1.5 pr-3">
@@ -145,10 +166,13 @@ export default function PriceTableEditor(): React.JSX.Element {
                     min="0"
                     value={row.outputPer1MTokens}
                     onChange={(e) => updateRow(idx, 'outputPer1MTokens', e.target.value)}
-                    className="w-24 rounded border border-[#1e1e2e] bg-[#12121a] px-2 py-1 text-right text-xs text-[#c9d1d9] focus:border-[#6366f1] focus:outline-none"
+                    className="w-24 text-right"
+                    style={inputStyle}
+                    onFocus={(e) => { (e.currentTarget as HTMLElement).style.borderColor = 'var(--ae-amber)'; }}
+                    onBlur={(e) => { (e.currentTarget as HTMLElement).style.borderColor = 'var(--ae-border)'; }}
                   />
                 </td>
-                <td className="py-1.5 text-right text-xs text-[#6b7280]">
+                <td className="py-1.5 text-right text-[11px]" style={{ color: 'var(--ae-text2)' }}>
                   {row.updatedAt ? new Date(row.updatedAt).toLocaleDateString() : '—'}
                 </td>
               </tr>
@@ -159,33 +183,44 @@ export default function PriceTableEditor(): React.JSX.Element {
 
       <button
         onClick={addRow}
-        className="text-xs text-[#6366f1] hover:text-indigo-300 hover:underline"
+        className="text-[11px] hover:underline"
+        style={{ color: 'var(--ae-cyan)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
       >
         + Add row
       </button>
 
-      <div className="flex items-center gap-3 border-t border-[#1e1e2e] pt-4">
+      <div className="flex items-center gap-3" style={{ borderTop: '1px solid var(--ae-border)', paddingTop: '1rem' }}>
         <input
           type="text"
           inputMode="numeric"
-          placeholder="TOTP code"
+          placeholder="TOTP"
           value={totpToken}
           onChange={(e) => {
             setTotpToken(e.target.value);
             setSaveError(undefined);
           }}
           maxLength={6}
-          className="w-28 rounded border border-[#1e1e2e] bg-[#12121a] px-2 py-1.5 text-center font-mono text-sm text-[#c9d1d9] focus:border-[#6366f1] focus:outline-none"
+          className="w-[100px] text-center"
+          style={inputStyle}
+          onFocus={(e) => { (e.currentTarget as HTMLElement).style.borderColor = 'var(--ae-amber)'; }}
+          onBlur={(e) => { (e.currentTarget as HTMLElement).style.borderColor = 'var(--ae-border)'; }}
         />
         <button
           onClick={() => { void handleSave(); }}
           disabled={saving}
-          className="rounded bg-[#6366f1] px-3 py-1.5 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-50"
+          className="text-[10px] uppercase tracking-[0.08em] disabled:opacity-50"
+          style={{
+            padding: '5px 12px',
+            background: 'var(--ae-amber)',
+            color: 'var(--ae-void)',
+            border: 'none',
+            cursor: 'pointer',
+          }}
         >
           {saving ? 'Saving…' : 'Save'}
         </button>
-        {saved && <span className="text-xs text-green-400">Saved.</span>}
-        {saveError && <span className="text-xs text-red-400">{saveError}</span>}
+        {saved && <span className="text-[11px]" style={{ color: 'var(--ae-green)' }}>Saved.</span>}
+        {saveError && <span className="text-[11px]" style={{ color: 'var(--ae-red)' }}>{saveError}</span>}
       </div>
     </div>
   );

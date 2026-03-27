@@ -24,11 +24,16 @@ interface TaskDetailPanelProps {
 
 const PRIORITY_OPTIONS: TaskPriority[] = ['P1', 'P2', 'P3', 'P4'];
 const TAG_OPTIONS: Array<TaskTag | ''> = ['', 'Work', 'Personal', 'Other'];
-const PRIORITY_COLORS: Record<string, string> = {
-  P1: 'text-red-400',
-  P2: 'text-orange-400',
-  P3: 'text-blue-400',
-  P4: 'text-[#6b7280]',
+
+const inputStyle: React.CSSProperties = {
+  background: 'var(--ae-raised)',
+  border: '1px solid var(--ae-border)',
+  color: 'var(--ae-text)',
+  fontFamily: '"IBM Plex Mono", ui-monospace, monospace',
+  fontSize: 11,
+  padding: '4px 6px',
+  outline: 'none',
+  width: '100%',
 };
 
 /**
@@ -205,19 +210,26 @@ export function TaskDetailPanel({
     }
   }
 
+  const panelStyle: React.CSSProperties = {
+    width: 320,
+    flexShrink: 0,
+    borderLeft: '1px solid var(--ae-border)',
+    background: 'var(--ae-void)',
+  };
+
   if (loading) {
     return (
-      <div className="w-80 flex-shrink-0 border-l border-[#1e1e2e] bg-[#0d0d14] p-4">
-        <p className="text-xs text-[#6b7280]">Loading…</p>
+      <div style={panelStyle} className="p-4">
+        <p className="text-[11px]" style={{ color: 'var(--ae-text2)' }}>Loading…</p>
       </div>
     );
   }
 
   if (error || !data) {
     return (
-      <div className="w-80 flex-shrink-0 border-l border-[#1e1e2e] bg-[#0d0d14] p-4">
-        <p className="text-xs text-red-400">{error || 'Task not found'}</p>
-        <button onClick={onClose} className="mt-2 text-xs text-[#6b7280] hover:text-white">Close</button>
+      <div style={panelStyle} className="p-4">
+        <p className="text-[11px]" style={{ color: 'var(--ae-red)' }}>{error || 'Task not found'}</p>
+        <button onClick={onClose} className="mt-2 text-[11px]" style={{ color: 'var(--ae-text2)', background: 'none', border: 'none', cursor: 'pointer' }}>Close</button>
       </div>
     );
   }
@@ -225,16 +237,16 @@ export function TaskDetailPanel({
   const { task, history, comments } = data;
 
   return (
-    <div className="w-80 flex-shrink-0 border-l border-[#1e1e2e] bg-[#0d0d14] flex flex-col overflow-hidden">
+    <div style={panelStyle} className="flex flex-col overflow-hidden">
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-[#1e1e2e]">
-        <span className="text-xs font-semibold text-[#6b7280] uppercase tracking-widest">Task Detail</span>
-        <button onClick={onClose} className="text-[#6b7280] hover:text-white text-lg leading-none">×</button>
+      <div className="flex items-center justify-between px-4 py-3" style={{ borderBottom: '1px solid var(--ae-border)' }}>
+        <span className="ae-section-label">── Task Detail</span>
+        <button onClick={onClose} className="text-[16px] leading-none" style={{ color: 'var(--ae-text2)', background: 'none', border: 'none', cursor: 'pointer' }}>×</button>
       </div>
 
       {/* Toast */}
       {toast && (
-        <div className="mx-4 mt-2 px-3 py-1.5 bg-[#1e1e2e] rounded text-xs text-white border border-[#374151]">
+        <div className="mx-4 mt-2 px-3 py-1.5 text-[11px]" style={{ background: 'var(--ae-raised)', border: '1px solid var(--ae-border)', color: 'var(--ae-text)' }}>
           {toast}
         </div>
       )}
@@ -242,48 +254,54 @@ export function TaskDetailPanel({
       <div className="flex-1 overflow-y-auto px-4 py-3 space-y-4">
         {/* Title */}
         <div>
-          <label className="block text-[10px] text-[#6b7280] uppercase tracking-widest mb-1">Title</label>
+          <label className="block text-[10px] uppercase tracking-[0.14em] mb-1" style={{ color: 'var(--ae-text3)' }}>Title</label>
           <input
             type="text"
             value={editTitle}
             onChange={(e) => setEditTitle(e.target.value)}
-            className="w-full px-2 py-1.5 bg-[#12121a] border border-[#1e1e2e] rounded text-xs text-white focus:outline-none focus:border-[#3b82f6]"
+            style={inputStyle}
+            onFocus={(e) => { (e.currentTarget as HTMLElement).style.borderColor = 'var(--ae-amber)'; }}
+            onBlur={(e) => { (e.currentTarget as HTMLElement).style.borderColor = 'var(--ae-border)'; }}
           />
         </div>
 
         {/* Description */}
         <div>
-          <label className="block text-[10px] text-[#6b7280] uppercase tracking-widest mb-1">Description</label>
+          <label className="block text-[10px] uppercase tracking-[0.14em] mb-1" style={{ color: 'var(--ae-text3)' }}>Description</label>
           <textarea
             value={editDesc}
             onChange={(e) => setEditDesc(e.target.value)}
             rows={4}
-            className="w-full px-2 py-1.5 bg-[#12121a] border border-[#1e1e2e] rounded text-xs text-white focus:outline-none focus:border-[#3b82f6] resize-none"
+            style={{ ...inputStyle, resize: 'none' }}
+            onFocus={(e) => { (e.currentTarget as HTMLElement).style.borderColor = 'var(--ae-amber)'; }}
+            onBlur={(e) => { (e.currentTarget as HTMLElement).style.borderColor = 'var(--ae-border)'; }}
           />
         </div>
 
         {/* Priority & Tag */}
         <div className="grid grid-cols-2 gap-2">
           <div>
-            <label className="block text-[10px] text-[#6b7280] uppercase tracking-widest mb-1">Priority</label>
+            <label className="block text-[10px] uppercase tracking-[0.14em] mb-1" style={{ color: 'var(--ae-text3)' }}>Priority</label>
             <select
               value={editPriority}
               onChange={(e) => setEditPriority(e.target.value as TaskPriority)}
-              className="w-full px-2 py-1.5 bg-[#12121a] border border-[#1e1e2e] rounded text-xs text-white focus:outline-none"
+              style={inputStyle}
+              onFocus={(e) => { (e.currentTarget as HTMLElement).style.borderColor = 'var(--ae-amber)'; }}
+              onBlur={(e) => { (e.currentTarget as HTMLElement).style.borderColor = 'var(--ae-border)'; }}
             >
               {PRIORITY_OPTIONS.map((p) => (
-                <option key={p} value={p} className={PRIORITY_COLORS[p]}>
-                  {p}
-                </option>
+                <option key={p} value={p}>{p}</option>
               ))}
             </select>
           </div>
           <div>
-            <label className="block text-[10px] text-[#6b7280] uppercase tracking-widest mb-1">Tag</label>
+            <label className="block text-[10px] uppercase tracking-[0.14em] mb-1" style={{ color: 'var(--ae-text3)' }}>Tag</label>
             <select
               value={editTag}
               onChange={(e) => setEditTag(e.target.value as TaskTag | '')}
-              className="w-full px-2 py-1.5 bg-[#12121a] border border-[#1e1e2e] rounded text-xs text-white focus:outline-none"
+              style={inputStyle}
+              onFocus={(e) => { (e.currentTarget as HTMLElement).style.borderColor = 'var(--ae-amber)'; }}
+              onBlur={(e) => { (e.currentTarget as HTMLElement).style.borderColor = 'var(--ae-border)'; }}
             >
               {TAG_OPTIONS.map((t) => (
                 <option key={t} value={t}>{t || '—'}</option>
@@ -295,22 +313,26 @@ export function TaskDetailPanel({
         {/* Agent & Due Date */}
         <div className="grid grid-cols-2 gap-2">
           <div>
-            <label className="block text-[10px] text-[#6b7280] uppercase tracking-widest mb-1">Agent</label>
+            <label className="block text-[10px] uppercase tracking-[0.14em] mb-1" style={{ color: 'var(--ae-text3)' }}>Agent</label>
             <input
               type="text"
               value={editAgent}
               onChange={(e) => setEditAgent(e.target.value)}
               placeholder="—"
-              className="w-full px-2 py-1.5 bg-[#12121a] border border-[#1e1e2e] rounded text-xs text-white focus:outline-none focus:border-[#3b82f6]"
+              style={inputStyle}
+              onFocus={(e) => { (e.currentTarget as HTMLElement).style.borderColor = 'var(--ae-amber)'; }}
+              onBlur={(e) => { (e.currentTarget as HTMLElement).style.borderColor = 'var(--ae-border)'; }}
             />
           </div>
           <div>
-            <label className="block text-[10px] text-[#6b7280] uppercase tracking-widest mb-1">Due</label>
+            <label className="block text-[10px] uppercase tracking-[0.14em] mb-1" style={{ color: 'var(--ae-text3)' }}>Due</label>
             <input
               type="date"
               value={editDue}
               onChange={(e) => setEditDue(e.target.value)}
-              className="w-full px-2 py-1.5 bg-[#12121a] border border-[#1e1e2e] rounded text-xs text-white focus:outline-none focus:border-[#3b82f6]"
+              style={inputStyle}
+              onFocus={(e) => { (e.currentTarget as HTMLElement).style.borderColor = 'var(--ae-amber)'; }}
+              onBlur={(e) => { (e.currentTarget as HTMLElement).style.borderColor = 'var(--ae-border)'; }}
             />
           </div>
         </div>
@@ -318,12 +340,13 @@ export function TaskDetailPanel({
         {/* Drive link */}
         {task.linked_output && (
           <div>
-            <label className="block text-[10px] text-[#6b7280] uppercase tracking-widest mb-1">Drive Doc</label>
+            <label className="block text-[10px] uppercase tracking-[0.14em] mb-1" style={{ color: 'var(--ae-text3)' }}>Drive Doc</label>
             <a
               href={task.linked_output}
               target="_blank"
               rel="noopener noreferrer"
-              className="text-[10px] text-[#3b82f6] hover:underline break-all"
+              className="text-[10px] no-underline hover:underline break-all"
+              style={{ color: 'var(--ae-cyan)' }}
             >
               {task.linked_output}
             </a>
@@ -334,7 +357,13 @@ export function TaskDetailPanel({
         <button
           disabled={saving}
           onClick={() => onRequestTotp(() => { void saveChanges(totpToken); })}
-          className="w-full py-1.5 text-xs text-white bg-[#3b82f6] rounded hover:bg-[#2563eb] disabled:opacity-50 transition-colors"
+          className="w-full text-[10px] uppercase tracking-[0.08em] disabled:opacity-50"
+          style={{
+            padding: '5px 12px',
+            background: 'var(--ae-amber)',
+            border: 'none',
+            color: 'var(--ae-void)',
+          }}
         >
           {saving ? 'Saving…' : 'Save Changes'}
         </button>
@@ -344,7 +373,13 @@ export function TaskDetailPanel({
           {task.status !== 'done' && (
             <button
               onClick={() => onRequestTotp(() => { void handleQuickStatus('done', totpToken); })}
-              className="flex-1 py-1 text-[10px] text-green-400 border border-green-900/50 rounded hover:bg-green-900/20 transition-colors"
+              className="flex-1 text-[10px] uppercase tracking-[0.08em]"
+              style={{
+                padding: '4px 8px',
+                background: 'transparent',
+                border: '1px solid var(--ae-green-dim)',
+                color: 'var(--ae-green)',
+              }}
             >
               Mark Done
             </button>
@@ -352,7 +387,13 @@ export function TaskDetailPanel({
           {task.status !== 'archived' && (
             <button
               onClick={() => onRequestTotp(() => { void handleQuickStatus('archived', totpToken); })}
-              className="flex-1 py-1 text-[10px] text-[#6b7280] border border-[#1e1e2e] rounded hover:text-white transition-colors"
+              className="flex-1 text-[10px] uppercase tracking-[0.08em]"
+              style={{
+                padding: '4px 8px',
+                background: 'transparent',
+                border: '1px solid var(--ae-border-hi)',
+                color: 'var(--ae-text2)',
+              }}
             >
               Archive
             </button>
@@ -360,16 +401,28 @@ export function TaskDetailPanel({
         </div>
 
         {/* Integrations */}
-        <div className="flex gap-2 pt-1 border-t border-[#1e1e2e]">
+        <div className="flex gap-2 pt-1" style={{ borderTop: '1px solid var(--ae-border)' }}>
           <button
             onClick={() => onRequestTotp(() => { void sendTelegram(totpToken); })}
-            className="flex-1 py-1 text-[10px] text-[#6b7280] border border-[#1e1e2e] rounded hover:text-white transition-colors"
+            className="flex-1 text-[10px] uppercase tracking-[0.08em]"
+            style={{
+              padding: '4px 8px',
+              background: 'transparent',
+              border: '1px solid var(--ae-border-hi)',
+              color: 'var(--ae-text2)',
+            }}
           >
             Send Telegram
           </button>
           <button
             onClick={() => onRequestTotp(() => { void sendDrive(totpToken); })}
-            className="flex-1 py-1 text-[10px] text-[#6b7280] border border-[#1e1e2e] rounded hover:text-white transition-colors"
+            className="flex-1 text-[10px] uppercase tracking-[0.08em]"
+            style={{
+              padding: '4px 8px',
+              background: 'transparent',
+              border: '1px solid var(--ae-border-hi)',
+              color: 'var(--ae-text2)',
+            }}
           >
             Write to Drive
           </button>
@@ -378,14 +431,14 @@ export function TaskDetailPanel({
         {/* Status history */}
         {history.length > 0 && (
           <div>
-            <label className="block text-[10px] text-[#6b7280] uppercase tracking-widest mb-2">History</label>
+            <label className="block text-[10px] uppercase tracking-[0.14em] mb-2" style={{ color: 'var(--ae-text3)' }}>History</label>
             <div className="space-y-1">
               {history.map((h) => (
-                <div key={h.id} className="text-[10px] text-[#4b5563]">
+                <div key={h.id} className="text-[10px]" style={{ color: 'var(--ae-text3)' }}>
                   <span>{h.from_status ?? 'new'}</span>
                   <span className="mx-1">→</span>
-                  <span className="text-[#9ca3af]">{h.to_status}</span>
-                  <span className="ml-2 text-[#374151]">{new Date(h.changed_at).toLocaleDateString()}</span>
+                  <span style={{ color: 'var(--ae-text2)' }}>{h.to_status}</span>
+                  <span className="ml-2">{new Date(h.changed_at).toLocaleDateString()}</span>
                 </div>
               ))}
             </div>
@@ -394,14 +447,14 @@ export function TaskDetailPanel({
 
         {/* Comments */}
         <div>
-          <label className="block text-[10px] text-[#6b7280] uppercase tracking-widest mb-2">
+          <label className="block text-[10px] uppercase tracking-[0.14em] mb-2" style={{ color: 'var(--ae-text3)' }}>
             Comments ({comments.length})
           </label>
           <div className="space-y-2 mb-2">
             {comments.map((c) => (
-              <div key={c.id} className="text-[10px] bg-[#12121a] border border-[#1e1e2e] rounded p-2">
-                <p className="text-[#d1d5db] whitespace-pre-wrap">{c.body}</p>
-                <p className="text-[#374151] mt-1">{new Date(c.created_at).toLocaleString()}</p>
+              <div key={c.id} className="text-[10px] p-2" style={{ background: 'var(--ae-raised)', border: '1px solid var(--ae-border)' }}>
+                <p className="whitespace-pre-wrap" style={{ color: 'var(--ae-text)' }}>{c.body}</p>
+                <p className="mt-1" style={{ color: 'var(--ae-text3)' }}>{new Date(c.created_at).toLocaleString()}</p>
               </div>
             ))}
           </div>
@@ -410,22 +463,36 @@ export function TaskDetailPanel({
             onChange={(e) => setComment(e.target.value)}
             rows={2}
             placeholder="Add a comment…"
-            className="w-full px-2 py-1.5 bg-[#12121a] border border-[#1e1e2e] rounded text-xs text-white placeholder-[#4b5563] focus:outline-none focus:border-[#3b82f6] resize-none mb-1"
+            style={{ ...inputStyle, resize: 'none', marginBottom: 4 }}
+            onFocus={(e) => { (e.currentTarget as HTMLElement).style.borderColor = 'var(--ae-amber)'; }}
+            onBlur={(e) => { (e.currentTarget as HTMLElement).style.borderColor = 'var(--ae-border)'; }}
           />
           <button
             disabled={!comment.trim() || saving}
             onClick={() => onRequestTotp(() => { void postComment(totpToken); })}
-            className="w-full py-1 text-[10px] text-[#6b7280] border border-[#1e1e2e] rounded hover:text-white disabled:opacity-40 transition-colors"
+            className="w-full text-[10px] uppercase tracking-[0.08em] disabled:opacity-40"
+            style={{
+              padding: '4px 8px',
+              background: 'transparent',
+              border: '1px solid var(--ae-border-hi)',
+              color: 'var(--ae-text2)',
+            }}
           >
             Add Comment
           </button>
         </div>
 
         {/* Delete */}
-        <div className="pt-2 border-t border-[#1e1e2e]">
+        <div className="pt-2" style={{ borderTop: '1px solid var(--ae-border)' }}>
           <button
             onClick={() => onRequestTotp(() => { void handleDelete(totpToken); })}
-            className="w-full py-1 text-[10px] text-red-500 border border-red-900/30 rounded hover:bg-red-900/20 transition-colors"
+            className="w-full text-[10px] uppercase tracking-[0.08em]"
+            style={{
+              padding: '4px 8px',
+              background: 'transparent',
+              border: '1px solid var(--ae-red-dim)',
+              color: 'var(--ae-red)',
+            }}
           >
             Delete Task
           </button>

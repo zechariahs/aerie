@@ -40,18 +40,14 @@ interface AuditResponse {
 // ---------------------------------------------------------------------------
 
 function ResultBadge({ result }: { result: string }): React.JSX.Element {
-  const classes =
+  const cls =
     result === 'success'
-      ? 'bg-green-900/40 text-green-400 border-green-800'
+      ? 'ae-badge ae-badge-ok'
       : result === 'denied'
-        ? 'bg-amber-900/40 text-amber-400 border-amber-800'
-        : 'bg-red-900/40 text-red-400 border-red-800';
+        ? 'ae-badge ae-badge-warn'
+        : 'ae-badge ae-badge-error';
 
-  return (
-    <span className={`inline-block px-1.5 py-0.5 text-[10px] rounded border ${classes}`}>
-      {result}
-    </span>
-  );
+  return <span className={cls}>{result}</span>;
 }
 
 // ---------------------------------------------------------------------------
@@ -86,47 +82,64 @@ function AuditTable(): React.JSX.Element {
   }, [fetchPage, page]);
 
   if (loading) {
-    return <div className="p-6 text-sm text-[#6b7280]">Loading audit log…</div>;
+    return <div className="p-6 text-[11px]" style={{ color: 'var(--ae-text2)' }}>Loading audit log…</div>;
   }
 
   if (error) {
-    return <div className="p-6 text-sm text-red-400">Failed to load: {error}</div>;
+    return <div className="p-6 text-[11px]" style={{ color: 'var(--ae-red)' }}>Failed to load: {error}</div>;
   }
 
   return (
     <div>
       <div className="overflow-x-auto">
-        <table className="w-full text-xs">
+        <table className="w-full">
           <thead>
-            <tr className="border-b border-[#1e1e2e] text-[#6b7280] text-left">
-              <th className="px-3 py-2 font-medium whitespace-nowrap">Timestamp (UTC)</th>
-              <th className="px-3 py-2 font-medium">Action</th>
-              <th className="px-3 py-2 font-medium">Resource</th>
-              <th className="px-3 py-2 font-medium">Result</th>
-              <th className="px-3 py-2 font-medium">IP</th>
+            <tr style={{ borderBottom: '1px solid var(--ae-border)' }}>
+              {['Timestamp (UTC)', 'Action', 'Resource', 'Result', 'IP'].map((h) => (
+                <th
+                  key={h}
+                  className="px-3 py-2 text-left font-normal text-[10px] uppercase tracking-[0.10em]"
+                  style={{ color: 'var(--ae-text3)' }}
+                >
+                  {h}
+                </th>
+              ))}
             </tr>
           </thead>
           <tbody>
             {entries.length === 0 ? (
               <tr>
-                <td colSpan={5} className="px-3 py-6 text-center text-[#6b7280]">
+                <td colSpan={5} className="px-3 py-6 text-center text-[11px]" style={{ color: 'var(--ae-text2)' }}>
                   No audit log entries yet.
                 </td>
               </tr>
             ) : (
               entries.map((entry) => (
-                <tr key={entry.id} className="border-b border-[#1a1a27] hover:bg-[#1a1a27]/40">
-                  <td className="px-3 py-2 font-mono text-[#6b7280] whitespace-nowrap">
+                <tr
+                  key={entry.id}
+                  style={{ borderBottom: '1px solid var(--ae-border)' }}
+                  onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = 'var(--ae-surface)'; }}
+                  onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
+                >
+                  <td className="px-3 py-2 text-[11px] whitespace-nowrap" style={{ color: 'var(--ae-text2)' }}>
                     {entry.timestamp}
                   </td>
-                  <td className="px-3 py-2 text-[#c9d1d9]">{entry.action}</td>
-                  <td className="px-3 py-2 font-mono text-[#818cf8] truncate max-w-[200px]">
-                    {entry.resource}
+                  <td className="px-3 py-2 text-[11px]" style={{ color: 'var(--ae-text)' }}>{entry.action}</td>
+                  <td className="px-3 py-2 truncate max-w-[200px]">
+                    <a
+                      href={entry.resource}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-[11px] no-underline hover:underline"
+                      style={{ color: 'var(--ae-cyan)' }}
+                    >
+                      {entry.resource}
+                    </a>
                   </td>
                   <td className="px-3 py-2">
                     <ResultBadge result={entry.result} />
                   </td>
-                  <td className="px-3 py-2 font-mono text-[#6b7280]">{entry.ip}</td>
+                  <td className="px-3 py-2 text-[10px]" style={{ color: 'var(--ae-text3)' }}>{entry.ip}</td>
                 </tr>
               ))
             )}
@@ -136,11 +149,12 @@ function AuditTable(): React.JSX.Element {
 
       {/* Pagination */}
       {pagination && pagination.totalPages > 1 && (
-        <div className="flex items-center gap-3 px-3 py-3 border-t border-[#1e1e2e] text-xs text-[#6b7280]">
+        <div className="flex items-center gap-3 px-3 py-3 text-[11px]" style={{ borderTop: '1px solid var(--ae-border)', color: 'var(--ae-text2)' }}>
           <button
             onClick={() => setPage((p) => Math.max(1, p - 1))}
             disabled={page <= 1}
-            className="px-2 py-1 rounded border border-[#2a2a3e] hover:text-white disabled:opacity-40 transition-colors"
+            className="text-[10px] uppercase tracking-[0.08em] disabled:opacity-40"
+            style={{ padding: '4px 10px', background: 'transparent', border: '1px solid var(--ae-border-hi)', color: 'var(--ae-text2)' }}
           >
             ← Prev
           </button>
@@ -150,7 +164,8 @@ function AuditTable(): React.JSX.Element {
           <button
             onClick={() => setPage((p) => Math.min(pagination.totalPages, p + 1))}
             disabled={page >= pagination.totalPages}
-            className="px-2 py-1 rounded border border-[#2a2a3e] hover:text-white disabled:opacity-40 transition-colors"
+            className="text-[10px] uppercase tracking-[0.08em] disabled:opacity-40"
+            style={{ padding: '4px 10px', background: 'transparent', border: '1px solid var(--ae-border-hi)', color: 'var(--ae-text2)' }}
           >
             Next →
           </button>
@@ -168,14 +183,14 @@ export default function SecurityPage(): React.JSX.Element {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-xl font-semibold text-white">Security</h1>
-        <p className="text-sm text-[#6b7280] mt-0.5">Audit log — read-only record of all write operations</p>
+        <h1 className="text-[14px] font-medium" style={{ color: 'var(--ae-text)' }}>Security</h1>
+        <p className="text-[11px] mt-0.5" style={{ color: 'var(--ae-text2)', letterSpacing: '0.04em' }}>Audit log — read-only record of all write operations</p>
       </div>
 
       <ErrorBoundary label="Audit Log">
-        <section className="rounded border border-[#1e1e2e] bg-[#12121a]">
-          <div className="px-4 py-3 border-b border-[#1e1e2e]">
-            <h2 className="text-sm font-semibold text-[#c9d1d9]">Audit Log</h2>
+        <section style={{ background: 'var(--ae-surface)', border: '1px solid var(--ae-border)' }}>
+          <div className="px-4 py-3" style={{ borderBottom: '1px solid var(--ae-border)' }}>
+            <p className="ae-section-label">── Audit Log ─────────────────────</p>
           </div>
           <AuditTable />
         </section>
