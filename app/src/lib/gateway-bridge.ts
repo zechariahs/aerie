@@ -258,6 +258,9 @@ function connect(): void {
       return;
     }
 
+    // Temporary: log every message from the gateway so we can see what's arriving
+    console.log('[gateway-bridge] raw message:', JSON.stringify(msg).slice(0, 300));
+
     // Handle connect challenge — respond with the full connect request.
     if (msg['type'] === 'event' && msg['event'] === 'connect.challenge') {
       const payload = msg['payload'] as Record<string, unknown> | undefined;
