@@ -85,10 +85,10 @@ export default function SessionInspector({ agentFilter }: SessionInspectorProps)
       .finally(() => setLoading(false));
   }, [agentFilter, page]);
 
-  if (loading) return <div className="h-48 animate-pulse rounded bg-[#1e1e2e]" />;
-  if (error) return <p className="text-sm text-red-400">Failed to load sessions: {error}</p>;
+  if (loading) return <div className="h-48 animate-pulse" style={{ background: 'var(--ae-raised)', border: '1px solid var(--ae-border)' }} />;
+  if (error) return <p className="text-[11px]" style={{ color: 'var(--ae-red)' }}>Failed to load sessions: {error}</p>;
   if (!data || data.items.length === 0) {
-    return <p className="text-sm text-[#6b7280]">No sessions found.</p>;
+    return <p className="text-[11px]" style={{ color: 'var(--ae-text2)' }}>No sessions found.</p>;
   }
 
   const totalPages = Math.ceil(data.total / limit);
@@ -96,17 +96,18 @@ export default function SessionInspector({ agentFilter }: SessionInspectorProps)
   return (
     <div className="space-y-3">
       <div className="overflow-x-auto">
-        <table className="w-full text-xs">
+        <table className="w-full">
           <thead>
-            <tr className="border-b border-[#1e1e2e] text-left text-[#6b7280]">
-              <th className="pb-2 pr-3">Timestamp</th>
-              <th className="pb-2 pr-3">Agent</th>
-              <th className="pb-2 pr-3">Model</th>
-              <th className="pb-2 pr-3 text-right">In Tokens</th>
-              <th className="pb-2 pr-3 text-right">Out Tokens</th>
-              <th className="pb-2 pr-3 text-right">Cost</th>
-              <th className="pb-2 pr-3 text-right">Duration</th>
-              <th className="pb-2">Source</th>
+            <tr style={{ borderBottom: '1px solid var(--ae-border)' }}>
+              {['Timestamp', 'Agent', 'Model', 'In Tokens', 'Out Tokens', 'Cost', 'Duration', 'Source'].map((h, i) => (
+                <th
+                  key={h}
+                  className={`pb-2 pr-3 font-normal text-[10px] uppercase tracking-[0.10em]${i >= 3 && i <= 6 ? ' text-right' : ' text-left'}`}
+                  style={{ color: 'var(--ae-text3)' }}
+                >
+                  {h}
+                </th>
+              ))}
             </tr>
           </thead>
           <tbody>
@@ -116,37 +117,28 @@ export default function SessionInspector({ agentFilter }: SessionInspectorProps)
               return (
                 <tr
                   key={session.sessionId}
-                  className={`border-b border-[#1e1e2e]/50 ${
-                    outlier ? 'bg-amber-950/20' : ''
-                  }`}
+                  style={{
+                    borderBottom: '1px solid var(--ae-border)',
+                    background: outlier ? 'var(--ae-amber-faint)' : 'transparent',
+                  }}
                 >
-                  <td className="py-1.5 pr-3 text-[#9ca3af]">{formatTs(session.startedAt)}</td>
-                  <td className="py-1.5 pr-3 font-mono text-[#c9d1d9]">{session.agentId}</td>
-                  <td className="py-1.5 pr-3 text-[#9ca3af]">{shortModel(session.modelId)}</td>
-                  <td className="py-1.5 pr-3 text-right text-[#9ca3af]">
+                  <td className="py-1.5 pr-3 text-[11px]" style={{ color: 'var(--ae-text2)' }}>{formatTs(session.startedAt)}</td>
+                  <td className="py-1.5 pr-3 text-[11px]" style={{ color: 'var(--ae-text)' }}>{session.agentId}</td>
+                  <td className="py-1.5 pr-3 text-[11px]" style={{ color: 'var(--ae-text2)' }}>{shortModel(session.modelId)}</td>
+                  <td className="py-1.5 pr-3 text-right text-[11px]" style={{ color: 'var(--ae-text2)' }}>
                     {tokens(session.inputTokens)}
                   </td>
-                  <td className="py-1.5 pr-3 text-right text-[#9ca3af]">
+                  <td className="py-1.5 pr-3 text-right text-[11px]" style={{ color: 'var(--ae-text2)' }}>
                     {tokens(session.outputTokens)}
                   </td>
-                  <td
-                    className={`py-1.5 pr-3 text-right font-medium ${
-                      outlier ? 'text-amber-400' : 'text-white'
-                    }`}
-                  >
+                  <td className="py-1.5 pr-3 text-right text-[11px] font-medium" style={{ color: outlier ? 'var(--ae-amber)' : 'var(--ae-text)' }}>
                     {usd(session.costUsd)}
                   </td>
-                  <td className="py-1.5 pr-3 text-right text-[#9ca3af]">
+                  <td className="py-1.5 pr-3 text-right text-[11px]" style={{ color: 'var(--ae-text2)' }}>
                     {formatDuration(session.durationMs)}
                   </td>
                   <td className="py-1.5">
-                    <span
-                      className={`rounded px-1.5 py-0.5 text-[10px] font-medium ${
-                        session.source === 'openrouter'
-                          ? 'bg-indigo-900/40 text-indigo-300'
-                          : 'bg-[#1e1e2e] text-[#6b7280]'
-                      }`}
-                    >
+                    <span className={session.source === 'openrouter' ? 'ae-badge ae-badge-active' : 'ae-badge ae-badge-off'}>
                       {session.source === 'openrouter' ? 'OpenRouter' : 'Estimated'}
                     </span>
                   </td>
@@ -158,7 +150,7 @@ export default function SessionInspector({ agentFilter }: SessionInspectorProps)
       </div>
 
       {totalPages > 1 && (
-        <div className="flex items-center justify-between text-xs text-[#6b7280]">
+        <div className="flex items-center justify-between text-[11px]" style={{ color: 'var(--ae-text2)' }}>
           <span>
             {(page - 1) * limit + 1}–{Math.min(page * limit, data.total)} of {data.total}
           </span>
@@ -166,17 +158,29 @@ export default function SessionInspector({ agentFilter }: SessionInspectorProps)
             <button
               disabled={page <= 1}
               onClick={() => setPage((p) => p - 1)}
-              className="rounded border border-[#1e1e2e] px-2 py-1 disabled:opacity-40 hover:bg-[#1e1e2e]"
+              className="text-[10px] uppercase tracking-[0.08em] disabled:opacity-40"
+              style={{
+                padding: '4px 10px',
+                background: 'transparent',
+                border: '1px solid var(--ae-border-hi)',
+                color: 'var(--ae-text2)',
+              }}
             >
               ←
             </button>
-            <span className="px-1">
+            <span className="px-1 self-center">
               {page} / {totalPages}
             </span>
             <button
               disabled={page >= totalPages}
               onClick={() => setPage((p) => p + 1)}
-              className="rounded border border-[#1e1e2e] px-2 py-1 disabled:opacity-40 hover:bg-[#1e1e2e]"
+              className="text-[10px] uppercase tracking-[0.08em] disabled:opacity-40"
+              style={{
+                padding: '4px 10px',
+                background: 'transparent',
+                border: '1px solid var(--ae-border-hi)',
+                color: 'var(--ae-text2)',
+              }}
             >
               →
             </button>

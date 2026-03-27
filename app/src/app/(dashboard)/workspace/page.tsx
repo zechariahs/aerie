@@ -65,14 +65,23 @@ function formatRelTime(isoString: string): string {
 }
 
 // ---------------------------------------------------------------------------
-// File icon (text-based, no emoji for consistency)
+// File icon — ae- amber badge style
 // ---------------------------------------------------------------------------
 
 function FileIcon({ name }: { name: string }): React.JSX.Element {
   const ext = fileExt(name);
-  const cls =
-    ext === 'md' ? 'text-blue-400' : ext === 'json' ? 'text-yellow-400' : 'text-gray-400';
-  return <span className={`font-mono text-xs select-none ${cls}`}>[{ext || 'f'}]</span>;
+  return (
+    <span
+      className="font-mono text-[10px] select-none px-1"
+      style={{
+        color: 'var(--ae-amber)',
+        border: '1px solid var(--ae-amber-dim)',
+        flexShrink: 0,
+      }}
+    >
+      {ext || 'f'}
+    </span>
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -86,6 +95,7 @@ interface TreeNodeProps {
   expandedDirs: Set<string>;
   onSelect: (path: string) => void;
   onToggle: (path: string) => void;
+  isLast?: boolean;
 }
 
 function TreeNode({
@@ -95,10 +105,12 @@ function TreeNode({
   expandedDirs,
   onSelect,
   onToggle,
+  isLast = false,
 }: TreeNodeProps): React.JSX.Element {
   const indent = depth * 12;
   const isExpanded = expandedDirs.has(node.path);
   const isSelected = selectedPath === node.path;
+  const connector = depth > 0 ? (isLast ? '└── ' : '├── ') : '';
 
   if (node.type === 'directory') {
     return (
@@ -106,13 +118,22 @@ function TreeNode({
         <button
           onClick={() => onToggle(node.path)}
           style={{ paddingLeft: indent + 8 }}
-          className="w-full text-left py-1 pr-2 text-xs text-[#9ca3af] hover:text-white flex items-center gap-1.5 transition-colors"
+          className="w-full text-left py-1 pr-2 text-[11px] flex items-center gap-1.5"
+          onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = 'var(--ae-text)'; }}
+          onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.color = 'var(--ae-text2)'; }}
         >
-          <span className="font-mono text-[10px] select-none">{isExpanded ? '▼' : '▶'}</span>
-          <span className="font-mono text-[#6b7280] select-none">[dir]</span>
-          {node.name}
+          <span style={{ color: 'var(--ae-text3)', whiteSpace: 'pre' }}>{connector}</span>
+          <span
+            className="font-mono text-[10px] select-none px-1"
+            style={{ color: 'var(--ae-amber)', border: '1px solid var(--ae-amber-dim)', flexShrink: 0 }}
+          >
+            dir
+          </span>
+          <span style={{ color: 'var(--ae-text2)' }}>
+            {isExpanded ? '▼ ' : '▶ '}{node.name}
+          </span>
         </button>
-        {isExpanded && node.children?.map((child) => (
+        {isExpanded && node.children?.map((child, i) => (
           <TreeNode
             key={child.path}
             node={child}
@@ -121,6 +142,7 @@ function TreeNode({
             expandedDirs={expandedDirs}
             onSelect={onSelect}
             onToggle={onToggle}
+            isLast={i === (node.children!.length - 1)}
           />
         ))}
       </div>
@@ -130,16 +152,29 @@ function TreeNode({
   return (
     <button
       onClick={() => onSelect(node.path)}
-      style={{ paddingLeft: indent + 8 }}
-      className={[
-        'w-full text-left py-1 pr-2 text-xs flex items-center gap-1.5 transition-colors',
-        isSelected
-          ? 'text-white bg-[#1e1e2e]'
-          : 'text-[#9ca3af] hover:text-white hover:bg-[#1a1a27]',
-      ].join(' ')}
+      style={{
+        paddingLeft: indent + 8,
+        background: isSelected ? 'var(--ae-raised)' : 'transparent',
+        borderLeft: isSelected ? '2px solid var(--ae-amber)' : '2px solid transparent',
+        display: 'flex',
+        alignItems: 'center',
+        gap: 6,
+        width: '100%',
+        textAlign: 'left',
+        paddingTop: 4,
+        paddingBottom: 4,
+        paddingRight: 8,
+      }}
+      onMouseEnter={(e) => {
+        if (!isSelected) (e.currentTarget as HTMLElement).style.background = 'var(--ae-surface)';
+      }}
+      onMouseLeave={(e) => {
+        if (!isSelected) (e.currentTarget as HTMLElement).style.background = 'transparent';
+      }}
     >
+      <span style={{ color: 'var(--ae-text3)', whiteSpace: 'pre', fontSize: 11 }}>{connector}</span>
       <FileIcon name={node.name} />
-      {node.name}
+      <span className="text-[11px]" style={{ color: isSelected ? 'var(--ae-text)' : 'var(--ae-text2)' }}>{node.name}</span>
     </button>
   );
 }
@@ -160,7 +195,7 @@ function HeartbeatView({ content }: { content: string }): React.JSX.Element {
 
   if (parseError) {
     return (
-      <div className="text-sm text-red-400 p-4">
+      <div className="text-[11px] p-4" style={{ color: 'var(--ae-red)' }}>
         Failed to parse heartbeat-state.json as JSON.
       </div>
     );
@@ -174,20 +209,20 @@ function HeartbeatView({ content }: { content: string }): React.JSX.Element {
   return (
     <div className="p-4">
       {isStale && (
-        <div className="mb-4 px-3 py-2 bg-yellow-900/40 border border-yellow-700 rounded text-sm text-yellow-300">
+        <div className="mb-4 px-3 py-2 text-[11px]" style={{ background: 'var(--ae-warn-dim)', border: '1px solid var(--ae-warn)', color: 'var(--ae-warn)' }}>
           STALE — last heartbeat was {lastHeartbeat ? formatRelTime(lastHeartbeat) : 'unknown'}
         </div>
       )}
-      <table className="w-full text-sm border-collapse">
+      <table className="w-full border-collapse">
         <tbody>
           {Object.entries(parsed).map(([key, value]) => (
-            <tr key={key} className="border-b border-[#1e1e2e]">
-              <td className="py-1.5 pr-4 font-mono text-[#9ca3af] text-xs w-48 align-top">{key}</td>
-              <td className="py-1.5 text-white break-all align-top">
+            <tr key={key} style={{ borderBottom: '1px solid var(--ae-border)' }}>
+              <td className="py-1.5 pr-4 text-[11px] w-48 align-top" style={{ color: 'var(--ae-text2)' }}>{key}</td>
+              <td className="py-1.5 text-[11px] break-all align-top" style={{ color: 'var(--ae-text)' }}>
                 {key === 'last_heartbeat' && typeof value === 'string' ? (
                   <span>
                     {value}
-                    <span className="ml-2 text-[#6b7280] text-xs">({formatRelTime(value)})</span>
+                    <span className="ml-2 text-[10px]" style={{ color: 'var(--ae-text3)' }}>({formatRelTime(value)})</span>
                   </span>
                 ) : (
                   String(value)
@@ -222,18 +257,19 @@ function JsonPreview({ content }: { content: string }): React.JSX.Element {
       /("(\\u[a-fA-F0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?)/g,
       (match) => {
         if (/^"/.test(match)) {
-          if (/:$/.test(match)) return `<span style="color:#a5b4fc">${match}</span>`; // key
-          return `<span style="color:#86efac">${match}</span>`; // string value
+          if (/:$/.test(match)) return `<span style="color:#C8890A">${match}</span>`; // key — amber
+          return `<span style="color:#1E9050">${match}</span>`; // string value — green
         }
-        if (/true|false/.test(match)) return `<span style="color:#fcd34d">${match}</span>`;
-        if (/null/.test(match)) return `<span style="color:#f87171">${match}</span>`;
-        return `<span style="color:#67e8f9">${match}</span>`; // number
+        if (/true|false/.test(match)) return `<span style="color:#A86020">${match}</span>`; // warn
+        if (/null/.test(match)) return `<span style="color:#A83030">${match}</span>`; // red
+        return `<span style="color:#3A8080">${match}</span>`; // number — cyan
       },
     );
 
   return (
     <pre
-      className="text-xs leading-relaxed overflow-auto p-4 h-full"
+      className="text-[11px] leading-relaxed overflow-auto p-4 h-full"
+      style={{ color: 'var(--ae-text)' }}
       dangerouslySetInnerHTML={{ __html: colorized }}
     />
   );
@@ -254,6 +290,16 @@ function SessionStateEditor({ content, onClose, onSaved }: SessionStateEditorPro
   const [totp, setTotp] = useState('');
   const [status, setStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const [errorMsg, setErrorMsg] = useState('');
+
+  const inputStyle: React.CSSProperties = {
+    background: 'var(--ae-raised)',
+    border: '1px solid var(--ae-border)',
+    color: 'var(--ae-text)',
+    fontFamily: '"IBM Plex Mono", ui-monospace, monospace',
+    fontSize: 11,
+    padding: '3px 6px',
+    outline: 'none',
+  };
 
   async function handleSave(): Promise<void> {
     if (!totp.trim()) {
@@ -288,39 +334,53 @@ function SessionStateEditor({ content, onClose, onSaved }: SessionStateEditorPro
 
   return (
     <div className="flex flex-col h-full">
-      <div className="flex items-center gap-2 px-3 py-2 border-b border-[#1e1e2e]">
-        <span className="text-xs text-[#6b7280] flex-1">Editing SESSION-STATE.md</span>
+      <div className="flex items-center gap-2 px-3 py-2 flex-shrink-0" style={{ borderBottom: '1px solid var(--ae-border)' }}>
+        <span className="text-[11px] flex-1" style={{ color: 'var(--ae-text2)' }}>Editing SESSION-STATE.md</span>
         <input
           type="text"
           value={totp}
           onChange={(e) => setTotp(e.target.value)}
-          placeholder="TOTP token"
+          placeholder="TOTP"
           maxLength={6}
-          className="w-24 px-2 py-1 text-xs font-mono bg-[#1e1e2e] border border-[#2d2d3e] rounded text-white placeholder-[#6b7280] focus:outline-none focus:border-[#6366f1]"
+          style={{ ...inputStyle, width: 80, textAlign: 'center' }}
+          onFocus={(e) => { (e.currentTarget as HTMLElement).style.borderColor = 'var(--ae-amber)'; }}
+          onBlur={(e) => { (e.currentTarget as HTMLElement).style.borderColor = 'var(--ae-border)'; }}
         />
         <button
           onClick={() => { void handleSave(); }}
           disabled={status === 'saving'}
-          className="px-3 py-1 text-xs bg-[#6366f1] hover:bg-[#5254cc] disabled:opacity-50 text-white rounded transition-colors"
+          className="text-[10px] uppercase tracking-[0.08em] disabled:opacity-50"
+          style={{
+            padding: '4px 10px',
+            background: 'var(--ae-amber)',
+            border: 'none',
+            color: 'var(--ae-void)',
+          }}
         >
           {status === 'saving' ? 'Saving…' : status === 'saved' ? 'Saved ✓' : 'Save'}
         </button>
         <button
           onClick={onClose}
-          className="px-2 py-1 text-xs text-[#6b7280] hover:text-white transition-colors"
+          className="text-[11px]"
+          style={{ color: 'var(--ae-text2)', background: 'none', border: 'none', cursor: 'pointer' }}
         >
           Cancel
         </button>
       </div>
       {errorMsg && (
-        <div className="px-3 py-1.5 bg-red-900/30 text-red-400 text-xs border-b border-red-800">
+        <div className="px-3 py-1.5 text-[11px]" style={{ background: 'var(--ae-red-dim)', borderBottom: '1px solid var(--ae-red)', color: 'var(--ae-red)' }}>
           {errorMsg}
         </div>
       )}
       <textarea
         value={draft}
         onChange={(e) => setDraft(e.target.value)}
-        className="flex-1 resize-none bg-[#0f0f17] text-white font-mono text-xs p-4 focus:outline-none"
+        className="flex-1 resize-none p-4 focus:outline-none text-[11px]"
+        style={{
+          background: 'var(--ae-raised)',
+          color: 'var(--ae-text)',
+          fontFamily: '"IBM Plex Mono", ui-monospace, monospace',
+        }}
         spellCheck={false}
       />
     </div>
@@ -360,7 +420,7 @@ function PreviewPane({
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-full text-[#6b7280] text-sm">
+      <div className="flex items-center justify-center h-full text-[11px]" style={{ color: 'var(--ae-text2)' }}>
         Loading…
       </div>
     );
@@ -368,13 +428,13 @@ function PreviewPane({
 
   if (error) {
     return (
-      <div className="p-4 text-sm text-red-400">Error: {error}</div>
+      <div className="p-4 text-[11px]" style={{ color: 'var(--ae-red)' }}>Error: {error}</div>
     );
   }
 
   if (!file) {
     return (
-      <div className="flex items-center justify-center h-full text-[#6b7280] text-sm">
+      <div className="flex items-center justify-center h-full text-[11px]" style={{ color: 'var(--ae-text2)' }}>
         Select a file to preview
       </div>
     );
@@ -385,12 +445,18 @@ function PreviewPane({
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
-      <div className="flex items-center gap-2 px-3 py-2 border-b border-[#1e1e2e] flex-shrink-0">
-        <span className="text-xs text-[#9ca3af] font-mono flex-1 truncate">{file.path}</span>
+      <div className="flex items-center gap-2 px-3 py-2 flex-shrink-0" style={{ borderBottom: '1px solid var(--ae-border)' }}>
+        <span className="text-[11px] flex-1 truncate" style={{ color: 'var(--ae-text2)' }}>{file.path}</span>
         {isSessionState && (
           <button
             onClick={onEditSessionState}
-            className="px-2 py-1 text-xs text-[#6366f1] hover:text-[#818cf8] border border-[#6366f1]/40 rounded transition-colors"
+            className="text-[10px] uppercase tracking-[0.08em]"
+            style={{
+              padding: '3px 8px',
+              background: 'transparent',
+              border: '1px solid var(--ae-amber-dim)',
+              color: 'var(--ae-amber)',
+            }}
           >
             Edit
           </button>
@@ -408,11 +474,11 @@ function PreviewPane({
         ) : file.ext === 'json' ? (
           <JsonPreview content={file.content} />
         ) : file.ext === 'txt' || file.ext === '' ? (
-          <pre className="text-xs leading-relaxed overflow-auto p-4 whitespace-pre-wrap text-[#e2e8f0]">
+          <pre className="text-[11px] leading-relaxed overflow-auto p-4 whitespace-pre-wrap" style={{ color: 'var(--ae-text)' }}>
             {file.content}
           </pre>
         ) : (
-          <div className="p-4 text-sm text-[#6b7280]">Binary file — cannot preview</div>
+          <div className="p-4 text-[11px]" style={{ color: 'var(--ae-text2)' }}>Binary file — cannot preview</div>
         )}
       </div>
     </div>
@@ -428,6 +494,16 @@ function TerminalPanel(): React.JSX.Element {
   const [cronId, setCronId] = useState(CRON_IDS[0]?.id ?? '');
   const [output, setOutput] = useState('');
   const [loading, setLoading] = useState(false);
+
+  const selectStyle: React.CSSProperties = {
+    background: 'var(--ae-raised)',
+    border: '1px solid var(--ae-border)',
+    color: 'var(--ae-text)',
+    fontFamily: '"IBM Plex Mono", ui-monospace, monospace',
+    fontSize: 11,
+    padding: '3px 6px',
+    outline: 'none',
+  };
 
   async function run(): Promise<void> {
     setLoading(true);
@@ -450,15 +526,15 @@ function TerminalPanel(): React.JSX.Element {
   }
 
   return (
-    <div className="flex flex-col border-t border-[#1e1e2e]">
+    <div className="flex flex-col" style={{ borderTop: '1px solid var(--ae-border)' }}>
       <div className="flex items-center gap-2 px-3 py-2 flex-shrink-0">
-        <span className="text-xs text-[#6b7280] font-semibold uppercase tracking-wider">
-          Terminal
-        </span>
+        <span className="ae-section-label">── Terminal ──────────────────</span>
         <select
           value={cmd}
           onChange={(e) => setCmd(e.target.value)}
-          className="ml-auto text-xs bg-[#1e1e2e] border border-[#2d2d3e] text-white rounded px-2 py-1 focus:outline-none focus:border-[#6366f1]"
+          style={{ ...selectStyle, marginLeft: 'auto' }}
+          onFocus={(e) => { (e.currentTarget as HTMLElement).style.borderColor = 'var(--ae-amber)'; }}
+          onBlur={(e) => { (e.currentTarget as HTMLElement).style.borderColor = 'var(--ae-border)'; }}
         >
           {TERMINAL_CMDS.map((c) => (
             <option key={c.key} value={c.key}>{c.label}</option>
@@ -469,7 +545,9 @@ function TerminalPanel(): React.JSX.Element {
           <select
             value={cronId}
             onChange={(e) => setCronId(e.target.value)}
-            className="text-xs bg-[#1e1e2e] border border-[#2d2d3e] text-white rounded px-2 py-1 focus:outline-none focus:border-[#6366f1]"
+            style={selectStyle}
+            onFocus={(e) => { (e.currentTarget as HTMLElement).style.borderColor = 'var(--ae-amber)'; }}
+            onBlur={(e) => { (e.currentTarget as HTMLElement).style.borderColor = 'var(--ae-border)'; }}
           >
             {CRON_IDS.map((c) => (
               <option key={c.id} value={c.id}>{c.name} ({c.id})</option>
@@ -479,13 +557,19 @@ function TerminalPanel(): React.JSX.Element {
         <button
           onClick={() => { void run(); }}
           disabled={loading}
-          className="px-3 py-1 text-xs bg-[#1e1e2e] hover:bg-[#2d2d3e] disabled:opacity-50 text-white rounded border border-[#2d2d3e] transition-colors"
+          className="text-[10px] uppercase tracking-[0.08em] disabled:opacity-50"
+          style={{
+            padding: '4px 10px',
+            background: 'transparent',
+            border: '1px solid var(--ae-border-hi)',
+            color: 'var(--ae-text2)',
+          }}
         >
           {loading ? 'Running…' : 'Run'}
         </button>
       </div>
       {output && (
-        <pre className="text-xs font-mono text-[#e2e8f0] bg-[#0a0a0f] border-t border-[#1e1e2e] p-3 overflow-auto max-h-40 whitespace-pre-wrap">
+        <pre className="text-[11px] p-3 overflow-auto max-h-40 whitespace-pre-wrap" style={{ color: 'var(--ae-text)', background: 'var(--ae-void)', borderTop: '1px solid var(--ae-border)' }}>
           {output}
         </pre>
       )}
@@ -639,11 +723,17 @@ export default function WorkspacePage(): React.JSX.Element {
     <div className="flex flex-col h-full">
       <div className="flex-shrink-0 mb-3">
         <div className="flex items-center gap-3 mb-3">
-          <h1 className="text-xl font-semibold text-white flex-1">Workspace &amp; Memory</h1>
+          <h1 className="text-[14px] font-medium flex-1" style={{ color: 'var(--ae-text)' }}>Workspace &amp; Memory</h1>
           {/* Files button — only visible on mobile */}
           <button
             onClick={() => setMobileTreeOpen(true)}
-            className="md:hidden px-3 py-1.5 text-xs bg-[#1e1e2e] border border-[#2a2a3e] rounded text-[#c9d1d9] hover:text-white transition-colors"
+            className="md:hidden text-[10px] uppercase tracking-[0.08em]"
+            style={{
+              padding: '4px 10px',
+              background: 'transparent',
+              border: '1px solid var(--ae-border-hi)',
+              color: 'var(--ae-text2)',
+            }}
           >
             Files
           </button>
@@ -656,31 +746,44 @@ export default function WorkspacePage(): React.JSX.Element {
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Search workspace files (.md, .json)…"
-            className="w-full px-3 py-2 text-sm bg-[#12121a] border border-[#1e1e2e] rounded text-white placeholder-[#6b7280] focus:outline-none focus:border-[#6366f1]"
+            className="w-full px-3 py-2 text-[11px] focus:outline-none"
+            style={{
+              background: 'var(--ae-raised)',
+              border: '1px solid var(--ae-border)',
+              color: 'var(--ae-text)',
+              fontFamily: '"IBM Plex Mono", ui-monospace, monospace',
+            }}
+            onFocus={(e) => { (e.currentTarget as HTMLElement).style.borderColor = 'var(--ae-amber)'; }}
+            onBlur={(e) => { (e.currentTarget as HTMLElement).style.borderColor = 'var(--ae-border)'; }}
           />
+          {/* Placeholder color via CSS injection for this specific input */}
+          <style>{`input::placeholder { color: var(--ae-text3) !important; }`}</style>
           {searchLoading && (
-            <span className="absolute right-3 top-2.5 text-xs text-[#6b7280]">Searching…</span>
+            <span className="absolute right-3 top-2.5 text-[10px]" style={{ color: 'var(--ae-text3)' }}>Searching…</span>
           )}
 
           {/* Search results dropdown */}
           {searchResults !== null && searchQuery.trim().length >= 2 && (
-            <div className="absolute z-10 top-full left-0 right-0 mt-1 bg-[#12121a] border border-[#1e1e2e] rounded shadow-xl max-h-64 overflow-y-auto">
+            <div className="absolute z-10 top-full left-0 right-0 mt-1 max-h-64 overflow-y-auto" style={{ background: 'var(--ae-surface)', border: '1px solid var(--ae-border)' }}>
               {searchResults.length === 0 ? (
-                <div className="p-3 text-sm text-[#6b7280]">No results</div>
+                <div className="p-3 text-[11px]" style={{ color: 'var(--ae-text2)' }}>No results</div>
               ) : (
                 searchResults.map((r) => (
                   <button
                     key={r.path}
                     onClick={() => handleSearchResultClick(r)}
-                    className="w-full text-left px-3 py-2.5 hover:bg-[#1e1e2e] border-b border-[#1a1a27] last:border-0"
+                    className="w-full text-left px-3 py-2.5"
+                    style={{ borderBottom: '1px solid var(--ae-border)' }}
+                    onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = 'var(--ae-raised)'; }}
+                    onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
                   >
                     <div className="flex items-center gap-2 mb-0.5">
-                      <span className="text-xs font-mono text-[#818cf8]">{r.path}</span>
-                      <span className="text-[10px] text-[#6b7280]">
+                      <span className="text-[11px]" style={{ color: 'var(--ae-cyan)' }}>{r.path}</span>
+                      <span className="text-[10px]" style={{ color: 'var(--ae-text3)' }}>
                         {r.matchCount} match{r.matchCount !== 1 ? 'es' : ''}
                       </span>
                     </div>
-                    <div className="text-xs text-[#9ca3af] truncate">{r.excerpt}</div>
+                    <div className="text-[10px] truncate" style={{ color: 'var(--ae-text2)' }}>{r.excerpt}</div>
                   </button>
                 ))
               )}
@@ -693,34 +796,35 @@ export default function WorkspacePage(): React.JSX.Element {
       {mobileTreeOpen && (
         <>
           <div
-            className="md:hidden fixed inset-0 z-40 bg-black/60"
+            className="md:hidden fixed inset-0 z-40"
+            style={{ background: 'rgba(0,0,0,0.6)' }}
             onClick={() => setMobileTreeOpen(false)}
           />
-          <div className="md:hidden fixed top-0 left-0 z-50 h-full w-64 bg-[#0f0f17] border-r border-[#1e1e2e] overflow-y-auto shadow-2xl">
-            <div className="flex items-center justify-between px-3 py-2 border-b border-[#1e1e2e]">
-              <span className="text-xs font-semibold text-[#6b7280] uppercase tracking-widest">Files</span>
-              <button onClick={() => setMobileTreeOpen(false)} className="text-[#6b7280] hover:text-white p-1">
+          <div className="md:hidden fixed top-0 left-0 z-50 h-full w-64 overflow-y-auto" style={{ background: 'var(--ae-void)', borderRight: '1px solid var(--ae-border)' }}>
+            <div className="flex items-center justify-between px-3 py-2" style={{ borderBottom: '1px solid var(--ae-border)' }}>
+              <span className="ae-section-label">── Files ──────────────</span>
+              <button onClick={() => setMobileTreeOpen(false)} style={{ color: 'var(--ae-text2)', background: 'none', border: 'none', cursor: 'pointer' }}>
                 <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
                   <path d="M3.293 3.293a1 1 0 011.414 0L8 6.586l3.293-3.293a1 1 0 011.414 1.414L9.414 8l3.293 3.293a1 1 0 01-1.414 1.414L8 9.414l-3.293 3.293a1 1 0 01-1.414-1.414L6.586 8 3.293 4.707a1 1 0 010-1.414z" />
                 </svg>
               </button>
             </div>
-            {/* Reuse same tree content */}
             {treeLoading ? (
-              <div className="p-3 text-xs text-[#6b7280]">Loading…</div>
+              <div className="p-3 text-[11px]" style={{ color: 'var(--ae-text2)' }}>Loading…</div>
             ) : treeError ? (
-              <div className="p-3 text-xs text-red-400">{treeError}</div>
+              <div className="p-3 text-[11px]" style={{ color: 'var(--ae-red)' }}>{treeError}</div>
             ) : (
               treeData?.pinned.concat(treeData.tree).map((node) => (
                 <button
                   key={node.path}
                   onClick={() => { handleSelectFile(node.path); setMobileTreeOpen(false); }}
-                  className={[
-                    'w-full text-left px-3 py-2 text-xs flex items-center gap-1.5 transition-colors border-b border-[#1a1a27]',
-                    selectedPath === node.path
-                      ? 'text-white bg-[#1e1e2e]'
-                      : 'text-[#9ca3af] hover:text-white hover:bg-[#1a1a27]',
-                  ].join(' ')}
+                  className="w-full text-left px-3 py-2 text-[11px] flex items-center gap-1.5"
+                  style={{
+                    borderBottom: '1px solid var(--ae-border)',
+                    background: selectedPath === node.path ? 'var(--ae-raised)' : 'transparent',
+                    borderLeft: selectedPath === node.path ? '2px solid var(--ae-amber)' : '2px solid transparent',
+                    color: selectedPath === node.path ? 'var(--ae-text)' : 'var(--ae-text2)',
+                  }}
                 >
                   <FileIcon name={node.name} />
                   {node.name}
@@ -733,49 +837,57 @@ export default function WorkspacePage(): React.JSX.Element {
 
       {/* Two-pane layout */}
       <ErrorBoundary label="File Browser">
-      <div className="flex-1 flex min-h-0 border border-[#1e1e2e] rounded overflow-hidden">
+      <div className="flex-1 flex min-h-0 overflow-hidden" style={{ border: '1px solid var(--ae-border)' }}>
         {/* Left: file tree — hidden on mobile, visible on md+ */}
-        <div className="hidden md:block w-56 flex-shrink-0 border-r border-[#1e1e2e] overflow-y-auto bg-[#0f0f17]">
+        <div className="hidden md:block w-56 flex-shrink-0 overflow-y-auto" style={{ borderRight: '1px solid var(--ae-border)', background: 'var(--ae-void)' }}>
           {treeLoading ? (
-            <div className="p-3 text-xs text-[#6b7280]">Loading…</div>
+            <div className="p-3 text-[11px]" style={{ color: 'var(--ae-text2)' }}>Loading…</div>
           ) : treeError ? (
-            <div className="p-3 text-xs text-red-400">{treeError}</div>
+            <div className="p-3 text-[11px]" style={{ color: 'var(--ae-red)' }}>{treeError}</div>
           ) : (
             <>
               {/* Pinned section */}
               {(treeData?.pinned.length ?? 0) > 0 && (
                 <div>
-                  <div className="px-3 pt-3 pb-1 text-[10px] font-semibold text-[#6b7280] uppercase tracking-widest">
-                    Pinned
+                  <div className="px-3 pt-3 pb-1">
+                    <span className="ae-section-label">── Pinned ─────</span>
                   </div>
                   {treeData?.pinned.map((node) => (
                     <button
                       key={node.path}
                       onClick={() => handleSelectFile(node.path)}
-                      className={[
-                        'w-full text-left px-3 py-1.5 text-xs flex items-center gap-1.5 transition-colors',
-                        selectedPath === node.path
-                          ? 'text-white bg-[#1e1e2e]'
+                      className="w-full text-left px-3 py-1.5 text-[11px] flex items-center gap-1.5"
+                      style={{
+                        background: selectedPath === node.path ? 'var(--ae-raised)' : 'transparent',
+                        borderLeft: selectedPath === node.path ? '2px solid var(--ae-amber)' : '2px solid transparent',
+                        color: selectedPath === node.path
+                          ? 'var(--ae-text)'
                           : PINNED_NAMES.has(node.name)
-                            ? 'text-[#a5b4fc] hover:text-white hover:bg-[#1a1a27]'
-                            : 'text-[#9ca3af] hover:text-white hover:bg-[#1a1a27]',
-                      ].join(' ')}
+                            ? 'var(--ae-text)'
+                            : 'var(--ae-text2)',
+                      }}
+                      onMouseEnter={(e) => {
+                        if (selectedPath !== node.path) (e.currentTarget as HTMLElement).style.background = 'var(--ae-surface)';
+                      }}
+                      onMouseLeave={(e) => {
+                        if (selectedPath !== node.path) (e.currentTarget as HTMLElement).style.background = 'transparent';
+                      }}
                     >
                       <FileIcon name={node.name} />
                       {node.name}
                     </button>
                   ))}
-                  <div className="border-b border-[#1e1e2e] my-1" />
+                  <div className="my-1" style={{ borderBottom: '1px solid var(--ae-border)' }} />
                 </div>
               )}
 
               {/* Regular tree */}
               {(treeData?.tree.length ?? 0) === 0 && (treeData?.pinned.length ?? 0) === 0 ? (
-                <div className="p-3 text-xs text-[#6b7280]">
+                <div className="p-3 text-[11px]" style={{ color: 'var(--ae-text2)' }}>
                   Workspace empty or unavailable
                 </div>
               ) : (
-                treeData?.tree.map((node) => (
+                treeData?.tree.map((node, i) => (
                   <TreeNode
                     key={node.path}
                     node={node}
@@ -784,6 +896,7 @@ export default function WorkspacePage(): React.JSX.Element {
                     expandedDirs={expandedDirs}
                     onSelect={handleSelectFile}
                     onToggle={handleToggleDir}
+                    isLast={i === (treeData!.tree.length - 1)}
                   />
                 ))
               )}
@@ -792,7 +905,7 @@ export default function WorkspacePage(): React.JSX.Element {
         </div>
 
         {/* Right: preview pane */}
-        <div className="flex-1 min-w-0 bg-[#0c0c14] overflow-hidden flex flex-col">
+        <div className="flex-1 min-w-0 overflow-hidden flex flex-col" style={{ background: 'var(--ae-surface)' }}>
           <PreviewPane
             file={currentFile}
             loading={fileLoading}
@@ -809,7 +922,7 @@ export default function WorkspacePage(): React.JSX.Element {
 
       {/* Terminal panel */}
       <ErrorBoundary label="Terminal">
-        <div className="flex-shrink-0 mt-3 border border-[#1e1e2e] rounded overflow-hidden bg-[#0f0f17]">
+        <div className="flex-shrink-0 mt-3 overflow-hidden" style={{ border: '1px solid var(--ae-border)', background: 'var(--ae-void)' }}>
           <TerminalPanel />
         </div>
       </ErrorBoundary>

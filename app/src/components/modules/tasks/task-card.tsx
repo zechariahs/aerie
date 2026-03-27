@@ -13,17 +13,19 @@ interface TaskCardProps {
   onClick: () => void;
 }
 
+// Priority indicator colors using ae- hex palette
 const PRIORITY_COLORS: Record<string, string> = {
-  P1: 'bg-red-500',
-  P2: 'bg-orange-400',
-  P3: 'bg-blue-500',
-  P4: 'bg-[#4b5563]',
+  P1: '#A83030', // ae-red
+  P2: '#A86020', // ae-warn
+  P3: '#3A8080', // ae-cyan
+  P4: '#363430', // ae-text3
 };
 
-const TAG_COLORS: Record<string, string> = {
-  Work: 'bg-purple-900/60 text-purple-300',
-  Personal: 'bg-teal-900/60 text-teal-300',
-  Other: 'bg-yellow-900/60 text-yellow-300',
+// Tag badges use ae-badge classes but with override colors for distinction
+const TAG_BADGE_STYLE: Record<string, React.CSSProperties> = {
+  Work:     { color: 'var(--ae-amber)', borderColor: 'var(--ae-amber-dim)' },
+  Personal: { color: 'var(--ae-cyan)',  borderColor: 'var(--ae-cyan)' },
+  Other:    { color: 'var(--ae-text2)', borderColor: 'var(--ae-border-hi)' },
 };
 
 /**
@@ -40,31 +42,46 @@ export function TaskCard({ task, index, isSelected, onClick }: TaskCardProps): R
           {...provided.draggableProps}
           {...provided.dragHandleProps}
           onClick={onClick}
-          className={[
-            'p-3 rounded border cursor-pointer transition-colors select-none',
-            snapshot.isDragging
-              ? 'border-[#3b82f6] bg-[#1a1f3a] shadow-lg'
+          className="relative p-3 cursor-pointer select-none"
+          style={{
+            background: snapshot.isDragging
+              ? 'var(--ae-raised)'
               : isSelected
-                ? 'border-[#3b82f6] bg-[#161625]'
-                : 'border-[#1e1e2e] bg-[#12121a] hover:border-[#374151]',
-          ].join(' ')}
+                ? 'var(--ae-raised)'
+                : 'var(--ae-surface)',
+            border: snapshot.isDragging
+              ? '1px solid var(--ae-amber)'
+              : isSelected
+                ? '1px solid var(--ae-amber)'
+                : '1px solid var(--ae-border)',
+          }}
         >
+          {/* Corner brackets */}
+          <div className="absolute top-[-1px] left-[-1px] w-2 h-2" style={{ borderTop: '1px solid var(--ae-amber-dim)', borderLeft: '1px solid var(--ae-amber-dim)' }} />
+          <div className="absolute top-[-1px] right-[-1px] w-2 h-2" style={{ borderTop: '1px solid var(--ae-amber-dim)', borderRight: '1px solid var(--ae-amber-dim)' }} />
+          <div className="absolute bottom-[-1px] left-[-1px] w-2 h-2" style={{ borderBottom: '1px solid var(--ae-amber-dim)', borderLeft: '1px solid var(--ae-amber-dim)' }} />
+          <div className="absolute bottom-[-1px] right-[-1px] w-2 h-2" style={{ borderBottom: '1px solid var(--ae-amber-dim)', borderRight: '1px solid var(--ae-amber-dim)' }} />
+
           <div className="flex items-start gap-2">
             {/* Priority dot */}
             <span
-              className={`mt-1 flex-shrink-0 w-2 h-2 rounded-full ${priorityColor}`}
+              className="mt-1 flex-shrink-0 w-2 h-2"
+              style={{ background: priorityColor }}
               title={task.priority}
             />
             <div className="flex-1 min-w-0">
-              <p className="text-xs text-white leading-snug line-clamp-2">{task.title}</p>
+              <p className="text-[11px] leading-snug line-clamp-2" style={{ color: 'var(--ae-text)' }}>{task.title}</p>
               <div className="flex flex-wrap gap-1 mt-1.5">
                 {task.tag && (
-                  <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${TAG_COLORS[task.tag] ?? 'bg-[#1e1e2e] text-[#6b7280]'}`}>
+                  <span
+                    className="ae-badge"
+                    style={TAG_BADGE_STYLE[task.tag] ?? { color: 'var(--ae-text2)', borderColor: 'var(--ae-border-hi)' }}
+                  >
                     {task.tag}
                   </span>
                 )}
                 {task.assigned_agent && (
-                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-[#1e1e2e] text-[#6b7280]">
+                  <span className="ae-badge ae-badge-off">
                     {task.assigned_agent}
                   </span>
                 )}

@@ -20,12 +20,9 @@ interface BadgeProps {
 
 function StatusBadge({ label, active }: BadgeProps): React.JSX.Element {
   return (
-    <div className="flex items-center justify-between py-2 border-b border-[#1e1e2e]/50 last:border-0">
-      <span className="text-sm text-[#e2e8f0]">{label}</span>
-      <span className={[
-        'px-2 py-0.5 rounded text-xs font-medium',
-        active ? 'bg-green-900/30 text-green-400' : 'bg-red-900/30 text-red-400',
-      ].join(' ')}>
+    <div className="flex items-center justify-between py-2" style={{ borderBottom: '1px solid var(--ae-border)' }}>
+      <span className="text-[11px]" style={{ color: 'var(--ae-text)' }}>{label}</span>
+      <span className={active ? 'ae-badge ae-badge-ok' : 'ae-badge ae-badge-error'}>
         {active ? 'active' : 'inactive'}
       </span>
     </div>
@@ -35,12 +32,18 @@ function StatusBadge({ label, active }: BadgeProps): React.JSX.Element {
 export function ServicesUnavailable({ onRetry }: { onRetry: () => void }): React.JSX.Element {
   return (
     <div className="flex flex-col items-center justify-center gap-3 py-8 text-center">
-      <p className="text-sm text-[#6b7280]">
+      <p className="text-[11px]" style={{ color: 'var(--ae-text2)' }}>
         Host agent unavailable — is host-agent running on the VPS host?
       </p>
       <button
         onClick={onRetry}
-        className="text-xs px-3 py-1.5 rounded border border-[#1e1e2e] text-[#6b7280] hover:text-white hover:border-[#6366f1] transition-colors"
+        className="text-[10px] uppercase tracking-[0.08em]"
+        style={{
+          padding: '4px 10px',
+          background: 'transparent',
+          border: '1px solid var(--ae-border-hi)',
+          color: 'var(--ae-text2)',
+        }}
       >
         Retry
       </button>
@@ -92,7 +95,7 @@ export function ServicesPanel(): React.JSX.Element {
   }
 
   if (state.loading) {
-    return <div className="py-8 text-center text-xs text-[#6b7280] animate-pulse">Loading services…</div>;
+    return <div className="py-8 text-center text-[11px] animate-pulse" style={{ color: 'var(--ae-text2)' }}>Loading services…</div>;
   }
 
   if (state.error) {

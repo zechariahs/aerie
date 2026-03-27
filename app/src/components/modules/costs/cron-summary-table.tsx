@@ -40,32 +40,36 @@ export default function CronSummaryTable(): React.JSX.Element {
       .finally(() => setLoading(false));
   }, []);
 
-  if (loading) return <div className="h-40 animate-pulse rounded bg-[#1e1e2e]" />;
-  if (error) return <p className="text-sm text-red-400">Failed to load cron summary: {error}</p>;
+  if (loading) return <div className="h-40 animate-pulse" style={{ background: 'var(--ae-raised)', border: '1px solid var(--ae-border)' }} />;
+  if (error) return <p className="text-[11px]" style={{ color: 'var(--ae-red)' }}>Failed to load cron summary: {error}</p>;
   if (!data || data.rows.length === 0) {
-    return <p className="text-sm text-[#6b7280]">No cron data available.</p>;
+    return <p className="text-[11px]" style={{ color: 'var(--ae-text2)' }}>No cron data available.</p>;
   }
 
   return (
     <div className="overflow-x-auto">
-      <table className="w-full text-sm">
+      <table className="w-full">
         <thead>
-          <tr className="border-b border-[#1e1e2e] text-left text-xs text-[#6b7280]">
-            <th className="pb-2 pr-4">Cron</th>
-            <th className="pb-2 pr-4">Avg Tokens/Run</th>
-            <th className="pb-2 pr-4">Avg Cost/Run</th>
-            <th className="pb-2 pr-4">Total This Month</th>
-            <th className="pb-2 pr-4">Runs</th>
+          <tr style={{ borderBottom: '1px solid var(--ae-border)' }}>
+            {['Cron', 'Avg Tokens/Run', 'Avg Cost/Run', 'Total This Month', 'Runs'].map((h) => (
+              <th
+                key={h}
+                className="pb-2 pr-4 text-left font-normal text-[10px] uppercase tracking-[0.10em]"
+                style={{ color: 'var(--ae-text3)' }}
+              >
+                {h}
+              </th>
+            ))}
           </tr>
         </thead>
         <tbody>
           {data.rows.map((row) => (
-            <tr key={row.cronId} className="border-b border-[#1e1e2e]/50">
-              <td className="py-2 pr-4 font-mono text-[#c9d1d9]">{row.cronName}</td>
-              <td className="py-2 pr-4 text-[#9ca3af]">{tokens(row.avgTokensPerRun)}</td>
-              <td className="py-2 pr-4 text-[#9ca3af]">{usd(row.avgCostPerRun)}</td>
-              <td className="py-2 pr-4 font-medium text-white">{usd(row.totalThisMonth)}</td>
-              <td className="py-2 pr-4 text-[#9ca3af]">{row.runCount}</td>
+            <tr key={row.cronId} style={{ borderBottom: '1px solid var(--ae-border)' }}>
+              <td className="py-2 pr-4 text-[11px]" style={{ color: 'var(--ae-text)' }}>{row.cronName}</td>
+              <td className="py-2 pr-4 text-[11px]" style={{ color: 'var(--ae-text2)' }}>{tokens(row.avgTokensPerRun)}</td>
+              <td className="py-2 pr-4 text-[11px]" style={{ color: 'var(--ae-text2)' }}>{usd(row.avgCostPerRun)}</td>
+              <td className="py-2 pr-4 text-[11px] font-medium" style={{ color: 'var(--ae-text)' }}>{usd(row.totalThisMonth)}</td>
+              <td className="py-2 pr-4 text-[11px]" style={{ color: 'var(--ae-text2)' }}>{row.runCount}</td>
             </tr>
           ))}
         </tbody>

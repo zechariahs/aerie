@@ -35,19 +35,21 @@ interface BarProps {
   used: number;
   total: number;
   label: string;
+  warnAt?: number;
 }
 
-function UsageBar({ used, total, label }: BarProps): React.JSX.Element {
+function UsageBar({ used, total, label, warnAt = 100 }: BarProps): React.JSX.Element {
   const pct = total > 0 ? Math.min(100, (used / total) * 100) : 0;
-  const color = pct > 85 ? '#ef4444' : pct > 65 ? '#f59e0b' : '#6366f1';
+  // Disk: warn at warnAt threshold; default amber
+  const fillColor = pct >= warnAt ? '#A86020' : '#C8890A';
   return (
     <div>
-      <div className="flex justify-between text-xs text-[#6b7280] mb-1">
+      <div className="flex justify-between text-[11px] mb-1" style={{ color: 'var(--ae-text2)' }}>
         <span>{label}</span>
-        <span className="text-[#e2e8f0]">{pct.toFixed(1)}%</span>
+        <span style={{ color: 'var(--ae-text)' }}>{pct.toFixed(1)}%</span>
       </div>
-      <div className="h-2 rounded-full bg-[#1e1e2e] overflow-hidden">
-        <div className="h-full rounded-full transition-all duration-500" style={{ width: `${pct}%`, backgroundColor: color }} />
+      <div className="h-1.5 overflow-hidden" style={{ background: 'var(--ae-raised)', border: '1px solid var(--ae-border)' }}>
+        <div className="h-full transition-all duration-500" style={{ width: `${pct}%`, backgroundColor: fillColor }} />
       </div>
     </div>
   );
@@ -58,33 +60,32 @@ interface GaugeProps {
 }
 
 function CpuGauge({ value }: GaugeProps): React.JSX.Element {
-  // Half-circle arc gauge using SVG paths
+  // Half-circle arc gauge using SVG paths — always amber
   const radius = 36;
   const sw = 7;
   const circumference = Math.PI * radius;
   const offset = circumference * (1 - Math.min(100, value) / 100);
-  const color = value > 85 ? '#ef4444' : value > 65 ? '#f59e0b' : '#6366f1';
 
   return (
     <svg width="88" height="52" viewBox="0 0 88 52" className="overflow-visible">
       <path
         d={`M ${sw} ${48} A ${radius} ${radius} 0 0 1 ${88 - sw} ${48}`}
         fill="none"
-        stroke="#1e1e2e"
+        stroke="#111411"
         strokeWidth={sw}
-        strokeLinecap="round"
+        strokeLinecap="butt"
       />
       <path
         d={`M ${sw} ${48} A ${radius} ${radius} 0 0 1 ${88 - sw} ${48}`}
         fill="none"
-        stroke={color}
+        stroke="#C8890A"
         strokeWidth={sw}
-        strokeLinecap="round"
+        strokeLinecap="butt"
         strokeDasharray={circumference}
         strokeDashoffset={offset}
-        style={{ transition: 'stroke-dashoffset 0.5s ease, stroke 0.5s ease' }}
+        style={{ transition: 'stroke-dashoffset 0.5s ease' }}
       />
-      <text x="44" y="44" textAnchor="middle" fill="#e2e8f0" fontSize="13" fontWeight="600">
+      <text x="44" y="44" textAnchor="middle" fill="#C8C4B0" fontSize="13" fontWeight="500">
         {value.toFixed(1)}%
       </text>
     </svg>
@@ -95,12 +96,18 @@ function CpuGauge({ value }: GaugeProps): React.JSX.Element {
 export function SystemMetricsUnavailable({ onRetry }: { onRetry: () => void }): React.JSX.Element {
   return (
     <div className="flex flex-col items-center justify-center gap-3 py-8 text-center">
-      <p className="text-sm text-[#6b7280]">
+      <p className="text-[11px]" style={{ color: 'var(--ae-text2)' }}>
         Host agent unavailable — is host-agent running on the VPS host?
       </p>
       <button
         onClick={onRetry}
-        className="text-xs px-3 py-1.5 rounded border border-[#1e1e2e] text-[#6b7280] hover:text-white hover:border-[#6366f1] transition-colors"
+        className="text-[10px] uppercase tracking-[0.08em]"
+        style={{
+          padding: '4px 10px',
+          background: 'transparent',
+          border: '1px solid var(--ae-border-hi)',
+          color: 'var(--ae-text2)',
+        }}
       >
         Retry
       </button>
@@ -158,7 +165,7 @@ export function SystemMetricsPanel(): React.JSX.Element {
   }
 
   if (state.loading) {
-    return <div className="py-8 text-center text-xs text-[#6b7280] animate-pulse">Loading metrics…</div>;
+    return <div className="py-8 text-center text-[11px] animate-pulse" style={{ color: 'var(--ae-text2)' }}>Loading metrics…</div>;
   }
 
   if (state.error) {
@@ -171,7 +178,7 @@ export function SystemMetricsPanel(): React.JSX.Element {
     <div className="space-y-5">
       {/* CPU */}
       <div>
-        <p className="text-xs font-semibold text-[#6b7280] uppercase tracking-wider mb-2">CPU</p>
+        <p className="ae-section-label mb-2">── CPU ────────────────────</p>
         <div className="flex items-end gap-4">
           <CpuGauge value={m.cpuPct} />
           <div className="flex-1 h-12">
@@ -180,10 +187,10 @@ export function SystemMetricsPanel(): React.JSX.Element {
                 <Area
                   type="monotone"
                   dataKey="value"
-                  stroke="#6366f1"
+                  stroke="#C8890A"
                   strokeWidth={1.5}
-                  fill="#6366f1"
-                  fillOpacity={0.1}
+                  fill="#C8890A"
+                  fillOpacity={0.08}
                   dot={false}
                   isAnimationActive={false}
                 />
@@ -196,21 +203,21 @@ export function SystemMetricsPanel(): React.JSX.Element {
       {/* RAM */}
       <UsageBar used={m.memUsedMb} total={m.memTotalMb} label={`RAM — ${m.memUsedMb} / ${m.memTotalMb} MB`} />
 
-      {/* Disk */}
-      <UsageBar used={m.diskUsedGb} total={m.diskTotalGb} label={`Disk — ${m.diskUsedGb} / ${m.diskTotalGb} GB`} />
+      {/* Disk — warn at 75% */}
+      <UsageBar used={m.diskUsedGb} total={m.diskTotalGb} label={`Disk — ${m.diskUsedGb} / ${m.diskTotalGb} GB`} warnAt={75} />
 
       {/* Network */}
       <div>
-        <p className="text-xs font-semibold text-[#6b7280] uppercase tracking-wider mb-2">Network</p>
-        <div className="flex gap-4 text-sm">
-          <span className="text-[#6b7280]">↓ <span className="text-[#e2e8f0]">{formatBytes(m.networkInBps)}</span></span>
-          <span className="text-[#6b7280]">↑ <span className="text-[#e2e8f0]">{formatBytes(m.networkOutBps)}</span></span>
+        <p className="ae-section-label mb-2">── Network ──────────────────</p>
+        <div className="flex gap-4 text-[11px]">
+          <span style={{ color: 'var(--ae-text2)' }}>↓ <span style={{ color: 'var(--ae-text)' }}>{formatBytes(m.networkInBps)}</span></span>
+          <span style={{ color: 'var(--ae-text2)' }}>↑ <span style={{ color: 'var(--ae-text)' }}>{formatBytes(m.networkOutBps)}</span></span>
         </div>
       </div>
 
       {/* Load Average */}
       <div>
-        <p className="text-xs font-semibold text-[#6b7280] uppercase tracking-wider mb-2">Load Average</p>
+        <p className="ae-section-label mb-2">── Load Average ──────────────</p>
         <div className="flex gap-2">
           {[
             { label: '1m', value: m.loadAvg1m },
@@ -219,7 +226,8 @@ export function SystemMetricsPanel(): React.JSX.Element {
           ].map(({ label, value }) => (
             <span
               key={label}
-              className="px-2 py-0.5 rounded text-xs border border-[#1e1e2e] text-[#e2e8f0]"
+              className="px-2 py-0.5 text-[11px]"
+              style={{ border: '1px solid var(--ae-border)', color: 'var(--ae-text)' }}
             >
               {label}: {value.toFixed(2)}
             </span>
@@ -228,11 +236,10 @@ export function SystemMetricsPanel(): React.JSX.Element {
       </div>
 
       {/* Uptime */}
-      <div className="flex justify-between text-xs">
-        <span className="text-[#6b7280]">Uptime</span>
-        <span className="text-[#e2e8f0]">{formatUptime(m.uptimeSeconds)}</span>
+      <div className="flex justify-between text-[11px]">
+        <span style={{ color: 'var(--ae-text2)' }}>Uptime</span>
+        <span style={{ color: 'var(--ae-text)' }}>{formatUptime(m.uptimeSeconds)}</span>
       </div>
     </div>
   );
 }
-

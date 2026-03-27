@@ -10,14 +10,78 @@ import type { BriefHistory, DriveFile } from '@/types';
 import { basePath } from '@/lib/client-url';
 
 // ---------------------------------------------------------------------------
+// Shared style constants
+// ---------------------------------------------------------------------------
+
+const panelStyle: React.CSSProperties = {
+  background: 'var(--ae-surface)',
+  border: '1px solid var(--ae-border)',
+  padding: '1rem',
+  position: 'relative',
+};
+
+const inputStyle: React.CSSProperties = {
+  background: 'var(--ae-raised)',
+  border: '1px solid var(--ae-border)',
+  color: 'var(--ae-text)',
+  fontFamily: '"IBM Plex Mono", ui-monospace, monospace',
+  fontSize: 11,
+  padding: '4px 8px',
+  outline: 'none',
+  width: '100%',
+};
+
+const totpStyle: React.CSSProperties = {
+  ...inputStyle,
+  width: 100,
+  textAlign: 'center',
+};
+
+const btnPrimary: React.CSSProperties = {
+  padding: '5px 16px',
+  background: 'var(--ae-amber)',
+  border: 'none',
+  color: 'var(--ae-void)',
+  fontFamily: '"IBM Plex Mono", ui-monospace, monospace',
+  fontSize: 10,
+  textTransform: 'uppercase',
+  letterSpacing: '0.08em',
+  cursor: 'pointer',
+};
+
+const btnSecondary: React.CSSProperties = {
+  padding: '5px 12px',
+  background: 'transparent',
+  border: '1px solid var(--ae-border-hi)',
+  color: 'var(--ae-text2)',
+  fontFamily: '"IBM Plex Mono", ui-monospace, monospace',
+  fontSize: 10,
+  textTransform: 'uppercase',
+  letterSpacing: '0.08em',
+  cursor: 'pointer',
+};
+
+// Corner brackets component
+function CornerBrackets(): React.JSX.Element {
+  return (
+    <>
+      <div className="absolute top-[-1px] left-[-1px] w-2 h-2" style={{ borderTop: '1px solid var(--ae-amber)', borderLeft: '1px solid var(--ae-amber)' }} />
+      <div className="absolute top-[-1px] right-[-1px] w-2 h-2" style={{ borderTop: '1px solid var(--ae-amber)', borderRight: '1px solid var(--ae-amber)' }} />
+      <div className="absolute bottom-[-1px] left-[-1px] w-2 h-2" style={{ borderBottom: '1px solid var(--ae-amber)', borderLeft: '1px solid var(--ae-amber)' }} />
+      <div className="absolute bottom-[-1px] right-[-1px] w-2 h-2" style={{ borderBottom: '1px solid var(--ae-amber)', borderRight: '1px solid var(--ae-amber)' }} />
+    </>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Shared UI primitives
 // ---------------------------------------------------------------------------
 
 function SectionHeader({ title, description }: { title: string; description: string }): React.JSX.Element {
   return (
     <div className="mb-4">
-      <h2 className="text-base font-semibold text-white">{title}</h2>
-      <p className="text-xs text-[#6b7280] mt-0.5">{description}</p>
+      <p className="ae-section-label mb-1">── {title} ─────────────────</p>
+      <p className="text-[11px]" style={{ color: 'var(--ae-text2)' }}>{description}</p>
     </div>
   );
 }
@@ -38,14 +102,16 @@ function TotpInput({
       onChange={(e) => onChange(e.target.value)}
       placeholder={label}
       maxLength={6}
-      className="w-24 px-2 py-1.5 text-xs font-mono bg-[#1e1e2e] border border-[#2d2d3e] rounded text-white placeholder-[#6b7280] focus:outline-none focus:border-[#6366f1]"
+      style={totpStyle}
+      onFocus={(e) => { (e.currentTarget as HTMLElement).style.borderColor = 'var(--ae-amber)'; }}
+      onBlur={(e) => { (e.currentTarget as HTMLElement).style.borderColor = 'var(--ae-border)'; }}
     />
   );
 }
 
 function ErrorBanner({ message }: { message: string }): React.JSX.Element {
   return (
-    <div className="px-3 py-2 bg-red-900/30 border border-red-800 rounded text-xs text-red-400">
+    <div className="px-3 py-2 text-[11px]" style={{ background: 'var(--ae-red-dim)', border: '1px solid var(--ae-red)', color: 'var(--ae-red)' }}>
       {message}
     </div>
   );
@@ -53,7 +119,7 @@ function ErrorBanner({ message }: { message: string }): React.JSX.Element {
 
 function SuccessBanner({ message }: { message: string }): React.JSX.Element {
   return (
-    <div className="px-3 py-2 bg-green-900/30 border border-green-800 rounded text-xs text-green-400">
+    <div className="px-3 py-2 text-[11px]" style={{ background: 'var(--ae-green-dim)', border: '1px solid var(--ae-green)', color: 'var(--ae-green)' }}>
       {message}
     </div>
   );
@@ -138,7 +204,8 @@ function BriefGenerator(): React.JSX.Element {
   const isGenerating = status === 'generating';
 
   return (
-    <div className="bg-[#0f0f17] border border-[#1e1e2e] rounded p-4 space-y-4">
+    <div style={panelStyle} className="space-y-4">
+      <CornerBrackets />
       <SectionHeader
         title="Brief Generator"
         description="Assemble a Claude context brief from live dashboard data and write it to Google Drive."
@@ -146,24 +213,26 @@ function BriefGenerator(): React.JSX.Element {
 
       {/* Notes textarea */}
       <div>
-        <label className="block text-xs text-[#9ca3af] mb-1">Operator notes (optional)</label>
+        <label className="block text-[10px] uppercase tracking-[0.14em] mb-1" style={{ color: 'var(--ae-text3)' }}>Operator notes (optional)</label>
         <textarea
           value={notes}
           onChange={(e) => setNotes(e.target.value)}
           rows={4}
-          placeholder="Add context for this Claude session — what you're working on, decisions pending, anything to highlight…"
-          className="w-full px-3 py-2 text-xs bg-[#12121a] border border-[#1e1e2e] rounded text-white placeholder-[#4b5563] focus:outline-none focus:border-[#6366f1] resize-none font-mono"
+          placeholder="Add context for this Claude session…"
+          style={{ ...inputStyle, resize: 'none' }}
+          onFocus={(e) => { (e.currentTarget as HTMLElement).style.borderColor = 'var(--ae-amber)'; }}
+          onBlur={(e) => { (e.currentTarget as HTMLElement).style.borderColor = 'var(--ae-border)'; }}
         />
       </div>
 
       {/* Progress steps while generating */}
       {isGenerating && (
-        <div className="px-3 py-2 bg-[#1e1e2e] rounded text-xs text-[#9ca3af] space-y-1">
+        <div className="px-3 py-2 text-[11px] space-y-1" style={{ background: 'var(--ae-raised)', color: 'var(--ae-text2)' }}>
           <div>Fetching cost summary…</div>
           <div>Reading cron run history…</div>
           <div>Loading task board…</div>
           <div>Reading SESSION-STATE.md…</div>
-          <div className="text-[#6366f1]">Writing to Google Drive…</div>
+          <div style={{ color: 'var(--ae-amber)' }}>Writing to Google Drive…</div>
         </div>
       )}
 
@@ -176,13 +245,15 @@ function BriefGenerator(): React.JSX.Element {
             href={lastBrief.url}
             target="_blank"
             rel="noopener noreferrer"
-            className="text-xs text-[#6366f1] hover:text-[#818cf8] underline whitespace-nowrap"
+            className="text-[11px] no-underline hover:underline whitespace-nowrap"
+            style={{ color: 'var(--ae-cyan)' }}
           >
             Open in Drive
           </a>
           <button
             onClick={() => { void copyUrl(); }}
-            className="text-xs text-[#6b7280] hover:text-white transition-colors whitespace-nowrap"
+            className="text-[11px] whitespace-nowrap"
+            style={{ color: 'var(--ae-text2)', background: 'none', border: 'none', cursor: 'pointer' }}
           >
             Copy URL
           </button>
@@ -195,7 +266,7 @@ function BriefGenerator(): React.JSX.Element {
         <button
           onClick={() => { void handleGenerate(); }}
           disabled={isGenerating}
-          className="px-4 py-1.5 text-xs bg-[#6366f1] hover:bg-[#5254cc] disabled:opacity-50 text-white rounded transition-colors"
+          style={{ ...btnPrimary, opacity: isGenerating ? 0.5 : 1 }}
         >
           {isGenerating ? 'Generating…' : 'Generate Brief'}
         </button>
@@ -203,36 +274,40 @@ function BriefGenerator(): React.JSX.Element {
 
       {/* Brief history table */}
       <div>
-        <div className="text-xs font-semibold text-[#6b7280] uppercase tracking-wider mb-2">
-          Brief History
-        </div>
+        <p className="ae-section-label mb-2">── Brief History ─────────────</p>
         {historyLoading ? (
-          <div className="text-xs text-[#6b7280]">Loading…</div>
+          <div className="text-[11px]" style={{ color: 'var(--ae-text2)' }}>Loading…</div>
         ) : history.length === 0 ? (
-          <div className="text-xs text-[#6b7280]">No briefs generated yet.</div>
+          <div className="text-[11px]" style={{ color: 'var(--ae-text2)' }}>No briefs generated yet.</div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-xs border-collapse">
+            <table className="w-full border-collapse">
               <thead>
-                <tr className="border-b border-[#1e1e2e]">
-                  <th className="text-left py-1.5 pr-4 text-[#6b7280] font-normal">Date</th>
-                  <th className="text-left py-1.5 pr-4 text-[#6b7280] font-normal">Title</th>
-                  <th className="text-left py-1.5 text-[#6b7280] font-normal">Link</th>
+                <tr style={{ borderBottom: '1px solid var(--ae-border)' }}>
+                  {['Date', 'Title', 'Link'].map((h) => (
+                    <th key={h} className="text-left py-1.5 pr-4 font-normal text-[10px] uppercase tracking-[0.10em]" style={{ color: 'var(--ae-text3)' }}>{h}</th>
+                  ))}
                 </tr>
               </thead>
               <tbody>
                 {history.map((b) => (
-                  <tr key={b.id} className="border-b border-[#12121a] hover:bg-[#1a1a27]">
-                    <td className="py-1.5 pr-4 text-[#9ca3af] font-mono whitespace-nowrap">
+                  <tr
+                    key={b.id}
+                    style={{ borderBottom: '1px solid var(--ae-border)' }}
+                    onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = 'var(--ae-raised)'; }}
+                    onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
+                  >
+                    <td className="py-2 pr-4 text-[11px] whitespace-nowrap" style={{ color: 'var(--ae-text2)' }}>
                       {new Date(b.created_at).toLocaleDateString()}
                     </td>
-                    <td className="py-1.5 pr-4 text-white truncate max-w-xs">{b.title}</td>
-                    <td className="py-1.5">
+                    <td className="py-2 pr-4 text-[11px] truncate max-w-xs" style={{ color: 'var(--ae-text)' }}>{b.title}</td>
+                    <td className="py-2">
                       <a
                         href={b.drive_url}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-[#6366f1] hover:text-[#818cf8] underline"
+                        className="text-[11px] no-underline hover:underline"
+                        style={{ color: 'var(--ae-cyan)' }}
                       >
                         Open
                       </a>
@@ -353,7 +428,8 @@ function SessionStateEditor(): React.JSX.Element {
     saveStatus === 'saving' ? 'Saving…' : saveStatus === 'saved' ? 'Saved ✓' : 'Save';
 
   return (
-    <div className="bg-[#0f0f17] border border-[#1e1e2e] rounded p-4 space-y-4">
+    <div style={panelStyle} className="space-y-4">
+      <CornerBrackets />
       <SectionHeader
         title="SESSION-STATE.md Editor"
         description="Edit the session state file included in Claude context briefs. Auto-saves 5 seconds after you stop typing (TOTP required)."
@@ -369,36 +445,36 @@ function SessionStateEditor(): React.JSX.Element {
             <button
               onClick={() => { void doSave(content, totp); }}
               disabled={saveStatus === 'saving' || !loaded}
-              className="px-3 py-1.5 text-xs bg-[#6366f1] hover:bg-[#5254cc] disabled:opacity-50 text-white rounded transition-colors"
+              style={{ ...btnPrimary, opacity: (saveStatus === 'saving' || !loaded) ? 0.5 : 1 }}
             >
               {saveLabel}
             </button>
             <button
               onClick={() => setShowPreview((p) => !p)}
-              className="px-3 py-1.5 text-xs border border-[#2d2d3e] text-[#9ca3af] hover:text-white rounded transition-colors"
+              style={btnSecondary}
             >
               {showPreview ? 'Edit' : 'Preview'}
             </button>
             <button
               onClick={() => { void handleExportForClaude(); }}
               disabled={!loaded}
-              className="px-3 py-1.5 text-xs border border-[#2d2d3e] text-[#9ca3af] hover:text-white disabled:opacity-50 rounded transition-colors"
+              style={{ ...btnSecondary, opacity: !loaded ? 0.5 : 1 }}
             >
               Export for Claude
             </button>
             {saveStatus === 'saving' && (
-              <span className="text-xs text-[#6b7280]">Saving…</span>
+              <span className="text-[11px]" style={{ color: 'var(--ae-text2)' }}>Saving…</span>
             )}
             {saveStatus === 'saved' && (
-              <span className="text-xs text-green-400">Saved ✓</span>
+              <span className="text-[11px]" style={{ color: 'var(--ae-green)' }}>Saved ✓</span>
             )}
           </div>
 
           {saveStatus === 'error' && errorMsg && <ErrorBanner message={errorMsg} />}
 
-          {/* Char count — helps verify content was received from the server */}
+          {/* Char count */}
           {loaded && (
-            <div className="text-[10px] text-[#4b5563] text-right">
+            <div className="text-[10px] text-right" style={{ color: 'var(--ae-text3)' }}>
               {content.length > 0
                 ? `${content.length.toLocaleString()} chars`
                 : 'File is empty — type to populate'}
@@ -408,7 +484,8 @@ function SessionStateEditor(): React.JSX.Element {
           {/* Editor / Preview */}
           {showPreview ? (
             <div
-              className="markdown-preview min-h-48 border border-[#1e1e2e] rounded p-3 text-sm overflow-auto max-h-96"
+              className="markdown-preview min-h-48 p-3 text-[11px] overflow-auto max-h-96"
+              style={{ border: '1px solid var(--ae-border)' }}
               dangerouslySetInnerHTML={{ __html: marked.parse(content) as string }}
             />
           ) : (
@@ -418,7 +495,9 @@ function SessionStateEditor(): React.JSX.Element {
               rows={16}
               disabled={!loaded}
               placeholder={loaded ? '' : 'Loading SESSION-STATE.md…'}
-              className="w-full px-3 py-2 text-xs bg-[#0a0a0f] border border-[#1e1e2e] rounded text-white placeholder-[#4b5563] focus:outline-none focus:border-[#6366f1] resize-none font-mono"
+              style={{ ...inputStyle, resize: 'none' }}
+              onFocus={(e) => { (e.currentTarget as HTMLElement).style.borderColor = 'var(--ae-amber)'; }}
+              onBlur={(e) => { (e.currentTarget as HTMLElement).style.borderColor = 'var(--ae-border)'; }}
               spellCheck={false}
             />
           )}
@@ -453,39 +532,38 @@ function DeliverablesList({
   onToggleQueue,
 }: DeliverableListProps): React.JSX.Element {
   if (files.length === 0) {
-    return <div className="text-xs text-[#6b7280] py-1">No files in {label}.</div>;
+    return <div className="text-[11px] py-1" style={{ color: 'var(--ae-text2)' }}>No files in {label}.</div>;
   }
 
   return (
     <div>
-      <div className="text-xs font-semibold text-[#6b7280] uppercase tracking-wider mb-2">{label}</div>
+      <p className="ae-section-label mb-2">── {label} ──────────────</p>
       <div className="space-y-1">
         {files.map((f) => {
           const queued = queuedPaths.has(f.id);
           return (
             <div
               key={f.id}
-              className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-[#1a1a27]"
+              className="flex items-center gap-2 px-2 py-1.5"
+              onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = 'var(--ae-raised)'; }}
+              onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
             >
               <a
                 href={f.webViewLink}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex-1 text-xs text-[#9ca3af] hover:text-white transition-colors truncate"
+                className="flex-1 text-[11px] no-underline hover:underline truncate"
+                style={{ color: 'var(--ae-text2)' }}
               >
                 {f.name}
               </a>
-              <span className="text-[10px] text-[#4b5563] whitespace-nowrap">
+              <span className="text-[10px] whitespace-nowrap" style={{ color: 'var(--ae-text3)' }}>
                 {new Date(f.createdTime).toLocaleDateString()}
               </span>
               <button
                 onClick={() => onToggleQueue(f)}
-                className={[
-                  'text-[10px] px-2 py-0.5 rounded border transition-colors whitespace-nowrap',
-                  queued
-                    ? 'border-[#6366f1] text-[#6366f1] bg-[#6366f1]/10'
-                    : 'border-[#2d2d3e] text-[#6b7280] hover:border-[#6366f1] hover:text-[#6366f1]',
-                ].join(' ')}
+                className={queued ? 'ae-badge ae-badge-active' : 'ae-badge ae-badge-off'}
+                style={{ cursor: 'pointer', whiteSpace: 'nowrap' }}
               >
                 {queued ? 'Queued ✓' : 'Add to Brief'}
               </button>
@@ -544,23 +622,24 @@ function DeliverablesBrowser(): React.JSX.Element {
   const queuedIds = new Set(queuedFiles.keys());
 
   return (
-    <div className="bg-[#0f0f17] border border-[#1e1e2e] rounded p-4 space-y-4">
+    <div style={panelStyle} className="space-y-4">
+      <CornerBrackets />
       <SectionHeader
         title="Deliverables Browser"
         description="Browse STG-Intelligence/ and Personal/ Drive folders. Queue files to include links in the next brief."
       />
 
-      {loading && <div className="text-xs text-[#6b7280]">Loading…</div>}
+      {loading && <div className="text-[11px]" style={{ color: 'var(--ae-text2)' }}>Loading…</div>}
       {error && <ErrorBanner message={error} />}
 
       {data && !data.configured && (
-        <div className="text-xs text-[#6b7280] px-3 py-2 bg-[#1e1e2e] rounded">
+        <div className="text-[11px] px-3 py-2" style={{ background: 'var(--ae-raised)', color: 'var(--ae-text2)' }}>
           Drive not configured — set GOOGLE_DRIVE_STG_FOLDER_ID and GOOGLE_DRIVE_PERSONAL_FOLDER_ID.
         </div>
       )}
 
       {data?.warnings?.map((w) => (
-        <div key={w} className="text-xs text-yellow-400 px-3 py-1 bg-yellow-900/20 border border-yellow-800 rounded">
+        <div key={w} className="text-[11px] px-3 py-1" style={{ background: 'var(--ae-warn-dim)', border: '1px solid var(--ae-warn)', color: 'var(--ae-warn)' }}>
           {w}
         </div>
       ))}
@@ -581,19 +660,21 @@ function DeliverablesBrowser(): React.JSX.Element {
           />
 
           {queuedFiles.size > 0 && (
-            <div className="flex items-center gap-3 pt-2 border-t border-[#1e1e2e]">
-              <span className="text-xs text-[#9ca3af]">
+            <div className="flex items-center gap-3 pt-2" style={{ borderTop: '1px solid var(--ae-border)' }}>
+              <span className="text-[11px]" style={{ color: 'var(--ae-text2)' }}>
                 {queuedFiles.size} file{queuedFiles.size !== 1 ? 's' : ''} queued for brief
               </span>
               <button
                 onClick={() => { void copyQueuedLinks(); }}
-                className="text-xs text-[#6366f1] hover:text-[#818cf8] transition-colors"
+                className="text-[11px]"
+                style={{ color: 'var(--ae-cyan)', background: 'none', border: 'none', cursor: 'pointer' }}
               >
                 Copy links
               </button>
               <button
                 onClick={() => setQueuedFiles(new Map())}
-                className="text-xs text-[#6b7280] hover:text-white transition-colors"
+                className="text-[11px]"
+                style={{ color: 'var(--ae-text2)', background: 'none', border: 'none', cursor: 'pointer' }}
               >
                 Clear queue
               </button>
@@ -670,31 +751,36 @@ function TaskSpecsWriter(): React.JSX.Element {
   const isWriting = status === 'writing';
 
   return (
-    <div className="bg-[#0f0f17] border border-[#1e1e2e] rounded p-4 space-y-4">
+    <div style={panelStyle} className="space-y-4">
+      <CornerBrackets />
       <SectionHeader
         title="Task-Specs Writer"
         description="Write a task specification document directly to the Task-Specs/ Drive folder. The configured agent will pick it up on the next cycle."
       />
 
       <div>
-        <label className="block text-xs text-[#9ca3af] mb-1">Title</label>
+        <label className="block text-[10px] uppercase tracking-[0.14em] mb-1" style={{ color: 'var(--ae-text3)' }}>Title</label>
         <input
           type="text"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           placeholder="Task spec title…"
-          className="w-full px-3 py-1.5 text-xs bg-[#12121a] border border-[#1e1e2e] rounded text-white placeholder-[#4b5563] focus:outline-none focus:border-[#6366f1]"
+          style={inputStyle}
+          onFocus={(e) => { (e.currentTarget as HTMLElement).style.borderColor = 'var(--ae-amber)'; }}
+          onBlur={(e) => { (e.currentTarget as HTMLElement).style.borderColor = 'var(--ae-border)'; }}
         />
       </div>
 
       <div>
-        <label className="block text-xs text-[#9ca3af] mb-1">Content (Markdown)</label>
+        <label className="block text-[10px] uppercase tracking-[0.14em] mb-1" style={{ color: 'var(--ae-text3)' }}>Content (Markdown)</label>
         <textarea
           value={content}
           onChange={(e) => setContent(e.target.value)}
           rows={10}
           placeholder={'## Objective\n\n## Background\n\n## Success Criteria\n'}
-          className="w-full px-3 py-2 text-xs bg-[#0a0a0f] border border-[#1e1e2e] rounded text-white placeholder-[#4b5563] focus:outline-none focus:border-[#6366f1] resize-none font-mono"
+          style={{ ...inputStyle, resize: 'none' }}
+          onFocus={(e) => { (e.currentTarget as HTMLElement).style.borderColor = 'var(--ae-amber)'; }}
+          onBlur={(e) => { (e.currentTarget as HTMLElement).style.borderColor = 'var(--ae-border)'; }}
           spellCheck={false}
         />
       </div>
@@ -709,14 +795,16 @@ function TaskSpecsWriter(): React.JSX.Element {
               href={driveUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="text-xs text-[#6366f1] hover:text-[#818cf8] underline whitespace-nowrap"
+              className="text-[11px] no-underline hover:underline whitespace-nowrap"
+              style={{ color: 'var(--ae-cyan)' }}
             >
               Open in Drive
             </a>
           )}
           <button
             onClick={handleReset}
-            className="text-xs text-[#6b7280] hover:text-white transition-colors"
+            className="text-[11px]"
+            style={{ color: 'var(--ae-text2)', background: 'none', border: 'none', cursor: 'pointer' }}
           >
             Write another
           </button>
@@ -729,7 +817,7 @@ function TaskSpecsWriter(): React.JSX.Element {
           <button
             onClick={() => { void handleWrite(); }}
             disabled={isWriting}
-            className="px-4 py-1.5 text-xs bg-[#6366f1] hover:bg-[#5254cc] disabled:opacity-50 text-white rounded transition-colors"
+            style={{ ...btnPrimary, opacity: isWriting ? 0.5 : 1 }}
           >
             {isWriting ? 'Writing…' : 'Write to Drive'}
           </button>
@@ -747,8 +835,8 @@ export default function ClaudeLoopPage(): React.JSX.Element {
   return (
     <div className="space-y-6 pb-8">
       <div className="flex-shrink-0">
-        <h1 className="text-xl font-semibold text-white">Claude Integration Loop</h1>
-        <p className="text-xs text-[#6b7280] mt-0.5">
+        <h1 className="text-[14px] font-medium" style={{ color: 'var(--ae-text)' }}>Claude Integration Loop</h1>
+        <p className="text-[11px] mt-0.5" style={{ color: 'var(--ae-text2)', letterSpacing: '0.04em' }}>
           Generate context briefs, manage session state, browse deliverables, and write task specs.
         </p>
       </div>

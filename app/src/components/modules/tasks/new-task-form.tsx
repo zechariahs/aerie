@@ -14,6 +14,17 @@ interface NewTaskFormProps {
   onRequestTotp: (action: () => void) => void;
 }
 
+const inputStyle: React.CSSProperties = {
+  background: 'var(--ae-raised)',
+  border: '1px solid var(--ae-border)',
+  color: 'var(--ae-text)',
+  fontFamily: '"IBM Plex Mono", ui-monospace, monospace',
+  fontSize: 11,
+  padding: '4px 6px',
+  outline: 'none',
+  width: '100%',
+};
+
 /**
  * Slide-over form for creating a new task.
  */
@@ -72,49 +83,62 @@ export function NewTaskForm({ totpToken, onCreated, onCancel, onRequestTotp }: N
     onRequestTotp(() => { void doCreate(totpToken); });
   }
 
+  const focusAmber = (e: React.FocusEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+    (e.currentTarget as HTMLElement).style.borderColor = 'var(--ae-amber)';
+  };
+  const blurBorder = (e: React.FocusEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+    (e.currentTarget as HTMLElement).style.borderColor = 'var(--ae-border)';
+  };
+
   return (
     <div className="fixed inset-0 z-40 flex">
       {/* Backdrop */}
-      <div className="flex-1 bg-black/50" onClick={onCancel} />
+      <div className="flex-1" style={{ background: 'rgba(0,0,0,0.5)' }} onClick={onCancel} />
 
       {/* Panel */}
-      <div className="w-96 bg-[#0d0d14] border-l border-[#1e1e2e] flex flex-col">
-        <div className="flex items-center justify-between px-4 py-3 border-b border-[#1e1e2e]">
-          <span className="text-xs font-semibold text-white">New Task</span>
-          <button onClick={onCancel} className="text-[#6b7280] hover:text-white text-lg leading-none">×</button>
+      <div className="w-96 flex flex-col" style={{ background: 'var(--ae-void)', borderLeft: '1px solid var(--ae-border)' }}>
+        <div className="flex items-center justify-between px-4 py-3" style={{ borderBottom: '1px solid var(--ae-border)' }}>
+          <span className="ae-section-label">── New Task ─────────────</span>
+          <button onClick={onCancel} className="text-[16px] leading-none" style={{ color: 'var(--ae-text2)', background: 'none', border: 'none', cursor: 'pointer' }}>×</button>
         </div>
 
         <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
           <div>
-            <label className="block text-[10px] text-[#6b7280] uppercase tracking-widest mb-1">Title *</label>
+            <label className="block text-[10px] uppercase tracking-[0.14em] mb-1" style={{ color: 'var(--ae-text3)' }}>Title *</label>
             <input
               type="text"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               autoFocus
-              className="w-full px-2 py-1.5 bg-[#12121a] border border-[#1e1e2e] rounded text-xs text-white focus:outline-none focus:border-[#3b82f6]"
+              style={inputStyle}
               placeholder="Task title"
+              onFocus={focusAmber}
+              onBlur={blurBorder}
             />
           </div>
 
           <div>
-            <label className="block text-[10px] text-[#6b7280] uppercase tracking-widest mb-1">Description</label>
+            <label className="block text-[10px] uppercase tracking-[0.14em] mb-1" style={{ color: 'var(--ae-text3)' }}>Description</label>
             <textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               rows={4}
-              className="w-full px-2 py-1.5 bg-[#12121a] border border-[#1e1e2e] rounded text-xs text-white focus:outline-none focus:border-[#3b82f6] resize-none"
+              style={{ ...inputStyle, resize: 'none' }}
               placeholder="Optional description"
+              onFocus={focusAmber}
+              onBlur={blurBorder}
             />
           </div>
 
           <div className="grid grid-cols-2 gap-2">
             <div>
-              <label className="block text-[10px] text-[#6b7280] uppercase tracking-widest mb-1">Priority</label>
+              <label className="block text-[10px] uppercase tracking-[0.14em] mb-1" style={{ color: 'var(--ae-text3)' }}>Priority</label>
               <select
                 value={priority}
                 onChange={(e) => setPriority(e.target.value as TaskPriority)}
-                className="w-full px-2 py-1.5 bg-[#12121a] border border-[#1e1e2e] rounded text-xs text-white focus:outline-none"
+                style={inputStyle}
+                onFocus={focusAmber}
+                onBlur={blurBorder}
               >
                 <option value="P1">P1 — Critical</option>
                 <option value="P2">P2 — High</option>
@@ -123,11 +147,13 @@ export function NewTaskForm({ totpToken, onCreated, onCancel, onRequestTotp }: N
               </select>
             </div>
             <div>
-              <label className="block text-[10px] text-[#6b7280] uppercase tracking-widest mb-1">Tag</label>
+              <label className="block text-[10px] uppercase tracking-[0.14em] mb-1" style={{ color: 'var(--ae-text3)' }}>Tag</label>
               <select
                 value={tag}
                 onChange={(e) => setTag(e.target.value as TaskTag | '')}
-                className="w-full px-2 py-1.5 bg-[#12121a] border border-[#1e1e2e] rounded text-xs text-white focus:outline-none"
+                style={inputStyle}
+                onFocus={focusAmber}
+                onBlur={blurBorder}
               >
                 <option value="">None</option>
                 <option value="Work">Work</option>
@@ -139,40 +165,56 @@ export function NewTaskForm({ totpToken, onCreated, onCancel, onRequestTotp }: N
 
           <div className="grid grid-cols-2 gap-2">
             <div>
-              <label className="block text-[10px] text-[#6b7280] uppercase tracking-widest mb-1">Agent</label>
+              <label className="block text-[10px] uppercase tracking-[0.14em] mb-1" style={{ color: 'var(--ae-text3)' }}>Agent</label>
               <input
                 type="text"
                 value={assignedAgent}
                 onChange={(e) => setAssignedAgent(e.target.value)}
                 placeholder="e.g. primary-agent"
-                className="w-full px-2 py-1.5 bg-[#12121a] border border-[#1e1e2e] rounded text-xs text-white focus:outline-none focus:border-[#3b82f6]"
+                style={inputStyle}
+                onFocus={focusAmber}
+                onBlur={blurBorder}
               />
             </div>
             <div>
-              <label className="block text-[10px] text-[#6b7280] uppercase tracking-widest mb-1">Due Date</label>
+              <label className="block text-[10px] uppercase tracking-[0.14em] mb-1" style={{ color: 'var(--ae-text3)' }}>Due Date</label>
               <input
                 type="date"
                 value={dueDate}
                 onChange={(e) => setDueDate(e.target.value)}
-                className="w-full px-2 py-1.5 bg-[#12121a] border border-[#1e1e2e] rounded text-xs text-white focus:outline-none focus:border-[#3b82f6]"
+                style={inputStyle}
+                onFocus={focusAmber}
+                onBlur={blurBorder}
               />
             </div>
           </div>
 
-          {error && <p className="text-xs text-red-400">{error}</p>}
+          {error && <p className="text-[11px]" style={{ color: 'var(--ae-red)' }}>{error}</p>}
 
           <div className="flex gap-2 pt-2">
             <button
               type="button"
               onClick={onCancel}
-              className="flex-1 py-1.5 text-xs text-[#6b7280] border border-[#1e1e2e] rounded hover:text-white transition-colors"
+              className="flex-1 text-[10px] uppercase tracking-[0.08em]"
+              style={{
+                padding: '5px 12px',
+                background: 'transparent',
+                border: '1px solid var(--ae-border-hi)',
+                color: 'var(--ae-text2)',
+              }}
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={saving}
-              className="flex-1 py-1.5 text-xs text-white bg-[#3b82f6] rounded hover:bg-[#2563eb] disabled:opacity-50 transition-colors"
+              className="flex-1 text-[10px] uppercase tracking-[0.08em] disabled:opacity-50"
+              style={{
+                padding: '5px 12px',
+                background: 'var(--ae-amber)',
+                border: 'none',
+                color: 'var(--ae-void)',
+              }}
             >
               {saving ? 'Creating…' : 'Create Task'}
             </button>

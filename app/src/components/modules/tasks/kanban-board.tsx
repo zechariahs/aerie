@@ -177,7 +177,7 @@ export function KanbanBoard(): React.JSX.Element {
   if (loading && Object.values(tasks).every((c) => c.length === 0)) {
     return (
       <div className="flex items-center justify-center h-40">
-        <p className="text-sm text-[#6b7280]">Loading tasks…</p>
+        <p className="text-[11px]" style={{ color: 'var(--ae-text2)' }}>Loading tasks…</p>
       </div>
     );
   }
@@ -188,21 +188,29 @@ export function KanbanBoard(): React.JSX.Element {
       <div className="flex items-center gap-3 flex-shrink-0">
         <button
           onClick={() => setShowNewForm(true)}
-          className="px-3 py-1.5 text-xs text-white bg-[#3b82f6] rounded hover:bg-[#2563eb] transition-colors"
+          className="text-[10px] uppercase tracking-[0.08em]"
+          style={{
+            padding: '5px 12px',
+            background: 'var(--ae-amber)',
+            border: 'none',
+            color: 'var(--ae-void)',
+          }}
         >
           + New Task
         </button>
         <button
           onClick={() => setShowArchiveColumn((v) => !v)}
-          className={`px-3 py-1.5 text-xs rounded border transition-colors ${
-            showArchiveColumn
-              ? 'text-white border-[#374151] bg-[#1e1e2e]'
-              : 'text-[#6b7280] border-[#1e1e2e] hover:text-white'
-          }`}
+          className="text-[10px] uppercase tracking-[0.08em]"
+          style={{
+            padding: '5px 12px',
+            background: 'transparent',
+            border: '1px solid var(--ae-border-hi)',
+            color: showArchiveColumn ? 'var(--ae-text)' : 'var(--ae-text2)',
+          }}
         >
           {showArchiveColumn ? 'Hide Archived' : 'Show Archived'}
         </button>
-        {error && <p className="text-xs text-red-400">{error}</p>}
+        {error && <p className="text-[11px]" style={{ color: 'var(--ae-red)' }}>{error}</p>}
       </div>
 
       {/* Board + detail panel */}
@@ -215,12 +223,17 @@ export function KanbanBoard(): React.JSX.Element {
                 const colTasks = tasks[col];
                 return (
                   <div key={col} className="flex flex-col w-48 flex-shrink-0">
-                    {/* Column header */}
+                    {/* Column header — amber dash-label pattern */}
                     <div className="flex items-center justify-between mb-2 px-1">
-                      <span className="text-xs font-semibold text-[#6b7280] uppercase tracking-widest">
-                        {COLUMN_LABELS[col]}
-                      </span>
-                      <span className="text-[10px] text-[#374151] bg-[#12121a] px-1.5 py-0.5 rounded">
+                      <span className="ae-section-label">── {COLUMN_LABELS[col]} ───</span>
+                      <span
+                        className="text-[10px] px-1.5 py-0.5"
+                        style={{
+                          background: 'var(--ae-surface)',
+                          border: '1px solid var(--ae-border)',
+                          color: 'var(--ae-text3)',
+                        }}
+                      >
                         {colTasks.length}
                       </span>
                     </div>
@@ -231,14 +244,20 @@ export function KanbanBoard(): React.JSX.Element {
                         <div
                           ref={provided.innerRef}
                           {...provided.droppableProps}
-                          className={[
-                            'flex-1 rounded-lg p-2 space-y-2 transition-colors overflow-y-auto',
-                            snapshot.isDraggingOver
-                              ? 'bg-[#1a1f3a] border border-[#3b82f6]/30'
-                              : 'bg-[#0a0a11] border border-[#1e1e2e]',
-                          ].join(' ')}
-                          style={{ minHeight: 120 }}
+                          className="flex-1 p-2 space-y-2 overflow-y-auto"
+                          style={{
+                            minHeight: 120,
+                            background: snapshot.isDraggingOver ? 'var(--ae-amber-faint)' : 'var(--ae-void)',
+                            border: snapshot.isDraggingOver
+                              ? '1px solid var(--ae-amber-dim)'
+                              : '1px solid var(--ae-border)',
+                          }}
                         >
+                          {colTasks.length === 0 && !snapshot.isDraggingOver && (
+                            <p className="text-[10px] text-center italic py-4" style={{ color: 'var(--ae-text3)' }}>
+                              empty
+                            </p>
+                          )}
                           {colTasks.map((task, index) => (
                             <TaskCard
                               key={task.id}

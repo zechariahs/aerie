@@ -13,8 +13,8 @@ interface PanelProps {
 
 function Panel({ title, children }: PanelProps): React.JSX.Element {
   return (
-    <div className="rounded border border-[#1e1e2e] bg-[#12121a] p-4">
-      <h2 className="text-xs font-semibold text-[#6b7280] uppercase tracking-wider mb-4">{title}</h2>
+    <div style={{ background: 'var(--ae-surface)', border: '1px solid var(--ae-border)' }} className="p-4">
+      <p className="ae-section-label mb-4">── {title} ────────────────</p>
       {children}
     </div>
   );
@@ -23,7 +23,7 @@ function Panel({ title, children }: PanelProps): React.JSX.Element {
 export default function VpsHealthPage(): React.JSX.Element {
   return (
     <div>
-      <h1 className="text-xl font-semibold text-white mb-6">VPS Health</h1>
+      <h1 className="text-[14px] font-medium mb-6" style={{ color: 'var(--ae-text)' }}>VPS Health</h1>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <ErrorBoundary label="System Metrics">

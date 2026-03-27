@@ -31,10 +31,10 @@ export function TotpDialog({ title, description, onConfirm, onCancel }: TotpDial
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-      <div className="bg-[#12121a] border border-[#1e1e2e] rounded-lg p-6 w-80 shadow-xl">
-        <h3 className="text-sm font-semibold text-white mb-1">{title}</h3>
-        <p className="text-xs text-[#6b7280] mb-4">{description}</p>
+    <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: 'rgba(0,0,0,0.6)' }}>
+      <div className="p-6 w-80" style={{ background: 'var(--ae-surface)', border: '1px solid var(--ae-border)' }}>
+        <h3 className="text-[13px] font-medium mb-1" style={{ color: 'var(--ae-text)' }}>{title}</h3>
+        <p className="text-[11px] mb-4" style={{ color: 'var(--ae-text2)' }}>{description}</p>
 
         <form onSubmit={handleSubmit}>
           <input
@@ -46,21 +46,44 @@ export function TotpDialog({ title, description, onConfirm, onCancel }: TotpDial
             autoFocus
             value={token}
             onChange={(e) => setToken(e.target.value.replace(/\D/g, ''))}
-            className="w-full px-3 py-2 bg-[#0d0d14] border border-[#1e1e2e] rounded text-sm text-white placeholder-[#4b5563] focus:outline-none focus:border-[#3b82f6] tracking-widest text-center font-mono mb-2"
+            className="w-full text-center tracking-widest mb-2"
+            style={{
+              padding: '6px 8px',
+              background: 'var(--ae-raised)',
+              border: '1px solid var(--ae-border)',
+              color: 'var(--ae-text)',
+              fontFamily: '"IBM Plex Mono", ui-monospace, monospace',
+              fontSize: 12,
+              outline: 'none',
+            }}
+            onFocus={(e) => { (e.currentTarget as HTMLElement).style.borderColor = 'var(--ae-amber)'; }}
+            onBlur={(e) => { (e.currentTarget as HTMLElement).style.borderColor = 'var(--ae-border)'; }}
           />
-          {error && <p className="text-xs text-red-400 mb-2">{error}</p>}
+          {error && <p className="text-[11px] mb-2" style={{ color: 'var(--ae-red)' }}>{error}</p>}
 
           <div className="flex gap-2">
             <button
               type="button"
               onClick={onCancel}
-              className="flex-1 py-1.5 text-xs text-[#6b7280] border border-[#1e1e2e] rounded hover:text-white hover:border-[#374151] transition-colors"
+              className="flex-1 text-[10px] uppercase tracking-[0.08em]"
+              style={{
+                padding: '5px 12px',
+                background: 'transparent',
+                border: '1px solid var(--ae-border-hi)',
+                color: 'var(--ae-text2)',
+              }}
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="flex-1 py-1.5 text-xs text-white bg-[#3b82f6] rounded hover:bg-[#2563eb] transition-colors"
+              className="flex-1 text-[10px] uppercase tracking-[0.08em]"
+              style={{
+                padding: '5px 12px',
+                background: 'var(--ae-amber)',
+                border: 'none',
+                color: 'var(--ae-void)',
+              }}
             >
               Confirm
             </button>
