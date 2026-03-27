@@ -354,13 +354,40 @@ function startWatcher(): void {
 
   const watcher = chokidar.watch(globs, { persistent: true, ignoreInitial: false });
 
+  // Track whether the initial directory scan has finished.
+  // Files added BEFORE ready are pre-existing — skip their history.
+  // Files added AFTER ready are newly created at runtime — read them immediately.
+  let watcherReady = false;
+  watcher.on('ready', () => { watcherReady = true; });
+
   watcher.on('add', (filePath: string) => {
-    // Set cursor to current file size — do not replay history on startup.
-    try {
-      const stat = fs.statSync(filePath);
-      fileOffsets.set(filePath, stat.size);
-    } catch {
-      fileOffsets.set(filePath, 0);
+    if (!watcherReady) {
+      // Startup scan — set cursor to end so we don't replay existing history.
+      try {
+        const stat = fs.statSync(filePath);
+        fileOffsets.set(filePath, stat.size);
+      } catch {
+        fileOffsets.set(filePath, 0);
+      }
+      return;
+    }
+
+    // New file created at runtime (e.g. first run of a cron job).
+    // Start from byte 0 and emit any content already written.
+    fileOffsets.set(filePath, 0);
+    const text = readNewBytes(filePath);
+    if (!text) return;
+    for (const line of text.split('\n')) {
+      const trimmed = line.trim();
+      if (!trimmed) continue;
+      let obj: Record<string, unknown>;
+      try {
+        obj = JSON.parse(trimmed) as Record<string, unknown>;
+      } catch {
+        console.error('[host-agent] unparseable JSONL line in', filePath);
+        continue;
+      }
+      emitToClients(buildEnvelope(obj, filePath));
     }
   });
 
