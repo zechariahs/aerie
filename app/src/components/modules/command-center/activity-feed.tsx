@@ -6,7 +6,8 @@
 // useEffect is needed for EventSource (SSE) subscription — client-only browser API.
 
 import { useEffect, useRef, useState, useMemo } from 'react';
-import type { ActivityEvent, ActivityEventType, GatewayStatus } from '@/types';
+import type { ActivityEvent, ActivityEventType, CronRun, GatewayStatus } from '@/types';
+import { basePath } from '@/lib/client-url';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -154,6 +155,33 @@ function parseEnvelope(data: Record<string, unknown>): ActivityEvent | null {
   };
 }
 
+/** Convert a CronRun DB record to an ActivityEvent for the historical backfill. */
+function cronRunToActivityEvent(run: CronRun): ActivityEvent {
+  const type: ActivityEventType =
+    run.status === 'success' ? 'cron.end' :
+    run.status === 'running' ? 'cron.start' :
+    'cron.error';
+
+  const summary =
+    run.outputExcerpt ? run.outputExcerpt.slice(0, 120) :
+    run.errorMessage ? run.errorMessage.slice(0, 120) :
+    `Cron run (${run.status})`;
+
+  return {
+    id: run.id,
+    type,
+    agentId: run.cronId,
+    summary,
+    meta: {
+      cronId: run.cronId,
+      status: run.status,
+      durationMs: run.durationMs,
+      model: run.model,
+    },
+    timestamp: run.startedAt,
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Filter bar
 // ---------------------------------------------------------------------------
@@ -290,6 +318,27 @@ export function ActivityFeed({ gatewayStatus, configuredAgentIds }: ActivityFeed
     };
 
     return () => es.close();
+  }, []);
+
+  // Pre-populate feed with recent historical cron runs on mount
+  useEffect(() => {
+    void (async () => {
+      try {
+        const res = await fetch(basePath + '/api/crons/recent-runs?limit=30');
+        if (!res.ok) return;
+        const json = (await res.json()) as { data: CronRun[] };
+        const initial = (json.data ?? []).map(cronRunToActivityEvent);
+        if (initial.length > 0) {
+          setEvents((prev) => {
+            // Only set if no live events have arrived yet — avoid overwriting live events
+            if (prev.length > 0) return prev;
+            return initial.slice(0, MAX_EVENTS);
+          });
+        }
+      } catch {
+        // Non-fatal — feed will still show live events as they arrive
+      }
+    })();
   }, []);
 
   // Merge configured agent IDs with any IDs seen in live events
