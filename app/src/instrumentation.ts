@@ -15,5 +15,8 @@ export async function register(): Promise<void> {
 
     const { ensureBridgeStarted } = await import('./lib/gateway-bridge');
     ensureBridgeStarted(); // connects to Gateway immediately so events are captured before any client connects
+
+    const { startHostAgentConsumer } = await import('./lib/cron-runs-sync');
+    startHostAgentConsumer(); // opens server-side SSE connection to host agent for live cron_run ingestion
   }
 }

@@ -4,80 +4,72 @@
 /**
  * GET /api/events
  *
- * Server-Sent Events stream. Each connected browser client receives
- * ActivityEvent objects as they arrive from the Gateway bridge.
+ * Server-Sent Events stream. Proxies the host agent SSE stream directly to
+ * connected browser clients. No buffering, no transformation.
  *
- * Heartbeat ping every 30s to keep connections alive through proxies.
- * Auth: requires valid session cookie (read-only — no TOTP needed).
- *
- * REQUIRES_GATEWAY — in fixture mode, events are streamed from
- * fixtures/activity-events.json every 3s by the bridge.
+ * Auth: requires valid session cookie (no TOTP).
  */
 
 import { getSession } from '@/lib/auth';
-import { ensureBridgeStarted, getActivityBus, getReplayBuffer } from '@/lib/gateway-bridge';
-import type { ActivityEvent } from '@/types';
 
 export const dynamic = 'force-dynamic';
 
-export async function GET(): Promise<Response> {
+export async function GET(request: Request): Promise<Response> {
   const session = await getSession();
   if (!session) {
     return new Response('Unauthorized', { status: 401 });
   }
 
-  ensureBridgeStarted();
+  const hostAgentUrl = `http://host.docker.internal:3101/events`;
+  const token = process.env['HOST_AGENT_TOKEN'] ?? '';
 
-  let cleanup: (() => void) | null = null;
+  let upstream: Response;
+  try {
+    upstream = await fetch(hostAgentUrl, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+  } catch {
+    return new Response('Service Unavailable', { status: 503 });
+  }
 
-  const stream = new ReadableStream({
-    start(controller) {
-      const encoder = new TextEncoder();
+  if (!upstream.ok || !upstream.body) {
+    return new Response('Bad Gateway', { status: 502 });
+  }
 
-      function send(data: string): void {
-        try {
-          controller.enqueue(encoder.encode(data));
-        } catch {
-          // Client disconnected
+  const encoder = new TextEncoder();
+  const upstreamBody = upstream.body;
+
+  const readable = new ReadableStream<Uint8Array>({
+    async start(controller) {
+      const reader = upstreamBody.getReader();
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          controller.enqueue(value);
         }
+      } catch {
+        // upstream closed or client disconnected
+      } finally {
+        try {
+          controller.enqueue(encoder.encode('data: {"type":"disconnect"}\n\n'));
+        } catch {
+          // controller already closed
+        }
+        controller.close();
       }
-
-      function onEvent(event: ActivityEvent): void {
-        send(`data: ${JSON.stringify(event)}\n\n`);
-      }
-
-      const bus = getActivityBus();
-
-      // Register live listener first so no events are missed during replay
-      bus.on('event', onEvent);
-
-      // Replay buffered events so the feed is populated immediately on connect
-      for (const ev of getReplayBuffer()) {
-        send(`data: ${JSON.stringify(ev)}\n\n`);
-      }
-
-      // Heartbeat ping every 30s to keep connection alive through proxies
-      const heartbeat = setInterval(() => {
-        send(': ping\n\n');
-      }, 30_000);
-
-      cleanup = () => {
-        clearInterval(heartbeat);
-        bus.off('event', onEvent);
-      };
     },
     cancel() {
-      cleanup?.();
-      cleanup = null;
+      // Browser client disconnected — the fetch abort propagates to upstream reader
     },
   });
 
-  return new Response(stream, {
+  return new Response(readable, {
     headers: {
       'Content-Type': 'text/event-stream',
       'Cache-Control': 'no-cache, no-transform',
       Connection: 'keep-alive',
-      'X-Accel-Buffering': 'no', // disable Nginx buffering for SSE
+      'X-Accel-Buffering': 'no',
     },
   });
 }
