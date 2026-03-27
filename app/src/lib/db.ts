@@ -153,7 +153,6 @@ function applyMigrationV1(database: Database.Database): void {
   // before any API route is reachable. Safe to import here — ingest.ts
   // only uses better-sqlite3 and fs, both available at startup.
   try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { ingestCronRuns } = require('./ingest') as typeof import('./ingest');
     ingestCronRuns();
   } catch (err) {
