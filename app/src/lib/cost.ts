@@ -14,7 +14,8 @@ import type {
   CronCostSummaryRow,
   PaginatedSessionCosts,
 } from '@/types';
-import { getCronJobs, readCronRuns, readOpenClawConfig } from './openclaw';
+import { readOpenClawConfig } from './openclaw';
+import { getDb } from './db';
 
 const DEFAULT_AGENT_ID = 'primary-agent';
 
@@ -42,7 +43,6 @@ const DEFAULT_PRICE_TABLE: ModelPrice[] = [
   },
 ];
 
-const CACHE_TTL_MS = 15 * 60 * 1000; // 15 minutes
 
 /** Resolves the path for storing the price table on disk. */
 function priceTablePath(): string {
@@ -136,98 +136,111 @@ export async function getOpenRouterDailyCosts(_days: number): Promise<DailyAgent
   return [];
 }
 
-/** In-memory cache for cron-run cost data. */
-let _cronRunsCache: { data: DailyAgentCost[]; expiresAt: number } | undefined;
-
 /**
- * Builds daily cost data by reading token usage from each cron's JSONL run files.
- * Groups results by date + agentId + model, tagged source: 'estimated'.
+ * Returns daily cost data by querying the mc.db cron_runs table.
+ * Data is populated by the ingestion pipeline (ingest.ts) which runs on
+ * startup and every 5 minutes. SQLite is the cache — no in-memory layer needed.
  */
 export function getCostsFromCronRuns(days: number): DailyAgentCost[] {
   if (process.env['USE_FIXTURES'] === 'true') return [];
 
-  const now = Date.now();
-  if (_cronRunsCache && _cronRunsCache.expiresAt > now) {
-    const cutoff = toDateString(daysAgo(days));
-    return _cronRunsCache.data.filter((d) => d.date >= cutoff);
-  }
-
   const priceTable = loadPriceTable();
   const { providerModels } = readOpenClawConfig();
-  const jobs = getCronJobs();
-  const map = new Map<string, DailyAgentCost>();
-
-  // Build UUID → ProviderModel lookup for resolving nexos-style UUID model IDs
-  const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-  const uuidModelMap = new Map<string, ProviderModel>();
-  for (const pm of providerModels) {
-    if (UUID_RE.test(pm.id)) {
-      uuidModelMap.set(`${pm.provider}/${pm.id}`, pm);
-      uuidModelMap.set(pm.id, pm);
-    }
-  }
-
-  for (const job of jobs) {
-    const runs = readCronRuns(job.id, 1000);
-    for (const run of runs) {
-      if (!run.usage) continue;
-
-      // Derive date from runAtMs if present, else startedAt
-      const dateStr = run.runAtMs
-        ? toDateString(new Date(run.runAtMs))
-        : run.startedAt.slice(0, 10);
-
-      // Prefix model with provider if not already namespaced
-      const rawModel = run.model ?? '';
-      let modelId =
-        run.provider && rawModel && !rawModel.includes('/')
-          ? `${run.provider}/${rawModel}`
-          : rawModel || 'unknown';
-
-      // Resolve UUID model IDs to human-readable names via provider registry
-      const resolved = uuidModelMap.get(modelId) ?? uuidModelMap.get(rawModel);
-      if (resolved) {
-        modelId = `${resolved.provider}/${resolved.name}`;
-      }
-
-      // Fallback to job payload model if still unknown
-      if (modelId === 'unknown' && job.modelOverride) {
-        modelId = job.modelOverride;
-      }
-
-      const inputTokens = run.usage.input_tokens;
-      const outputTokens = run.usage.output_tokens;
-      const totalTokens = run.usage.total_tokens;
-      const costUsd = computeCost(inputTokens, outputTokens, modelId, priceTable, {
-        totalTokens,
-        providerModels,
-      });
-
-      const key = `${dateStr}::${job.agentId}::${modelId}`;
-      const existing = map.get(key);
-      if (existing) {
-        existing.inputTokens += inputTokens;
-        existing.outputTokens += outputTokens;
-        existing.costUsd += costUsd;
-      } else {
-        map.set(key, {
-          date: dateStr,
-          agentId: job.agentId,
-          modelId,
-          inputTokens,
-          outputTokens,
-          costUsd,
-          source: 'estimated',
-        });
-      }
-    }
-  }
-
-  const all = [...map.values()].sort((a, b) => a.date.localeCompare(b.date));
-  _cronRunsCache = { data: all, expiresAt: now + CACHE_TTL_MS };
-
   const cutoff = toDateString(daysAgo(days));
-  return all.filter((d) => d.date >= cutoff);
+
+  type Row = {
+    date: string;
+    agent_id: string | null;
+    model: string | null;
+    input_tokens: number;
+    output_tokens: number;
+    total_tokens: number | null;
+  };
+
+  const rows = getDb()
+    .prepare<[string], Row>(
+      `SELECT
+         substr(started_at, 1, 10) AS date,
+         agent_id,
+         model,
+         CAST(SUM(input_tokens)  AS INTEGER) AS input_tokens,
+         CAST(SUM(output_tokens) AS INTEGER) AS output_tokens,
+         CAST(SUM(total_tokens)  AS INTEGER) AS total_tokens
+       FROM cron_runs
+       WHERE started_at >= ?
+         AND input_tokens IS NOT NULL
+       GROUP BY date, agent_id, model
+       ORDER BY date ASC`,
+    )
+    .all(cutoff);
+
+  return rows.map((row): DailyAgentCost => {
+    const modelId = row.model ?? 'unknown';
+    const inputTokens = row.input_tokens ?? 0;
+    const outputTokens = row.output_tokens ?? 0;
+    const costUsd = computeCost(inputTokens, outputTokens, modelId, priceTable, {
+      totalTokens: row.total_tokens ?? undefined,
+      providerModels,
+    });
+    return {
+      date: row.date,
+      agentId: row.agent_id ?? 'unknown',
+      modelId,
+      inputTokens,
+      outputTokens,
+      costUsd,
+      source: 'estimated',
+    };
+  });
+}
+
+/**
+ * Returns per-cron cost summary rows for the given month start (YYYY-MM-DD).
+ * Used by the /api/costs/crons endpoint and CronSummaryTable component.
+ */
+export function getCronRunSummaryRows(monthStart: string): Array<{
+  cronId: string;
+  runCount: number;
+  totalInput: number;
+  totalOutput: number;
+  totalAllTokens: number;
+  avgTokensPerRun: number;
+}> {
+  if (process.env['USE_FIXTURES'] === 'true') return [];
+
+  type Row = {
+    cron_id: string;
+    run_count: number;
+    total_input: number;
+    total_output: number;
+    total_all_tokens: number | null;
+    avg_tokens_per_run: number;
+  };
+
+  const rows = getDb()
+    .prepare<[string], Row>(
+      `SELECT
+         cron_id,
+         COUNT(*)                                    AS run_count,
+         CAST(SUM(input_tokens)  AS INTEGER)         AS total_input,
+         CAST(SUM(output_tokens) AS INTEGER)         AS total_output,
+         CAST(SUM(total_tokens)  AS INTEGER)         AS total_all_tokens,
+         AVG(input_tokens + output_tokens)           AS avg_tokens_per_run
+       FROM cron_runs
+       WHERE started_at >= ?
+         AND input_tokens IS NOT NULL
+       GROUP BY cron_id`,
+    )
+    .all(monthStart);
+
+  return rows.map((row) => ({
+    cronId: row.cron_id,
+    runCount: row.run_count,
+    totalInput: row.total_input ?? 0,
+    totalOutput: row.total_output ?? 0,
+    totalAllTokens: row.total_all_tokens ?? 0,
+    avgTokensPerRun: Math.round(row.avg_tokens_per_run ?? 0),
+  }));
 }
 
 /**

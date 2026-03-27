@@ -26,66 +26,13 @@ export default function CronSummaryTable(): React.JSX.Element {
   const [error, setError] = useState<string | undefined>();
 
   useEffect(() => {
-    // Fetch sessions and derive cron summary client-side.
-    // Real cron attribution requires openclaw.json — in dev/fixture mode the data
-    // will show placeholder rows for the 6 known crons.
-    Promise.all([
-      fetch(basePath + '/api/costs/sessions?days=30&limit=200').then(async (r) => {
+    fetch(basePath + '/api/costs/crons?days=30')
+      .then(async (r) => {
         if (!r.ok) throw new Error(`HTTP ${r.status}`);
-        return r.json() as Promise<{ data: { items: Array<{ sessionId: string; costUsd: number; inputTokens: number; outputTokens: number; startedAt: string }> } }>;
-      }),
-    ])
-      .then(([sessionsResp]) => {
-        // Without live openclaw.json access in the browser, show a static fallback
-        // for the 6 known crons using session approximation.
-        // TODO(session-3): wire cron attribution once cron IDs are stamped on sessions
-        const now = new Date();
-        const monthStart = new Date(now.getFullYear(), now.getMonth(), 1)
-          .toISOString()
-          .slice(0, 10);
-
-        const thisMonthSessions = sessionsResp.data.items.filter(
-          (s) => s.startedAt >= monthStart,
-        );
-
-        const KNOWN_CRONS = [
-          { cronId: '51d8a322', cronName: 'heartbeat' },
-          { cronId: '76114cf6', cronName: 'reddit-signal-scan' },
-          { cronId: 'bb9599ba', cronName: 'reddit-engagement-brief' },
-          { cronId: 'aec5f855', cronName: 'weekly-research-digest' },
-          { cronId: '63530884', cronName: 'competitor-changelog-monitor' },
-          { cronId: '19f6e1bd', cronName: 'competitor-review-scrape' },
-        ];
-
-        // Distribute sessions evenly across crons as a best-effort approximation
-        const perCron = Math.ceil(thisMonthSessions.length / KNOWN_CRONS.length);
-        const rows: CronCostSummaryRow[] = KNOWN_CRONS.map((cron, idx) => {
-          const cronSessions = thisMonthSessions.slice(
-            idx * perCron,
-            (idx + 1) * perCron,
-          );
-          const runCount = cronSessions.length;
-          const totalThisMonth = cronSessions.reduce((s, c) => s + c.costUsd, 0);
-          const avgCostPerRun = runCount > 0 ? totalThisMonth / runCount : 0;
-          const avgTokensPerRun =
-            runCount > 0
-              ? cronSessions.reduce((s, c) => s + c.inputTokens + c.outputTokens, 0) /
-                runCount
-              : 0;
-
-          return {
-            cronId: cron.cronId,
-            cronName: cron.cronName,
-            avgTokensPerRun: Math.round(avgTokensPerRun),
-            avgCostPerRun,
-            totalThisMonth,
-            runCount,
-          };
-        });
-
-        // Sort by total this month descending
-        rows.sort((a, b) => b.totalThisMonth - a.totalThisMonth);
-        setData({ rows });
+        return r.json() as Promise<{ data: CronCostSummaryRow[] }>;
+      })
+      .then((resp) => {
+        setData({ rows: resp.data });
       })
       .catch((e: unknown) => {
         setError(e instanceof Error ? e.message : 'Failed to load');

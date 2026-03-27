@@ -4,6 +4,7 @@
 import fs from 'fs';
 import path from 'path';
 import type { CronJob, CronRun, AgentDescriptor, ProviderModel } from '@/types';
+import { getDb } from './db';
 
 // ── Raw config types ─────────────────────────────────────────────────────────
 
@@ -38,7 +39,7 @@ interface RawCronState {
   lastError?: string;
 }
 
-interface RawCronJob {
+export interface RawCronJob {
   id: string;
   agentId: string;
   name: string;
@@ -190,7 +191,7 @@ function parseProviderModels(obj: Record<string, unknown>): ProviderModel[] {
  * Reads cron job definitions from OPENCLAW_DIR/cron/jobs.json.
  * Returns an empty array if the file is absent or malformed.
  */
-function readCronJobsFile(): RawCronJob[] {
+export function readCronJobsFile(): RawCronJob[] {
   const clawDir = process.env['OPENCLAW_DIR'] ?? '/openclaw';
   const jobsPath = path.join(clawDir, 'cron', 'jobs.json');
 
@@ -250,85 +251,64 @@ export function getCronJobs(): CronJob[] {
 }
 
 /**
- * Reads the last N run entries for a cron job from
- * OPENCLAW_DIR/cron/runs/<cronId>.jsonl, newest-first.
+ * Returns the last N run entries for a cron job, newest-first.
+ * Queries mc.db (populated by the ingestion pipeline) as the primary source.
  */
 export function readCronRuns(cronId: string, limit: number): CronRun[] {
-  const clawDir = process.env['OPENCLAW_DIR'] ?? '/openclaw';
-  const runsPath = path.join(clawDir, 'cron', 'runs', `${cronId}.jsonl`);
+  type Row = {
+    id: string;
+    cron_id: string;
+    status: string;
+    started_at: string;
+    finished_at: string | null;
+    duration_ms: number | null;
+    output_excerpt: string | null;
+    drive_url: string | null;
+    error_message: string | null;
+    run_at_ms: number | null;
+    model: string | null;
+    provider: string | null;
+    input_tokens: number | null;
+    output_tokens: number | null;
+    total_tokens: number | null;
+  };
 
-  let text: string;
-  try {
-    text = fs.readFileSync(runsPath, 'utf8');
-  } catch {
-    return [];
-  }
+  const rows = getDb()
+    .prepare<[string, number], Row>(
+      `SELECT * FROM cron_runs
+       WHERE cron_id = ?
+       ORDER BY started_at DESC
+       LIMIT ?`,
+    )
+    .all(cronId, limit);
 
-  const lines = text.split('\n').filter((l) => l.trim() !== '');
-  const tail = lines.slice(-limit).reverse();
-
-  return tail.flatMap((line): CronRun[] => {
-    let obj: Record<string, unknown>;
-    try {
-      obj = JSON.parse(line) as Record<string, unknown>;
-    } catch {
-      return [];
-    }
-
-    const id =
-      typeof obj['sessionId'] === 'string' ? obj['sessionId'] :
-      typeof obj['id'] === 'string' ? obj['id'] :
-      crypto.randomUUID();
-    const rawStatus = typeof obj['status'] === 'string' ? obj['status'] : 'failure';
+  return rows.map((row): CronRun => {
+    const rawStatus = row.status;
     const status: CronRun['status'] =
       rawStatus === 'success' || rawStatus === 'running' ? rawStatus : 'failure';
 
-    const runAtMs = typeof obj['runAtMs'] === 'number' ? obj['runAtMs'] : null;
-    const durationMs =
-      typeof obj['durationMs'] === 'number' ? obj['durationMs'] :
-      typeof obj['duration_ms'] === 'number' ? obj['duration_ms'] : null;
-
-    const startedAt =
-      runAtMs != null ? new Date(runAtMs).toISOString() :
-      typeof obj['startedAt'] === 'string' ? obj['startedAt'] :
-      typeof obj['started_at'] === 'string' ? obj['started_at'] :
-      new Date().toISOString();
-
-    const finishedAt =
-      runAtMs != null && durationMs != null ? new Date(runAtMs + durationMs).toISOString() :
-      typeof obj['finishedAt'] === 'string' ? obj['finishedAt'] :
-      typeof obj['finished_at'] === 'string' ? obj['finished_at'] : undefined;
-
-    const rawUsage = typeof obj['usage'] === 'object' && obj['usage'] !== null
-      ? obj['usage'] as Record<string, unknown>
-      : null;
-
-    return [{
-      id,
-      cronId,
+    return {
+      id: row.id,
+      cronId: row.cron_id,
       status,
-      startedAt,
-      finishedAt,
-      durationMs: durationMs ?? undefined,
-      outputExcerpt:
-        typeof obj['summary'] === 'string' ? obj['summary'] :
-        typeof obj['outputExcerpt'] === 'string' ? obj['outputExcerpt'] :
-        typeof obj['output_excerpt'] === 'string' ? obj['output_excerpt'] : undefined,
-      driveUrl: typeof obj['driveUrl'] === 'string' ? obj['driveUrl'] : undefined,
-      errorMessage:
-        typeof obj['errorMessage'] === 'string' ? obj['errorMessage'] :
-        typeof obj['error'] === 'string' ? obj['error'] : undefined,
-      runAtMs: typeof obj['runAtMs'] === 'number' ? obj['runAtMs'] : undefined,
-      model: typeof obj['model'] === 'string' ? obj['model'] : undefined,
-      provider: typeof obj['provider'] === 'string' ? obj['provider'] : undefined,
-      usage: rawUsage
-        ? {
-            input_tokens: typeof rawUsage['input_tokens'] === 'number' ? rawUsage['input_tokens'] : 0,
-            output_tokens: typeof rawUsage['output_tokens'] === 'number' ? rawUsage['output_tokens'] : 0,
-            total_tokens: typeof rawUsage['total_tokens'] === 'number' ? rawUsage['total_tokens'] : undefined,
-          }
-        : undefined,
-    }];
+      startedAt: row.started_at,
+      finishedAt: row.finished_at ?? undefined,
+      durationMs: row.duration_ms ?? undefined,
+      outputExcerpt: row.output_excerpt ?? undefined,
+      driveUrl: row.drive_url ?? undefined,
+      errorMessage: row.error_message ?? undefined,
+      runAtMs: row.run_at_ms ?? undefined,
+      model: row.model ?? undefined,
+      provider: row.provider ?? undefined,
+      usage:
+        row.input_tokens != null && row.output_tokens != null
+          ? {
+              input_tokens: row.input_tokens,
+              output_tokens: row.output_tokens,
+              total_tokens: row.total_tokens ?? undefined,
+            }
+          : undefined,
+    };
   });
 }
 

@@ -177,7 +177,7 @@ function persistCronRun(event: ActivityEvent): void {
   try {
     const db = getDb();
     db.prepare(
-      `INSERT OR IGNORE INTO cron_runs
+      `INSERT OR REPLACE INTO cron_runs
          (id, cron_id, status, started_at, finished_at, duration_ms, error_message)
        VALUES (?, ?, ?, datetime('now', ? || ' seconds'), datetime('now'), ?, ?)`,
     ).run(

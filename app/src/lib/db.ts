@@ -32,6 +32,11 @@ export function getDb(): Database.Database {
 
 function runMigrations(database: Database.Database): void {
   database.exec(`
+    CREATE TABLE IF NOT EXISTS schema_version (
+      version    INTEGER PRIMARY KEY,
+      applied_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
     CREATE TABLE IF NOT EXISTS tasks (
       id          TEXT PRIMARY KEY,
       title       TEXT NOT NULL,
@@ -102,6 +107,58 @@ function runMigrations(database: Database.Database): void {
 
     CREATE INDEX IF NOT EXISTS idx_task_status_changes_task_id ON task_status_changes (task_id, changed_at DESC);
   `);
+
+  applyMigrationV1(database);
+}
+
+function applyMigrationV1(database: Database.Database): void {
+  const current = (
+    database.prepare('SELECT MAX(version) AS v FROM schema_version').get() as { v: number | null }
+  ).v ?? 0;
+
+  if (current >= 1) return;
+
+  // Extend cron_runs with token/cost tracking columns.
+  // ALTER TABLE ADD COLUMN throws if the column already exists — wrap each in try/catch.
+  const newColumns = [
+    'ALTER TABLE cron_runs ADD COLUMN model         TEXT',
+    'ALTER TABLE cron_runs ADD COLUMN provider      TEXT',
+    'ALTER TABLE cron_runs ADD COLUMN agent_id      TEXT',
+    'ALTER TABLE cron_runs ADD COLUMN input_tokens  INTEGER',
+    'ALTER TABLE cron_runs ADD COLUMN output_tokens INTEGER',
+    'ALTER TABLE cron_runs ADD COLUMN total_tokens  INTEGER',
+    'ALTER TABLE cron_runs ADD COLUMN run_at_ms     INTEGER',
+  ];
+  for (const sql of newColumns) {
+    try { database.exec(sql); } catch { /* column already exists */ }
+  }
+
+  database.exec(`
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_cron_runs_unique
+      ON cron_runs (cron_id, started_at);
+
+    CREATE INDEX IF NOT EXISTS idx_cron_runs_date
+      ON cron_runs (agent_id, run_at_ms DESC);
+
+    CREATE TABLE IF NOT EXISTS ingestion_state (
+      file_path   TEXT PRIMARY KEY,
+      last_offset INTEGER NOT NULL DEFAULT 0,
+      updated_at  TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+  `);
+
+  database.prepare('INSERT INTO schema_version (version) VALUES (1)').run();
+
+  // Run initial ingestion synchronously so SQLite is fully populated
+  // before any API route is reachable. Safe to import here — ingest.ts
+  // only uses better-sqlite3 and fs, both available at startup.
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { ingestCronRuns } = require('./ingest') as typeof import('./ingest');
+    ingestCronRuns();
+  } catch (err) {
+    console.error('[db] initial ingestion failed (non-fatal):', err);
+  }
 }
 
 /**
