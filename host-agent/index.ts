@@ -10,10 +10,12 @@
 import http from 'http';
 import { execFile } from 'child_process';
 import fs from 'fs';
+import chokidar from 'chokidar';
 
 const PORT = parseInt(process.env['HOST_AGENT_PORT'] ?? '3101', 10);
 const BIND_ADDRESS = process.env['HOST_AGENT_BIND'] ?? '127.0.0.1';
 const HOST_AGENT_TOKEN = process.env['HOST_AGENT_TOKEN'];
+const OPENCLAW_DATA_DIR = process.env['OPENCLAW_DATA_DIR'] ?? '/docker/openclaw-v5t3/data/.openclaw';
 
 // Allowlist of container names the agent may restart.
 // Read from ALLOWED_RESTART_CONTAINERS env var (comma-separated).
@@ -249,6 +251,159 @@ function sendJson(res: http.ServerResponse, status: number, body: unknown): void
   res.end(payload);
 }
 
+// ---------------------------------------------------------------------------
+// JSONL tail watcher — streams new lines from cron run and session files
+// ---------------------------------------------------------------------------
+
+interface SseEnvelope {
+  ts: string;
+  source: 'cron_run' | 'session';
+  agentId: string | null;
+  sessionId: string | null;
+  type: string;
+  raw: Record<string, unknown>;
+}
+
+/** Byte-offset cursor per watched file. Set to current file size on add (no history replay). */
+const fileOffsets = new Map<string, number>();
+
+/** All currently connected SSE clients. */
+const sseClients = new Set<http.ServerResponse>();
+
+/** Parse a file path to determine its source type and path-derived IDs. */
+function parseFilePath(filePath: string): {
+  source: 'cron_run' | 'session';
+  pathAgentId: string | null;
+  pathSessionId: string | null;
+} {
+  const cronMatch = filePath.match(/\/cron\/runs\/([^/]+)\.jsonl$/);
+  if (cronMatch) {
+    return { source: 'cron_run', pathAgentId: cronMatch[1] ?? null, pathSessionId: null };
+  }
+  const sessionMatch = filePath.match(/\/agents\/([^/]+)\/sessions\/([^/]+)\.jsonl$/);
+  if (sessionMatch) {
+    return { source: 'session', pathAgentId: sessionMatch[1] ?? null, pathSessionId: sessionMatch[2] ?? null };
+  }
+  return { source: 'session', pathAgentId: null, pathSessionId: null };
+}
+
+/** Read bytes beyond the stored cursor for this file; advance the cursor. */
+function readNewBytes(filePath: string): string {
+  const offset = fileOffsets.get(filePath) ?? 0;
+  let stat: fs.Stats;
+  try { stat = fs.statSync(filePath); } catch { return ''; }
+  if (stat.size <= offset) return '';
+  const newByteCount = stat.size - offset;
+  const buf = Buffer.alloc(newByteCount);
+  const fd = fs.openSync(filePath, 'r');
+  try {
+    fs.readSync(fd, buf, 0, newByteCount, offset);
+  } finally {
+    fs.closeSync(fd);
+  }
+  fileOffsets.set(filePath, stat.size);
+  return buf.toString('utf8');
+}
+
+/** Build an SSE envelope from a parsed JSONL line and its file path. */
+function buildEnvelope(line: Record<string, unknown>, filePath: string): SseEnvelope {
+  const { source, pathAgentId, pathSessionId } = parseFilePath(filePath);
+
+  const rawTs = line['timestamp'] ?? line['ts'];
+  const ts =
+    typeof rawTs === 'string' ? rawTs :
+    typeof rawTs === 'number' ? new Date(rawTs).toISOString() :
+    new Date().toISOString();
+
+  let agentId: string | null;
+  let sessionId: string | null;
+  if (source === 'cron_run') {
+    agentId = typeof line['jobId'] === 'string' ? line['jobId'] : pathAgentId;
+    sessionId = typeof line['sessionId'] === 'string' ? line['sessionId'] : null;
+  } else {
+    agentId = pathAgentId;
+    sessionId = pathSessionId;
+  }
+
+  const type =
+    typeof line['type'] === 'string' ? line['type'] :
+    typeof line['action'] === 'string' ? line['action'] :
+    'unknown';
+
+  return { ts, source, agentId, sessionId, type, raw: line };
+}
+
+/** Write an SSE envelope to all connected clients; remove dead connections. */
+function emitToClients(envelope: SseEnvelope): void {
+  const data = `data: ${JSON.stringify(envelope)}\n\n`;
+  for (const res of sseClients) {
+    try {
+      res.write(data);
+    } catch {
+      sseClients.delete(res);
+    }
+  }
+}
+
+/** Start chokidar watcher for cron run and session JSONL files. */
+function startWatcher(): void {
+  const globs = [
+    `${OPENCLAW_DATA_DIR}/cron/runs/*.jsonl`,
+    `${OPENCLAW_DATA_DIR}/agents/*/sessions/*.jsonl`,
+  ];
+
+  const watcher = chokidar.watch(globs, { persistent: true, ignoreInitial: false });
+
+  watcher.on('add', (filePath: string) => {
+    // Set cursor to current file size — do not replay history on startup.
+    try {
+      const stat = fs.statSync(filePath);
+      fileOffsets.set(filePath, stat.size);
+    } catch {
+      fileOffsets.set(filePath, 0);
+    }
+  });
+
+  watcher.on('change', (filePath: string) => {
+    const text = readNewBytes(filePath);
+    if (!text) return;
+    const lines = text.split('\n');
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed) continue;
+      let obj: Record<string, unknown>;
+      try {
+        obj = JSON.parse(trimmed) as Record<string, unknown>;
+      } catch {
+        console.error('[host-agent] unparseable JSONL line in', filePath);
+        continue;
+      }
+      emitToClients(buildEnvelope(obj, filePath));
+    }
+  });
+
+  watcher.on('error', (err: unknown) => {
+    console.error('[host-agent] watcher error:', err);
+  });
+
+  console.log(`[host-agent] watching JSONL files under ${OPENCLAW_DATA_DIR}`);
+}
+
+/** Send a heartbeat ping to all SSE clients every 30s. */
+setInterval(() => {
+  for (const res of sseClients) {
+    try {
+      res.write(': ping\n\n');
+    } catch {
+      sseClients.delete(res);
+    }
+  }
+}, 30_000);
+
+// ---------------------------------------------------------------------------
+// HTTP server
+// ---------------------------------------------------------------------------
+
 const server = http.createServer(async (req, res) => {
   // Only accept connections from localhost or Docker bridge networks
   const remoteAddr = req.socket.remoteAddress ?? '';
@@ -258,6 +413,29 @@ const server = http.createServer(async (req, res) => {
   }
 
   const url = req.url ?? '/';
+
+  if (req.method === 'GET' && url === '/events') {
+    if (!requireBearerAuth(req)) {
+      sendJson(res, 401, { error: 'Unauthorized' });
+      return;
+    }
+
+    res.writeHead(200, {
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache',
+      'Connection': 'keep-alive',
+      'X-Accel-Buffering': 'no',
+    });
+
+    res.write(': connected\n\n');
+    sseClients.add(res);
+
+    req.on('close', () => {
+      sseClients.delete(res);
+    });
+
+    return;
+  }
 
   if (req.method === 'GET' && url === '/metrics') {
     const [disk, network] = await Promise.all([getDiskStats(), getNetworkDelta()]);
@@ -328,4 +506,5 @@ server.listen(PORT, BIND_ADDRESS, () => {
   if (ALLOWED_CONTAINERS.size === 0) {
     console.warn('[host-agent] ALLOWED_RESTART_CONTAINERS is not set — docker restart endpoint will reject all requests');
   }
+  startWatcher();
 });

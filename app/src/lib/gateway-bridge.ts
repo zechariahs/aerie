@@ -349,6 +349,10 @@ function connect(): void {
         const payload2 = msg['payload'] as Record<string, unknown> | undefined;
         if (msg['ok'] === true && payload2?.['type'] === 'hello-ok') {
           console.log('[gateway-bridge] authenticated as operator');
+          // Backfill cron_runs from JSONL files now that we know the gateway is live
+          void import('./cron-runs-sync').then(({ backfillCronRuns }) => backfillCronRuns()).catch(
+            (err: unknown) => console.error('[gateway-bridge] backfill failed:', err),
+          );
         } else if (msg['ok'] === false) {
           console.error('[gateway-bridge] connect request rejected:', JSON.stringify(msg).slice(0, 200));
         }
