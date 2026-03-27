@@ -362,9 +362,9 @@ function ingestAgentSessions(
     let files: string[];
     try { files = fs.readdirSync(sessionsDir); } catch { continue; }
 
-    // Process UUID-named .jsonl files and sessions.json; skip .deleted files
+    // Process UUID-named .jsonl files (including .jsonl.deleted.*) and sessions.json
     const targets = files.filter(
-      (f) => f.indexOf('deleted') === -1 && (f.endsWith('.jsonl') || f === 'sessions.json'),
+      (f) => f.includes('.jsonl') || f === 'sessions.json',
     );
 
     for (const file of targets) {
