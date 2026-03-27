@@ -101,16 +101,39 @@ export function readOpenClawConfig(): OpenClawConfig {
 }
 
 function parseAgents(obj: Record<string, unknown>): OpenClawAgent[] {
-  // openclaw.json may use "agents" array or a top-level "agent" object
-  if (Array.isArray(obj['agents'])) {
-    return (obj['agents'] as unknown[]).flatMap((a) => {
+  // Resolve agent list — may be a direct array (agents: [...])
+  // or nested under agents.list ([...]) as in newer openclaw.json versions.
+  const agentsValue = obj['agents'];
+  let agentArray: unknown[] | null = null;
+  let defaultModel = '';
+
+  if (Array.isArray(agentsValue)) {
+    agentArray = agentsValue;
+  } else if (typeof agentsValue === 'object' && agentsValue !== null) {
+    const agentsObj = agentsValue as Record<string, unknown>;
+    if (Array.isArray(agentsObj['list'])) {
+      agentArray = agentsObj['list'] as unknown[];
+    }
+    // Pull the default model name from agents.defaults.model.primary
+    const defaults = agentsObj['defaults'];
+    if (typeof defaults === 'object' && defaults !== null) {
+      const modelSection = (defaults as Record<string, unknown>)['model'];
+      if (typeof modelSection === 'object' && modelSection !== null) {
+        const primary = (modelSection as Record<string, unknown>)['primary'];
+        if (typeof primary === 'string') defaultModel = primary;
+      }
+    }
+  }
+
+  if (agentArray) {
+    return agentArray.flatMap((a) => {
       if (typeof a !== 'object' || a === null) return [];
       const agent = a as Record<string, unknown>;
       if (typeof agent['id'] !== 'string' || typeof agent['name'] !== 'string') return [];
       return [{
         id: agent['id'],
         name: agent['name'],
-        model: typeof agent['model'] === 'string' ? agent['model'] : '',
+        model: typeof agent['model'] === 'string' ? agent['model'] : defaultModel,
       }];
     });
   }
