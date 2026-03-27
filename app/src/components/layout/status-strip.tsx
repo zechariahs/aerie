@@ -25,30 +25,30 @@ const COST_POLL_MS = 15 * 60 * 1000; // 15 minutes
 // Helpers
 // ---------------------------------------------------------------------------
 
-function agentStatusColor(status: AgentStatus): string {
+function agentDotColor(status: AgentStatus): string {
   switch (status) {
-    case 'ACTIVE':  return 'bg-green-500';
-    case 'IDLE':    return 'bg-gray-500';
-    case 'ERROR':   return 'bg-red-500';
-    case 'OFFLINE': return 'bg-gray-700';
+    case 'ACTIVE':  return 'var(--ae-green)';
+    case 'IDLE':    return 'var(--ae-text3)';
+    case 'ERROR':   return 'var(--ae-red)';
+    case 'OFFLINE': return 'var(--ae-border-hi)';
   }
 }
 
-function gatewayIndicatorColor(status: GatewayStatus): string {
+function gatewayDotColor(status: GatewayStatus): string {
   switch (status) {
-    case 'connected':        return 'bg-green-500';
-    case 'reconnecting':     return 'bg-yellow-500 animate-pulse';
-    case 'pairing-required': return 'bg-orange-500 animate-pulse';
-    case 'disconnected':     return 'bg-gray-600';
+    case 'connected':        return 'var(--ae-green)';
+    case 'reconnecting':     return 'var(--ae-warn)';
+    case 'pairing-required': return 'var(--ae-warn)';
+    case 'disconnected':     return 'var(--ae-text3)';
   }
 }
 
 function gatewayLabel(status: GatewayStatus): string {
   switch (status) {
-    case 'connected':        return 'Gateway: online';
-    case 'reconnecting':     return 'Gateway: reconnecting\u2026';
-    case 'pairing-required': return 'Gateway: pairing required';
-    case 'disconnected':     return 'Gateway: offline';
+    case 'connected':        return 'GATEWAY: ONLINE';
+    case 'reconnecting':     return 'GATEWAY: RECONNECTING\u2026';
+    case 'pairing-required': return 'GATEWAY: PAIRING REQUIRED';
+    case 'disconnected':     return 'GATEWAY: OFFLINE';
   }
 }
 
@@ -139,17 +139,48 @@ export function StatusStrip(): React.JSX.Element {
   }
 
   const gwStatus: GatewayStatus = gatewayData?.status ?? 'disconnected';
+  const isReconnecting = gwStatus === 'reconnecting' || gwStatus === 'pairing-required';
 
   return (
-    <div className="h-8 border-b border-[#1e1e2e] bg-[#12121a] flex items-center px-4 gap-4 text-xs text-[#6b7280] shrink-0 overflow-hidden pl-12 md:pl-4">
-      {/* Gateway health dot — visible on all breakpoints */}
+    <div
+      className="h-[30px] border-b flex items-center px-4 gap-3 text-[11px] shrink-0 overflow-hidden pl-12 md:pl-4"
+      style={{
+        background: 'var(--ae-void)',
+        borderColor: 'var(--ae-border)',
+        color: 'var(--ae-text2)',
+      }}
+    >
+      {/* Gateway health dot + label — visible on all breakpoints */}
       <span className="flex items-center gap-1.5 shrink-0">
-        <span className={`w-1.5 h-1.5 rounded-full inline-block ${gatewayIndicatorColor(gwStatus)}`} />
-        {/* Full label only on md+ */}
-        <span className="hidden md:inline">{gatewayLabel(gwStatus)}</span>
+        <span
+          className={`w-[6px] h-[6px] rounded-full inline-block shrink-0${isReconnecting ? ' animate-pulse' : ''}`}
+          style={{ background: gatewayDotColor(gwStatus) }}
+        />
+        <span
+          className="hidden md:inline"
+          style={{ color: 'var(--ae-text)' }}
+        >
+          {gatewayLabel(gwStatus)}
+        </span>
       </span>
 
-      {/* Per-agent status dots — hidden on mobile */}
+      {/* Separator */}
+      <span className="hidden md:inline shrink-0" style={{ color: 'var(--ae-border-hi)' }}>·</span>
+
+      {/* Month-to-date spend — hidden on mobile */}
+      {thisMonthSpend !== null && (
+        <>
+          <span
+            className="hidden md:inline shrink-0"
+            style={{ color: 'var(--ae-amber)' }}
+          >
+            {hideSensitive ? '[redacted]' : `$${thisMonthSpend.toFixed(2)} MTD`}
+          </span>
+          <span className="hidden md:inline shrink-0" style={{ color: 'var(--ae-border-hi)' }}>·</span>
+        </>
+      )}
+
+      {/* Per-agent names + error badges — hidden on mobile */}
       {gatewayData && gatewayData.agentStates.length > 0 && (
         <span className="hidden md:flex items-center gap-2 shrink-0">
           {gatewayData.agentStates.map((agent) => (
@@ -158,17 +189,21 @@ export function StatusStrip(): React.JSX.Element {
               className="flex items-center gap-1"
               title={`${agent.agentId}: ${agent.status}`}
             >
-              <span className={`w-1.5 h-1.5 rounded-full inline-block ${agentStatusColor(agent.status)}`} />
-              <span className="text-[#4b5563]">{agent.agentId}</span>
+              <span
+                className="w-[6px] h-[6px] rounded-full inline-block shrink-0"
+                style={{ background: agentDotColor(agent.status) }}
+              />
+              <span style={{ color: 'var(--ae-text2)' }}>{agent.agentId}</span>
+              {agent.status === 'ERROR' && (
+                <span
+                  className="text-[10px] tracking-[0.06em]"
+                  style={{ color: 'var(--ae-red)' }}
+                >
+                  [ERR]
+                </span>
+              )}
             </span>
           ))}
-        </span>
-      )}
-
-      {/* Month-to-date spend — hidden on mobile */}
-      {thisMonthSpend !== null && (
-        <span className="hidden md:inline shrink-0">
-          {hideSensitive ? '[redacted]' : `$${thisMonthSpend.toFixed(2)} MTD`}
         </span>
       )}
 
@@ -178,18 +213,25 @@ export function StatusStrip(): React.JSX.Element {
       {/* Hide-sensitive toggle — hidden on mobile */}
       <button
         onClick={toggleHideSensitive}
-        className={`hidden md:inline shrink-0 px-1.5 py-0.5 rounded text-[10px] border transition-colors ${
+        className="hidden md:inline shrink-0 px-1.5 py-0.5 text-[10px] border transition-colors tracking-[0.06em]"
+        style={
           hideSensitive
-            ? 'border-orange-800 text-orange-400 bg-orange-950/30'
-            : 'border-[#2a2a3e] text-[#4b5563] hover:text-[#6b7280]'
-        }`}
+            ? {
+                borderColor: 'var(--ae-warn-dim)',
+                color: 'var(--ae-warn)',
+              }
+            : {
+                borderColor: 'var(--ae-border-hi)',
+                color: 'var(--ae-text3)',
+              }
+        }
         title={hideSensitive ? 'Show sensitive content' : 'Hide sensitive content'}
       >
         {hideSensitive ? 'HIDDEN' : 'HIDE'}
       </button>
 
       {/* CT clock — visible on all breakpoints */}
-      <span className="font-mono shrink-0">{clock} CT</span>
+      <span className="shrink-0" style={{ color: 'var(--ae-text2)' }}>{clock} CT</span>
     </div>
   );
 }

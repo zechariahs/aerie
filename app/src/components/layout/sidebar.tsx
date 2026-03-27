@@ -34,13 +34,19 @@ function NavList({ onNavClick }: NavListProps): React.JSX.Element {
 
   return (
     <>
-      <div className="px-4 py-4 border-b border-[#1e1e2e]">
-        <span className="text-xs font-semibold text-[#6b7280] uppercase tracking-widest">
-          Aerie
+      <div
+        className="px-[14px] py-[10px] border-b"
+        style={{ borderColor: 'var(--ae-border)' }}
+      >
+        <span
+          className="text-[12px] tracking-[0.18em] uppercase"
+          style={{ color: 'var(--ae-amber)' }}
+        >
+          &gt;_ AERIE
         </span>
       </div>
 
-      <nav className="flex-1 py-2">
+      <nav className="flex-1 py-1">
         {navItems.map(({ href, label }) => {
           const isActive = pathname === href;
           return (
@@ -48,12 +54,31 @@ function NavList({ onNavClick }: NavListProps): React.JSX.Element {
               key={href}
               href={href}
               onClick={onNavClick}
-              className={[
-                'block px-4 py-2 text-sm transition-colors',
+              className="block text-[11px] tracking-[0.03em] transition-colors"
+              style={
                 isActive
-                  ? 'text-white bg-[#1e1e2e]'
-                  : 'text-[#6b7280] hover:text-white hover:bg-[#1a1a27]',
-              ].join(' ')}
+                  ? {
+                      color: 'var(--ae-amber)',
+                      borderLeft: '2px solid var(--ae-amber)',
+                      paddingTop: '6px',
+                      paddingBottom: '6px',
+                      paddingLeft: '12px',
+                      paddingRight: '14px',
+                    }
+                  : {
+                      color: 'var(--ae-text2)',
+                      paddingTop: '6px',
+                      paddingBottom: '6px',
+                      paddingLeft: '14px',
+                      paddingRight: '14px',
+                    }
+              }
+              onMouseEnter={(e) => {
+                if (!isActive) (e.currentTarget as HTMLElement).style.color = 'var(--ae-text)';
+              }}
+              onMouseLeave={(e) => {
+                if (!isActive) (e.currentTarget as HTMLElement).style.color = 'var(--ae-text2)';
+              }}
             >
               {label}
             </Link>
@@ -61,10 +86,16 @@ function NavList({ onNavClick }: NavListProps): React.JSX.Element {
         })}
       </nav>
 
-      <div className="px-4 py-4 border-t border-[#1e1e2e]">
+      <div
+        className="px-[14px] py-[14px] border-t"
+        style={{ borderColor: 'var(--ae-border)' }}
+      >
         <button
           onClick={() => { void handleLogout(); }}
-          className="text-xs text-[#6b7280] hover:text-white transition-colors"
+          className="text-[11px] transition-colors"
+          style={{ color: 'var(--ae-text2)' }}
+          onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = 'var(--ae-text)'; }}
+          onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.color = 'var(--ae-text2)'; }}
         >
           Sign out
         </button>
@@ -81,7 +112,12 @@ export function Sidebar(): React.JSX.Element {
       {/* Mobile hamburger button — only visible below md */}
       <button
         onClick={() => setMobileOpen(true)}
-        className="md:hidden fixed top-2 left-3 z-50 p-1.5 rounded bg-[#12121a] border border-[#1e1e2e] text-[#6b7280] hover:text-white"
+        className="md:hidden fixed top-2 left-3 z-50 p-1.5"
+        style={{
+          background: 'var(--ae-surface)',
+          border: '1px solid var(--ae-border)',
+          color: 'var(--ae-text2)',
+        }}
         aria-label="Open navigation"
       >
         <svg width="18" height="18" viewBox="0 0 18 18" fill="currentColor">
@@ -92,7 +128,13 @@ export function Sidebar(): React.JSX.Element {
       </button>
 
       {/* Desktop sidebar — hidden below md */}
-      <aside className="hidden md:flex w-48 flex-shrink-0 border-r border-[#1e1e2e] flex-col bg-[#12121a] min-h-screen">
+      <aside
+        className="hidden md:flex w-[152px] flex-shrink-0 flex-col min-h-screen border-r"
+        style={{
+          background: 'var(--ae-void)',
+          borderColor: 'var(--ae-border)',
+        }}
+      >
         <NavList />
       </aside>
 
@@ -105,11 +147,21 @@ export function Sidebar(): React.JSX.Element {
             onClick={() => setMobileOpen(false)}
           />
           {/* Drawer */}
-          <aside className="md:hidden fixed top-0 left-0 z-50 h-full w-56 flex flex-col bg-[#12121a] border-r border-[#1e1e2e] shadow-2xl">
-            <div className="flex items-center justify-end px-3 py-3 border-b border-[#1e1e2e]">
+          <aside
+            className="md:hidden fixed top-0 left-0 z-50 h-full w-56 flex flex-col border-r shadow-2xl"
+            style={{
+              background: 'var(--ae-void)',
+              borderColor: 'var(--ae-border)',
+            }}
+          >
+            <div
+              className="flex items-center justify-end px-3 py-3 border-b"
+              style={{ borderColor: 'var(--ae-border)' }}
+            >
               <button
                 onClick={() => setMobileOpen(false)}
-                className="text-[#6b7280] hover:text-white p-1"
+                className="p-1"
+                style={{ color: 'var(--ae-text2)' }}
                 aria-label="Close navigation"
               >
                 <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
