@@ -15,7 +15,7 @@
  */
 
 import { getSession } from '@/lib/auth';
-import { ensureBridgeStarted, activityBus, getReplayBuffer } from '@/lib/gateway-bridge';
+import { ensureBridgeStarted, getActivityBus, getReplayBuffer } from '@/lib/gateway-bridge';
 import type { ActivityEvent } from '@/types';
 
 export const dynamic = 'force-dynamic';
@@ -46,8 +46,10 @@ export async function GET(): Promise<Response> {
         send(`data: ${JSON.stringify(event)}\n\n`);
       }
 
+      const bus = getActivityBus();
+
       // Register live listener first so no events are missed during replay
-      activityBus.on('event', onEvent);
+      bus.on('event', onEvent);
 
       // Replay buffered events so the feed is populated immediately on connect
       for (const ev of getReplayBuffer()) {
@@ -61,7 +63,7 @@ export async function GET(): Promise<Response> {
 
       cleanup = () => {
         clearInterval(heartbeat);
-        activityBus.off('event', onEvent);
+        bus.off('event', onEvent);
       };
     },
     cancel() {
