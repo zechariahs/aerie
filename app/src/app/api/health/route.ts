@@ -6,7 +6,7 @@
 import fs from 'fs';
 import path from 'path';
 import { getDb } from '@/lib/db';
-import { gatewayStatus } from '@/lib/gateway-bridge';
+import { getGatewayStatus } from '@/lib/gateway-bridge';
 
 const startTime = Date.now();
 
@@ -34,7 +34,7 @@ export async function GET(): Promise<Response> {
   }
 
   // gatewayConnected — read from singleton
-  const gatewayConnected = gatewayStatus === 'connected';
+  const gatewayConnected = getGatewayStatus() === 'connected';
 
   // hostAgentReachable — non-blocking, 1s timeout
   let hostAgentReachable = false;

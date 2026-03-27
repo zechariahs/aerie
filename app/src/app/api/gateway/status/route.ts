@@ -15,9 +15,9 @@ import { getSession } from '@/lib/auth';
 import { errorResponse, successResponse } from '@/lib/api-response';
 import {
   ensureBridgeStarted,
-  gatewayStatus,
-  lastEventAt,
-  agentStates,
+  getGatewayStatus,
+  getLastEventAt,
+  getAgentStates,
 } from '@/lib/gateway-bridge';
 import type { GatewayStatusResponse } from '@/types';
 
@@ -31,9 +31,9 @@ export async function GET(): Promise<Response> {
   ensureBridgeStarted();
 
   const response: GatewayStatusResponse = {
-    status: gatewayStatus,
-    lastEventAt,
-    agentStates: Array.from(agentStates.values()),
+    status: getGatewayStatus(),
+    lastEventAt: getLastEventAt(),
+    agentStates: Array.from(getAgentStates().values()),
   };
 
   return successResponse(response);

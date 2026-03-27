@@ -16,7 +16,7 @@
 
 import { getSession } from '@/lib/auth';
 import { errorResponse, successResponse } from '@/lib/api-response';
-import { ensureBridgeStarted, gatewayStatus } from '@/lib/gateway-bridge';
+import { ensureBridgeStarted, getGatewayStatus } from '@/lib/gateway-bridge';
 
 export const dynamic = 'force-dynamic';
 
@@ -26,5 +26,5 @@ export async function GET(): Promise<Response> {
 
   ensureBridgeStarted();
 
-  return successResponse({ status: gatewayStatus });
+  return successResponse({ status: getGatewayStatus() });
 }

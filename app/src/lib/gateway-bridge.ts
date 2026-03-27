@@ -13,6 +13,11 @@
  * Incoming Gateway events are transformed into ActivityEvent objects and
  * broadcast to all connected SSE clients via an EventEmitter.
  *
+ * SINGLETON NOTE: Next.js bundles each API route separately, so module-level
+ * variables are NOT shared across routes. All mutable state is stored on
+ * globalThis so every bundle (instrumentation, /api/events, /api/gateway/*)
+ * reads and writes the same objects.
+ *
  * REQUIRES_GATEWAY — operates in fixture mode when USE_FIXTURES=true,
  * streaming synthetic events every 3s instead of connecting to the Gateway.
  */
@@ -25,45 +30,7 @@ import { getDb } from './db';
 import type { ActivityEvent, AgentState, GatewayStatus } from '@/types';
 
 // ---------------------------------------------------------------------------
-// In-process event bus (SSE clients subscribe to this)
-// ---------------------------------------------------------------------------
-
-export const activityBus = new EventEmitter();
-activityBus.setMaxListeners(100); // allow many concurrent SSE clients
-
-// In-memory ring buffer — replayed to new SSE clients on connect
-const REPLAY_BUFFER_SIZE = 100;
-const replayBuffer: ActivityEvent[] = [];
-
-function pushReplay(event: ActivityEvent): void {
-  replayBuffer.push(event);
-  if (replayBuffer.length > REPLAY_BUFFER_SIZE) replayBuffer.shift();
-}
-
-export function getReplayBuffer(): ActivityEvent[] {
-  return [...replayBuffer];
-}
-
-// ---------------------------------------------------------------------------
-// Shared mutable state (read by /api/gateway/status)
-// ---------------------------------------------------------------------------
-
-export let gatewayStatus: GatewayStatus = 'disconnected';
-export let lastEventAt: number | null = null;
-export const agentStates = new Map<string, AgentState>();
-
-// ---------------------------------------------------------------------------
-// Internal reconnection state
-// ---------------------------------------------------------------------------
-
-let ws: WebSocket | null = null;
-let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
-let reconnectDelay = 2000; // starts at 2s, backs off to 60s
-const MAX_RECONNECT_DELAY = 60_000;
-let bridgeStarted = false;
-
-// ---------------------------------------------------------------------------
-// RPC over the authenticated connection
+// RPC types (exported — used by callers of sendRequest)
 // ---------------------------------------------------------------------------
 
 export interface GatewayRpcResponse {
@@ -78,8 +45,78 @@ type PendingRequest = {
   timer: ReturnType<typeof setTimeout>;
 };
 
-const pendingRequests = new Map<string, PendingRequest>();
-let connectRequestId: string | null = null; // tracks the auth handshake message ID
+// ---------------------------------------------------------------------------
+// Global singleton state
+//
+// Stored on globalThis so all Next.js bundle instances share the same objects.
+// ---------------------------------------------------------------------------
+
+type BridgeGlobals = {
+  activityBus: EventEmitter;
+  replayBuffer: ActivityEvent[];
+  gatewayStatus: GatewayStatus;
+  lastEventAt: number | null;
+  agentStates: Map<string, AgentState>;
+  ws: WebSocket | null;
+  reconnectTimer: ReturnType<typeof setTimeout> | null;
+  reconnectDelay: number;
+  bridgeStarted: boolean;
+  pendingRequests: Map<string, PendingRequest>;
+  connectRequestId: string | null;
+  fixtureInterval: ReturnType<typeof setInterval> | null;
+  fixtureIndex: number;
+};
+
+declare global {
+  // eslint-disable-next-line no-var
+  var __gatewayBridge: BridgeGlobals | undefined;
+}
+
+function getG(): BridgeGlobals {
+  if (!globalThis.__gatewayBridge) {
+    const bus = new EventEmitter();
+    bus.setMaxListeners(100);
+    globalThis.__gatewayBridge = {
+      activityBus: bus,
+      replayBuffer: [],
+      gatewayStatus: 'disconnected',
+      lastEventAt: null,
+      agentStates: new Map(),
+      ws: null,
+      reconnectTimer: null,
+      reconnectDelay: 2000,
+      bridgeStarted: false,
+      pendingRequests: new Map(),
+      connectRequestId: null,
+      fixtureInterval: null,
+      fixtureIndex: 0,
+    };
+  }
+  return globalThis.__gatewayBridge;
+}
+
+// ---------------------------------------------------------------------------
+// Public read-only accessors (consumed by /api/events, /api/gateway/status)
+// ---------------------------------------------------------------------------
+
+/** The shared EventEmitter — SSE routes subscribe to its 'event' events. */
+export function getActivityBus(): EventEmitter { return getG().activityBus; }
+
+export function getGatewayStatus(): GatewayStatus { return getG().gatewayStatus; }
+export function getLastEventAt(): number | null { return getG().lastEventAt; }
+export function getAgentStates(): Map<string, AgentState> { return getG().agentStates; }
+
+const REPLAY_BUFFER_SIZE = 100;
+
+function pushReplay(event: ActivityEvent): void {
+  const g = getG();
+  g.replayBuffer.push(event);
+  if (g.replayBuffer.length > REPLAY_BUFFER_SIZE) g.replayBuffer.shift();
+}
+
+export function getReplayBuffer(): ActivityEvent[] {
+  return [...getG().replayBuffer];
+}
 
 // ---------------------------------------------------------------------------
 // Gateway credentials
@@ -97,11 +134,9 @@ function gatewayToken(): string {
 // Fixture streaming (dev mode)
 // ---------------------------------------------------------------------------
 
-let fixtureInterval: ReturnType<typeof setInterval> | null = null;
-let fixtureIndex = 0;
-
 function startFixtureStream(): void {
-  if (fixtureInterval) return;
+  const g = getG();
+  if (g.fixtureInterval) return;
 
   const fixturePath = path.join(process.cwd(), 'fixtures', 'activity-events.json');
   let events: ActivityEvent[] = [];
@@ -113,20 +148,19 @@ function startFixtureStream(): void {
     return;
   }
 
-  gatewayStatus = 'connected';
+  g.gatewayStatus = 'connected';
 
-  // Emit one fixture event every 3 seconds, cycling through the list
-  fixtureInterval = setInterval(() => {
+  g.fixtureInterval = setInterval(() => {
+    const g2 = getG();
     if (events.length === 0) return;
-    const event = events[fixtureIndex % events.length];
+    const event = events[g2.fixtureIndex % events.length];
     if (!event) return;
-    fixtureIndex++;
+    g2.fixtureIndex++;
 
-    // Stamp current time so the feed looks live
     const live: ActivityEvent = { ...event, timestamp: new Date().toISOString() };
-    lastEventAt = Date.now();
+    g2.lastEventAt = Date.now();
     pushReplay(live);
-    activityBus.emit('event', live);
+    g2.activityBus.emit('event', live);
     updateAgentState(live);
   }, 3000);
 }
@@ -136,7 +170,8 @@ function startFixtureStream(): void {
 // ---------------------------------------------------------------------------
 
 function updateAgentState(event: ActivityEvent): void {
-  const existing = agentStates.get(event.agentId) ?? {
+  const g = getG();
+  const existing = g.agentStates.get(event.agentId) ?? {
     agentId: event.agentId,
     status: 'IDLE' as const,
     lastActiveAt: null,
@@ -167,11 +202,10 @@ function updateAgentState(event: ActivityEvent): void {
       next.status = 'ERROR';
       break;
     default:
-      // tool.call, message.sent — agent is active
       next.status = 'ACTIVE';
   }
 
-  agentStates.set(event.agentId, next);
+  g.agentStates.set(event.agentId, next);
 }
 
 // ---------------------------------------------------------------------------
@@ -211,64 +245,66 @@ function persistCronRun(event: ActivityEvent): void {
 // WebSocket connection lifecycle
 // ---------------------------------------------------------------------------
 
+const MAX_RECONNECT_DELAY = 60_000;
+
 function scheduleReconnect(): void {
-  if (reconnectTimer) return;
-  gatewayStatus = 'reconnecting';
-  console.log(`[gateway-bridge] reconnecting in ${reconnectDelay}ms`);
-  reconnectTimer = setTimeout(() => {
-    reconnectTimer = null;
+  const g = getG();
+  if (g.reconnectTimer) return;
+  g.gatewayStatus = 'reconnecting';
+  console.log(`[gateway-bridge] reconnecting in ${g.reconnectDelay}ms`);
+  g.reconnectTimer = setTimeout(() => {
+    getG().reconnectTimer = null;
     connect();
-  }, reconnectDelay);
-  reconnectDelay = Math.min(reconnectDelay * 2, MAX_RECONNECT_DELAY);
+  }, g.reconnectDelay);
+  g.reconnectDelay = Math.min(g.reconnectDelay * 2, MAX_RECONNECT_DELAY);
 }
 
 function connect(): void {
-  if (ws) {
-    ws.removeAllListeners();
-    ws.terminate();
-    ws = null;
+  const g = getG();
+
+  if (g.ws) {
+    g.ws.removeAllListeners();
+    g.ws.terminate();
+    g.ws = null;
   }
 
   const url = gatewayUrl();
   const token = gatewayToken();
-
   const origin = process.env['AERIE_ORIGIN'] ?? 'https://srv1398517.hstgr.cloud';
 
   try {
-    ws = new WebSocket(url, { headers: { Origin: origin } });
+    g.ws = new WebSocket(url, { headers: { Origin: origin } });
   } catch (err) {
     console.error('[gateway-bridge] failed to create WebSocket:', err);
     scheduleReconnect();
     return;
   }
 
-  ws.on('open', () => {
+  g.ws.on('open', () => {
     console.log('[gateway-bridge] connected to Gateway');
-    gatewayStatus = 'connected';
-    reconnectDelay = 2000; // reset backoff on successful connect
-
+    getG().gatewayStatus = 'connected';
+    getG().reconnectDelay = 2000;
   });
 
-  ws.on('message', (data) => {
+  g.ws.on('message', (data) => {
     let msg: Record<string, unknown>;
     try {
       msg = JSON.parse(data.toString()) as Record<string, unknown>;
     } catch {
-      // Non-JSON frame (heartbeat ping) — ignore
       return;
     }
 
-    // Temporary: log every message from the gateway so we can see what's arriving
-    console.log('[gateway-bridge] raw message:', JSON.stringify(msg).slice(0, 300));
+    const g2 = getG();
 
     // Handle connect challenge — respond with the full connect request.
     if (msg['type'] === 'event' && msg['event'] === 'connect.challenge') {
       const payload = msg['payload'] as Record<string, unknown> | undefined;
       const nonce = typeof payload?.['nonce'] === 'string' ? payload['nonce'] : '';
+      void nonce;
       console.log('[gateway-bridge] received connect.challenge, sending connect request');
       const connectId = crypto.randomUUID();
-      connectRequestId = connectId;
-      ws?.send(JSON.stringify({
+      g2.connectRequestId = connectId;
+      g2.ws?.send(JSON.stringify({
         type: 'req',
         id: connectId,
         method: 'connect',
@@ -298,22 +334,20 @@ function connect(): void {
     if (msg['type'] === 'res') {
       const id = typeof msg['id'] === 'string' ? msg['id'] : null;
 
-      // Pending RPC response
-      if (id && pendingRequests.has(id)) {
-        const pending = pendingRequests.get(id)!;
-        pendingRequests.delete(id);
+      if (id && g2.pendingRequests.has(id)) {
+        const pending = g2.pendingRequests.get(id)!;
+        g2.pendingRequests.delete(id);
         clearTimeout(pending.timer);
         const error = typeof msg['error'] === 'string' ? msg['error'] : undefined;
-        const payload = msg['payload'] as Record<string, unknown> | undefined;
-        pending.resolve({ id, result: payload, error });
+        const payload2 = msg['payload'] as Record<string, unknown> | undefined;
+        pending.resolve({ id, result: payload2, error });
         return;
       }
 
-      // Auth connect response — match by saved connect ID
-      if (id && id === connectRequestId) {
-        connectRequestId = null;
-        const payload = msg['payload'] as Record<string, unknown> | undefined;
-        if (msg['ok'] === true && payload?.['type'] === 'hello-ok') {
+      if (id && id === g2.connectRequestId) {
+        g2.connectRequestId = null;
+        const payload2 = msg['payload'] as Record<string, unknown> | undefined;
+        if (msg['ok'] === true && payload2?.['type'] === 'hello-ok') {
           console.log('[gateway-bridge] authenticated as operator');
         } else if (msg['ok'] === false) {
           console.error('[gateway-bridge] connect request rejected:', JSON.stringify(msg).slice(0, 200));
@@ -325,9 +359,9 @@ function connect(): void {
       return;
     }
 
-    // Handle pairing-required response
+    // Handle pairing-required
     if (msg['type'] === 'pairing-required') {
-      gatewayStatus = 'pairing-required';
+      g2.gatewayStatus = 'pairing-required';
       const pairingId = typeof msg['deviceId'] === 'string' ? msg['deviceId'] : 'unknown';
       console.warn(
         `[gateway-bridge] Gateway pairing required — run: openclaw devices approve ${pairingId}`,
@@ -339,27 +373,28 @@ function connect(): void {
     const event = transformGatewayMessage(msg);
     if (!event) return;
 
-    lastEventAt = Date.now();
+    g2.lastEventAt = Date.now();
     updateAgentState(event);
     persistCronRun(event);
     pushReplay(event);
-    activityBus.emit('event', event);
+    g2.activityBus.emit('event', event);
   });
 
-  ws.on('error', (err) => {
+  g.ws.on('error', (err) => {
     console.error('[gateway-bridge] WebSocket error:', err.message);
   });
 
-  ws.on('close', (code) => {
+  g.ws.on('close', (code) => {
     console.warn(`[gateway-bridge] WebSocket closed (code ${code})`);
-    ws = null;
-    connectRequestId = null;
-    for (const [id, pending] of pendingRequests) {
+    const g2 = getG();
+    g2.ws = null;
+    g2.connectRequestId = null;
+    for (const [id, pending] of g2.pendingRequests) {
       clearTimeout(pending.timer);
       pending.reject(new Error(`Gateway connection closed (code ${code})`));
-      pendingRequests.delete(id);
+      g2.pendingRequests.delete(id);
     }
-    if (gatewayStatus !== 'pairing-required') {
+    if (g2.gatewayStatus !== 'pairing-required') {
       scheduleReconnect();
     }
   });
@@ -370,12 +405,10 @@ function connect(): void {
 // ---------------------------------------------------------------------------
 
 function transformGatewayMessage(msg: Record<string, unknown>): ActivityEvent | null {
-  // The Gateway event schema is inferred — adapt gracefully if fields differ.
   // Gateway wraps events as { type: 'event', event: '<specific-type>', ... }.
   // Prefer msg['event'] (the specific type) over msg['type'] (the envelope).
   const rawType = msg['event'] ?? msg['type'];
   if (typeof rawType !== 'string') {
-    // Unknown message shape — log for diagnostics, do not crash
     console.debug('[gateway-bridge] unknown message shape:', JSON.stringify(msg).slice(0, 200));
     return null;
   }
@@ -388,7 +421,7 @@ function transformGatewayMessage(msg: Record<string, unknown>): ActivityEvent | 
 
   const type = knownTypes.has(rawType)
     ? (rawType as ActivityEvent['type'])
-    : 'error'; // treat unknown event types as informational errors
+    : 'error';
 
   const agentId =
     typeof msg['agentId'] === 'string' ? msg['agentId'] :
@@ -401,7 +434,6 @@ function transformGatewayMessage(msg: Record<string, unknown>): ActivityEvent | 
     ? msg['timestamp']
     : new Date().toISOString();
 
-  // Omit known top-level fields; pass the rest through as meta
   const { type: _t, event: _e, agentId: _a, agent_id: _ai, id: _id, timestamp: _ts, ...rest } = msg;
   void _t; void _e; void _a; void _ai; void _id; void _ts;
 
@@ -432,7 +464,7 @@ function buildSummary(type: ActivityEvent['type'], msg: Record<string, unknown>)
 }
 
 // ---------------------------------------------------------------------------
-// Public initializer — called once from the SSE route or gateway/ws route
+// Public initializer
 // ---------------------------------------------------------------------------
 
 /**
@@ -441,8 +473,9 @@ function buildSummary(type: ActivityEvent['type'], msg: Record<string, unknown>)
  * In fixture mode, streams synthetic events every 3s instead.
  */
 export function ensureBridgeStarted(): void {
-  if (bridgeStarted) return;
-  bridgeStarted = true;
+  const g = getG();
+  if (g.bridgeStarted) return;
+  g.bridgeStarted = true;
 
   if (process.env['USE_FIXTURES'] === 'true') {
     console.log('[gateway-bridge] fixture mode — skipping real Gateway connection');
@@ -468,20 +501,21 @@ export function sendRequest(
   method: string,
   params: Record<string, unknown>,
 ): Promise<GatewayRpcResponse> {
-  ensureBridgeStarted(); // idempotent — safe to call before SSE routes have fired
+  ensureBridgeStarted();
   return new Promise((resolve, reject) => {
-    if (gatewayStatus !== 'connected' || !ws) {
-      reject(new Error(`Gateway not connected (status: ${gatewayStatus})`));
+    const g = getG();
+    if (g.gatewayStatus !== 'connected' || !g.ws) {
+      reject(new Error(`Gateway not connected (status: ${g.gatewayStatus})`));
       return;
     }
 
     const id = crypto.randomUUID();
     const timer = setTimeout(() => {
-      pendingRequests.delete(id);
+      getG().pendingRequests.delete(id);
       reject(new Error('Gateway RPC timeout'));
     }, SEND_TIMEOUT_MS);
 
-    pendingRequests.set(id, { resolve, reject, timer });
-    ws.send(JSON.stringify({ type: 'req', id, method, params }));
+    g.pendingRequests.set(id, { resolve, reject, timer });
+    g.ws.send(JSON.stringify({ type: 'req', id, method, params }));
   });
 }
