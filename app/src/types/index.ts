@@ -142,9 +142,23 @@ export interface DailyAgentCost {
 /** Price table row for a single model. */
 export interface ModelPrice {
   modelId: string;
-  inputPer1MTokens: number;   // USD per 1M input tokens
-  outputPer1MTokens: number;  // USD per 1M output tokens
-  updatedAt: string;          // ISO timestamp
+  inputPer1MTokens: number;    // USD per 1M input tokens
+  outputPer1MTokens: number;   // USD per 1M output tokens
+  cacheReadPer1MTokens?: number; // USD per 1M cache-read tokens; defaults to inputPer1MTokens * 0.1
+  updatedAt: string;           // ISO timestamp
+}
+
+/** A model entry from the openclaw.json provider registry. */
+export interface ProviderModel {
+  id: string;       // UUID or human-readable id as stored by the provider
+  name: string;     // human-readable display name
+  provider: string; // provider key, e.g. 'nexos' | 'openrouter'
+  cost?: {
+    input: number;     // USD per 1M input tokens
+    output: number;    // USD per 1M output tokens
+    cacheRead: number; // USD per 1M cache-read tokens
+    cacheWrite: number;// USD per 1M cache-write tokens
+  };
 }
 
 /** Individual session cost record (from OpenClaw SQLite or OpenRouter). */
@@ -245,7 +259,7 @@ export interface CronRun {
   /** Provider for this run, e.g. "openrouter" (from JSONL). */
   provider?: string;
   /** Token usage for this run (from JSONL). */
-  usage?: { input_tokens: number; output_tokens: number };
+  usage?: { input_tokens: number; output_tokens: number; total_tokens?: number };
 }
 
 // ── Workspace & Memory (Module 6) ────────────────────────────────────────────
