@@ -12,5 +12,8 @@ export async function register(): Promise<void> {
 
     const { startIngestion } = await import('./lib/ingest');
     startIngestion(); // sets up 5-min background ingestion interval
+
+    const { ensureBridgeStarted } = await import('./lib/gateway-bridge');
+    ensureBridgeStarted(); // connects to Gateway immediately so events are captured before any client connects
   }
 }
