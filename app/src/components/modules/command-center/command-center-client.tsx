@@ -13,13 +13,14 @@ import { basePath } from '@/lib/client-url';
 interface CommandCenterClientProps {
   agents: AgentDescriptor[];
   initialCostSummary: CostSummary | null;
+  agentTodayCosts: Record<string, number>;
 }
 
 type ApiGatewayStatus = { data: GatewayStatusResponse };
 
 const GATEWAY_POLL_MS = 10_000;
 
-export function CommandCenterClient({ agents, initialCostSummary }: CommandCenterClientProps): React.JSX.Element {
+export function CommandCenterClient({ agents, initialCostSummary, agentTodayCosts }: CommandCenterClientProps): React.JSX.Element {
   const [agentStatesMap, setAgentStatesMap] = useState<Map<string, AgentState>>(new Map());
   const [gatewayStatus, setGatewayStatus] = useState<GatewayStatus>('disconnected');
 
@@ -58,7 +59,7 @@ export function CommandCenterClient({ agents, initialCostSummary }: CommandCente
                 key={agent.id}
                 agent={agent}
                 liveState={agentStatesMap.get(agent.id)}
-                todayCost={initialCostSummary?.today}
+                todayCost={agentTodayCosts[agent.id]}
                 todaySessionCount={undefined}
               />
             ))}
@@ -93,7 +94,7 @@ export function CommandCenterClient({ agents, initialCostSummary }: CommandCente
             }}
             className="p-4"
           >
-            <ActivityFeed gatewayStatus={gatewayStatus} />
+            <ActivityFeed gatewayStatus={gatewayStatus} configuredAgentIds={agents.map((a) => a.id)} />
           </div>
         </section>
       </ErrorBoundary>

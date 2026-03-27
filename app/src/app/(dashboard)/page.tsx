@@ -10,7 +10,7 @@
  */
 
 import { getAgents } from '@/lib/openclaw';
-import { getCostSummary } from '@/lib/cost';
+import { getCostSummary, getAgentTodayCosts } from '@/lib/cost';
 import { ErrorBoundary } from '@/components/ui/error-boundary';
 import { CommandCenterClient } from '@/components/modules/command-center/command-center-client';
 
@@ -22,6 +22,7 @@ export default async function CommandCenterPage(): Promise<React.JSX.Element> {
 
   const agentList = agents.status === 'fulfilled' ? agents.value : [];
   const summary = costSummary.status === 'fulfilled' ? costSummary.value : null;
+  const agentTodayCosts = getAgentTodayCosts();
 
   return (
     <div className="flex flex-col gap-6">
@@ -38,7 +39,7 @@ export default async function CommandCenterPage(): Promise<React.JSX.Element> {
       </div>
 
       <ErrorBoundary label="Command Center">
-        <CommandCenterClient agents={agentList} initialCostSummary={summary} />
+        <CommandCenterClient agents={agentList} initialCostSummary={summary} agentTodayCosts={agentTodayCosts} />
       </ErrorBoundary>
     </div>
   );

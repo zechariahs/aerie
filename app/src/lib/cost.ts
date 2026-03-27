@@ -515,6 +515,21 @@ export async function getCostSummary(): Promise<CostSummary> {
 }
 
 /**
+ * Returns today's cost in USD keyed by agent ID.
+ * Used to populate individual agent cards on the Command Center.
+ */
+export function getAgentTodayCosts(): Record<string, number> {
+  const todayStr = toDateString(new Date());
+  const daily = getCostsFromCronRuns(1);
+  const result: Record<string, number> = {};
+  for (const row of daily) {
+    if (row.date !== todayStr) continue;
+    result[row.agentId] = (result[row.agentId] ?? 0) + row.costUsd;
+  }
+  return result;
+}
+
+/**
  * Computes per-agent summary rows from daily cost data.
  */
 export function buildAgentSummaryRows(daily: DailyAgentCost[], sessions: SessionCost[]): AgentCostSummaryRow[] {

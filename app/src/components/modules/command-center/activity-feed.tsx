@@ -165,9 +165,11 @@ function FilterBar({ agentIds, filter, onChange }: FilterBarProps): React.JSX.El
 
 interface ActivityFeedProps {
   gatewayStatus: GatewayStatus;
+  /** Agent IDs from openclaw.json — used to pre-populate the filter dropdown. */
+  configuredAgentIds: string[];
 }
 
-export function ActivityFeed({ gatewayStatus }: ActivityFeedProps): React.JSX.Element {
+export function ActivityFeed({ gatewayStatus, configuredAgentIds }: ActivityFeedProps): React.JSX.Element {
   const [events, setEvents] = useState<ActivityEvent[]>([]);
   const [filter, setFilter] = useState<FilterState>({ agentId: '', types: new Set() });
   const [hideSensitive, setHideSensitive] = useState<boolean>(false);
@@ -208,10 +210,10 @@ export function ActivityFeed({ gatewayStatus }: ActivityFeedProps): React.JSX.El
     return () => es.close();
   }, [gatewayStatus]);
 
-  // Derive unique agent IDs from received events
+  // Merge configured agent IDs with any IDs seen in live events
   const agentIds = useMemo(
-    () => Array.from(new Set(events.map((e) => e.agentId))),
-    [events],
+    () => Array.from(new Set([...configuredAgentIds, ...events.map((e) => e.agentId)])),
+    [configuredAgentIds, events],
   );
 
   // Apply filters
@@ -242,7 +244,7 @@ export function ActivityFeed({ gatewayStatus }: ActivityFeedProps): React.JSX.El
         {visible.length === 0 ? (
           <div className="flex items-center justify-center h-48">
             <span className="text-[11px]" style={{ color: 'var(--ae-text3)' }}>
-              Waiting for activity\u2026
+              {'Waiting for activity\u2026'}
             </span>
           </div>
         ) : (
