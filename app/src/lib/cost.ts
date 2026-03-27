@@ -361,6 +361,62 @@ export async function getMergedCosts(days: number): Promise<DailyAgentCost[]> {
 }
 
 /**
+ * Returns session costs from mc.db's agent_sessions table (populated by ingest.ts).
+ * Used as a fallback when the agent's own SQLite DB has no sessions table.
+ */
+function getSessionCostsFromMcDb(days: number): SessionCost[] {
+  const priceTable = loadPriceTable();
+  const { providerModels } = readOpenClawConfig();
+  const cutoff = toDateString(daysAgo(days));
+
+  try {
+    type Row = {
+      id: string;
+      agent_id: string;
+      model: string | null;
+      provider: string | null;
+      started_at: string | null;
+      input_tokens: number;
+      output_tokens: number;
+      total_tokens: number;
+      message_count: number;
+    };
+
+    const rows = getDb()
+      .prepare<[string], Row>(
+        `SELECT id, agent_id, model, provider, started_at,
+                input_tokens, output_tokens, total_tokens, message_count
+         FROM agent_sessions
+         WHERE started_at >= ? AND message_count > 0
+         ORDER BY started_at DESC`,
+      )
+      .all(cutoff);
+
+    return rows.flatMap((row): SessionCost[] => {
+      if (!row.started_at) return [];
+      const modelId = row.model ?? 'unknown';
+      const cost = computeCost(row.input_tokens, row.output_tokens, modelId, priceTable, {
+        totalTokens: row.total_tokens || undefined,
+        providerModels,
+      });
+      return [{
+        sessionId: row.id,
+        agentId: row.agent_id,
+        modelId,
+        inputTokens: row.input_tokens,
+        outputTokens: row.output_tokens,
+        costUsd: cost,
+        durationMs: undefined,
+        startedAt: row.started_at,
+        source: 'estimated',
+      }];
+    });
+  } catch {
+    return [];
+  }
+}
+
+/**
  * Returns paginated session costs from SQLite (or fixtures in dev mode).
  */
 export async function getPaginatedSessions({
@@ -380,6 +436,10 @@ export async function getPaginatedSessions({
     sessions = loadFixtureSessions();
   } else {
     sessions = getSessionCostsFromSqlite(days);
+    // Fall back to mc.db agent_sessions if the agent's own DB has no data
+    if (sessions.length === 0) {
+      sessions = getSessionCostsFromMcDb(days);
+    }
   }
 
   if (agentId) {

@@ -85,7 +85,7 @@ export default function SessionInspector({ agentFilter }: SessionInspectorProps)
       .finally(() => setLoading(false));
   }, [agentFilter, page]);
 
-  if (loading) return <div className="h-48 animate-pulse" style={{ background: 'var(--ae-raised)', border: '1px solid var(--ae-border)' }} />;
+  if (loading) return <div className="h-48 animate-pulse" style={{ background: 'var(--ae-amber-faint)', border: '1px solid var(--ae-amber-dim)' }} />;
   if (error) return <p className="text-[11px]" style={{ color: 'var(--ae-red)' }}>Failed to load sessions: {error}</p>;
   if (!data || data.items.length === 0) {
     return <p className="text-[11px]" style={{ color: 'var(--ae-text2)' }}>No sessions found.</p>;

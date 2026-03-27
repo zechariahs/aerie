@@ -15,7 +15,7 @@
  */
 
 import { getSession } from '@/lib/auth';
-import { ensureBridgeStarted, activityBus } from '@/lib/gateway-bridge';
+import { ensureBridgeStarted, activityBus, getReplayBuffer } from '@/lib/gateway-bridge';
 import type { ActivityEvent } from '@/types';
 
 export const dynamic = 'force-dynamic';
@@ -28,6 +28,8 @@ export async function GET(): Promise<Response> {
 
   ensureBridgeStarted();
 
+  let cleanup: (() => void) | null = null;
+
   const stream = new ReadableStream({
     start(controller) {
       const encoder = new TextEncoder();
@@ -36,7 +38,7 @@ export async function GET(): Promise<Response> {
         try {
           controller.enqueue(encoder.encode(data));
         } catch {
-          // Client disconnected — cleanup handled in cancel()
+          // Client disconnected
         }
       }
 
@@ -44,28 +46,27 @@ export async function GET(): Promise<Response> {
         send(`data: ${JSON.stringify(event)}\n\n`);
       }
 
+      // Register live listener first so no events are missed during replay
+      activityBus.on('event', onEvent);
+
+      // Replay buffered events so the feed is populated immediately on connect
+      for (const ev of getReplayBuffer()) {
+        send(`data: ${JSON.stringify(ev)}\n\n`);
+      }
+
       // Heartbeat ping every 30s to keep connection alive through proxies
       const heartbeat = setInterval(() => {
         send(': ping\n\n');
       }, 30_000);
 
-      activityBus.on('event', onEvent);
-
-      // Cleanup when client disconnects
-      // ReadableStream cancel is called on client disconnect
-      void (controller as unknown as { cancel?: () => void });
-
-      // Store cleanup on the controller so cancel() can reach it
-      (controller as unknown as Record<string, unknown>)['_cleanup'] = () => {
+      cleanup = () => {
         clearInterval(heartbeat);
         activityBus.off('event', onEvent);
       };
     },
-    cancel(controller) {
-      const cleanup = (controller as unknown as Record<string, unknown>)['_cleanup'];
-      if (typeof cleanup === 'function') {
-        (cleanup as () => void)();
-      }
+    cancel() {
+      cleanup?.();
+      cleanup = null;
     },
   });
 
