@@ -368,7 +368,9 @@ function connect(): void {
 
 function transformGatewayMessage(msg: Record<string, unknown>): ActivityEvent | null {
   // The Gateway event schema is inferred — adapt gracefully if fields differ.
-  const rawType = msg['type'] ?? msg['event'];
+  // Gateway wraps events as { type: 'event', event: '<specific-type>', ... }.
+  // Prefer msg['event'] (the specific type) over msg['type'] (the envelope).
+  const rawType = msg['event'] ?? msg['type'];
   if (typeof rawType !== 'string') {
     // Unknown message shape — log for diagnostics, do not crash
     console.debug('[gateway-bridge] unknown message shape:', JSON.stringify(msg).slice(0, 200));
