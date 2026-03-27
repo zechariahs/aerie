@@ -31,9 +31,16 @@ export class ModuleErrorBoundary extends React.Component<Props, State> {
   override render(): React.ReactNode {
     if (this.state.error) {
       return (
-        <div className="rounded border border-red-800/40 bg-[#1a0f0f] p-4">
-          <p className="text-sm font-medium text-red-400">{this.props.title} — error</p>
-          <p className="mt-1 text-xs text-red-600">{this.state.error.message}</p>
+        <div
+          className="p-4"
+          style={{ border: '1px solid var(--ae-red-dim)', background: 'var(--ae-surface)' }}
+        >
+          <p className="text-[11px] uppercase tracking-[0.08em]" style={{ color: 'var(--ae-red)' }}>
+            {this.props.title} — error
+          </p>
+          <p className="mt-1 text-[11px]" style={{ color: 'var(--ae-text2)' }}>
+            {this.state.error.message}
+          </p>
         </div>
       );
     }

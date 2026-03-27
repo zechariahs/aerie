@@ -51,7 +51,7 @@ export function CommandCenterClient({ agents, initialCostSummary }: CommandCente
       {/* Agent Cards Grid */}
       <ErrorBoundary label="Agent Cards">
         <section>
-          <h2 className="text-sm font-medium text-[#6b7280] mb-3 uppercase tracking-wider">Agents</h2>
+          <p className="ae-section-label mb-[10px]">── Agents ────────────────────────────────</p>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {agents.map((agent) => (
               <AgentCard
@@ -63,7 +63,7 @@ export function CommandCenterClient({ agents, initialCostSummary }: CommandCente
               />
             ))}
             {agents.length === 0 && (
-              <p className="text-sm text-[#4b5563] col-span-full">
+              <p className="text-[12px] col-span-full" style={{ color: 'var(--ae-text2)' }}>
                 No agents configured — check openclaw.json or OPENCLAW_DIR.
               </p>
             )}
@@ -74,15 +74,25 @@ export function CommandCenterClient({ agents, initialCostSummary }: CommandCente
       {/* Activity Feed */}
       <ErrorBoundary label="Activity Feed">
         <section>
-          <h2 className="text-sm font-medium text-[#6b7280] mb-3 uppercase tracking-wider">
-            Activity Feed
+          <p className="ae-section-label mb-[10px]">
+            ── Activity Feed
             {gatewayStatus === 'connected' && (
-              <span className="ml-2 text-[10px] text-green-500 font-normal normal-case tracking-normal">
+              <span
+                className="ml-2 text-[10px] font-normal normal-case tracking-normal"
+                style={{ color: 'var(--ae-green)' }}
+              >
                 ● live
               </span>
             )}
-          </h2>
-          <div className="bg-[#0f0f1a] border border-[#1e1e2e] rounded-lg p-4">
+            {' '}────────────────────────
+          </p>
+          <div
+            style={{
+              background: 'var(--ae-surface)',
+              border: '1px solid var(--ae-border)',
+            }}
+            className="p-4"
+          >
             <ActivityFeed gatewayStatus={gatewayStatus} />
           </div>
         </section>

@@ -14,11 +14,13 @@ interface CronHistoryDrawerProps {
   onClose: () => void;
 }
 
-const STATUS_BADGE: Record<CronRun['status'], string> = {
-  success: 'bg-emerald-500/20 text-emerald-400',
-  failure: 'bg-red-500/20 text-red-400',
-  running: 'bg-indigo-500/20 text-indigo-300',
-};
+function runStatusBadge(status: CronRun['status']): string {
+  switch (status) {
+    case 'success': return 'ae-badge ae-badge-ok';
+    case 'failure': return 'ae-badge ae-badge-error';
+    case 'running': return 'ae-badge ae-badge-active';
+  }
+}
 
 function formatDuration(ms: number | undefined): string {
   if (ms === undefined) return '—';
@@ -70,16 +72,28 @@ export default function CronHistoryDrawer({ cronId, cronName, onClose }: CronHis
       <div className="fixed inset-0 z-40 bg-black/40" onClick={onClose} />
 
       {/* Drawer */}
-      <div className="fixed right-0 top-0 bottom-0 z-50 w-full max-w-md bg-[#12121a] border-l border-[#1e1e2e] shadow-2xl flex flex-col">
+      <div
+        className="fixed right-0 top-0 bottom-0 z-50 w-full max-w-md flex flex-col"
+        style={{
+          background: 'var(--ae-void)',
+          borderLeft: '1px solid var(--ae-border)',
+        }}
+      >
         {/* Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-[#1e1e2e]">
+        <div
+          className="flex items-center justify-between px-5 py-4"
+          style={{ borderBottom: '1px solid var(--ae-border)' }}
+        >
           <div>
-            <div className="text-white font-semibold text-sm">{cronName}</div>
-            <div className="text-[#6b7280] text-xs mt-0.5">Run history (last 20)</div>
+            <div className="text-[13px]" style={{ color: 'var(--ae-text)' }}>{cronName}</div>
+            <div className="text-[10px] mt-[2px]" style={{ color: 'var(--ae-text2)' }}>Run history (last 20)</div>
           </div>
           <button
             onClick={onClose}
-            className="text-[#6b7280] hover:text-white text-lg leading-none transition-colors"
+            className="text-lg leading-none transition-colors"
+            style={{ color: 'var(--ae-text2)' }}
+            onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = 'var(--ae-text)'; }}
+            onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.color = 'var(--ae-text2)'; }}
           >
             ✕
           </button>
@@ -88,35 +102,48 @@ export default function CronHistoryDrawer({ cronId, cronName, onClose }: CronHis
         {/* Content */}
         <div className="flex-1 overflow-y-auto">
           {loading && (
-            <div className="flex items-center justify-center h-32 text-[#6b7280] text-sm">Loading…</div>
+            <div className="flex items-center justify-center h-32 text-[11px]" style={{ color: 'var(--ae-text2)' }}>
+              Loading…
+            </div>
           )}
           {error && (
-            <div className="m-4 p-3 bg-red-500/10 border border-red-500/20 rounded text-red-400 text-sm">{error}</div>
+            <div
+              className="m-4 p-3 text-[11px]"
+              style={{ border: '1px solid var(--ae-red-dim)', color: 'var(--ae-red)' }}
+            >
+              {error}
+            </div>
           )}
           {!loading && !error && runs.length === 0 && (
-            <div className="flex items-center justify-center h-32 text-[#6b7280] text-sm">No run history yet</div>
+            <div className="flex items-center justify-center h-32 text-[11px]" style={{ color: 'var(--ae-text2)' }}>
+              No run history yet
+            </div>
           )}
           {!loading && !error && runs.length > 0 && (
-            <div className="divide-y divide-[#1e1e2e]">
+            <div>
               {runs.map((run) => (
-                <div key={run.id} className="px-5 py-3">
+                <div
+                  key={run.id}
+                  className="px-5 py-3"
+                  style={{ borderBottom: '1px solid var(--ae-border)' }}
+                >
                   <button
                     className="w-full text-left"
                     onClick={() => setExpandedId(expandedId === run.id ? undefined : run.id)}
                   >
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
-                        <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${STATUS_BADGE[run.status]}`}>
-                          {run.status}
+                        <span className={runStatusBadge(run.status)}>{run.status}</span>
+                        <span className="text-[11px]" style={{ color: 'var(--ae-text2)' }}>
+                          {relativeTime(run.startedAt)}
                         </span>
-                        <span className="text-[#6b7280] text-xs">{relativeTime(run.startedAt)}</span>
                       </div>
-                      <div className="flex items-center gap-3 text-xs text-[#6b7280]">
+                      <div className="flex items-center gap-3 text-[11px]" style={{ color: 'var(--ae-text2)' }}>
                         <span>{formatDuration(run.durationMs)}</span>
-                        <span>{expandedId === run.id ? '▲' : '▼'}</span>
+                        <span style={{ color: 'var(--ae-text3)' }}>{expandedId === run.id ? '▲' : '▼'}</span>
                       </div>
                     </div>
-                    <div className="text-[#4b5563] text-[11px] mt-0.5 font-mono">
+                    <div className="text-[10px] mt-[3px]" style={{ color: 'var(--ae-text3)' }}>
                       {new Date(run.startedAt).toLocaleString('en-US', { timeZone: 'America/Chicago' })} CT
                     </div>
                   </button>
@@ -125,16 +152,30 @@ export default function CronHistoryDrawer({ cronId, cronName, onClose }: CronHis
                     <div className="mt-2 space-y-2">
                       {run.outputExcerpt && (
                         <div>
-                          <div className="text-[#6b7280] text-xs mb-1">Output</div>
-                          <pre className="bg-[#0a0a0f] border border-[#1e1e2e] rounded p-2 text-[#9ca3af] text-[11px] font-mono whitespace-pre-wrap overflow-x-auto max-h-40 overflow-y-auto">
+                          <div className="text-[10px] uppercase tracking-[0.08em] mb-1" style={{ color: 'var(--ae-text2)' }}>Output</div>
+                          <pre
+                            className="p-2 text-[11px] whitespace-pre-wrap overflow-x-auto max-h-40 overflow-y-auto"
+                            style={{
+                              background: 'var(--ae-raised)',
+                              border: '1px solid var(--ae-border)',
+                              color: 'var(--ae-text)',
+                            }}
+                          >
                             {run.outputExcerpt}
                           </pre>
                         </div>
                       )}
                       {run.errorMessage && (
                         <div>
-                          <div className="text-red-400 text-xs mb-1">Error</div>
-                          <pre className="bg-red-500/5 border border-red-500/20 rounded p-2 text-red-400 text-[11px] font-mono whitespace-pre-wrap overflow-x-auto max-h-24 overflow-y-auto">
+                          <div className="text-[10px] uppercase tracking-[0.08em] mb-1" style={{ color: 'var(--ae-red)' }}>Error</div>
+                          <pre
+                            className="p-2 text-[11px] whitespace-pre-wrap overflow-x-auto max-h-24 overflow-y-auto"
+                            style={{
+                              background: 'var(--ae-surface)',
+                              border: '1px solid var(--ae-red-dim)',
+                              color: 'var(--ae-red)',
+                            }}
+                          >
                             {run.errorMessage}
                           </pre>
                         </div>
@@ -144,7 +185,10 @@ export default function CronHistoryDrawer({ cronId, cronName, onClose }: CronHis
                           href={run.driveUrl}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="inline-flex items-center gap-1 text-[#6366f1] text-xs hover:underline"
+                          className="inline-flex items-center gap-1 text-[11px]"
+                          style={{ color: 'var(--ae-cyan)', textDecoration: 'none' }}
+                          onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.textDecoration = 'underline'; }}
+                          onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.textDecoration = 'none'; }}
                         >
                           View in Drive ↗
                         </a>

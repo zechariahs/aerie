@@ -23,21 +23,12 @@ function statusLabel(status: AgentStatus): string {
   }
 }
 
-function statusBadgeClass(status: AgentStatus): string {
+function statusBadgeStyle(status: AgentStatus): React.CSSProperties {
   switch (status) {
-    case 'ACTIVE':  return 'bg-green-900/60 text-green-400 border border-green-800';
-    case 'IDLE':    return 'bg-gray-800/60 text-gray-400 border border-gray-700';
-    case 'ERROR':   return 'bg-red-900/60 text-red-400 border border-red-800';
-    case 'OFFLINE': return 'bg-gray-900/60 text-gray-600 border border-gray-800';
-  }
-}
-
-function statusDotClass(status: AgentStatus): string {
-  switch (status) {
-    case 'ACTIVE':  return 'bg-green-500 animate-pulse';
-    case 'IDLE':    return 'bg-gray-500';
-    case 'ERROR':   return 'bg-red-500';
-    case 'OFFLINE': return 'bg-gray-700';
+    case 'ACTIVE':  return { color: 'var(--ae-amber)',  borderColor: 'var(--ae-amber-dim)' };
+    case 'IDLE':    return { color: 'var(--ae-text2)',  borderColor: 'var(--ae-border-hi)' };
+    case 'ERROR':   return { color: 'var(--ae-red)',    borderColor: 'var(--ae-red-dim)'   };
+    case 'OFFLINE': return { color: 'var(--ae-text3)',  borderColor: 'var(--ae-border)'    };
   }
 }
 
@@ -58,51 +49,83 @@ export function AgentCard({ agent, liveState, todayCost, todaySessionCount }: Ag
   const status: AgentStatus = liveState?.status ?? 'OFFLINE';
 
   return (
-    <div className="bg-[#0f0f1a] border border-[#1e1e2e] rounded-lg p-4 flex flex-col gap-3 hover:border-[#2a2a3e] transition-colors">
+    <div
+      className="relative flex flex-col"
+      style={{
+        background: 'var(--ae-surface)',
+        border: '1px solid var(--ae-border)',
+      }}
+    >
+      {/* Corner brackets */}
+      <div className="absolute top-[-1px] left-[-1px] w-2 h-2" style={{ borderTop: '1px solid var(--ae-amber)', borderLeft: '1px solid var(--ae-amber)' }} />
+      <div className="absolute top-[-1px] right-[-1px] w-2 h-2" style={{ borderTop: '1px solid var(--ae-amber)', borderRight: '1px solid var(--ae-amber)' }} />
+      <div className="absolute bottom-[-1px] left-[-1px] w-2 h-2" style={{ borderBottom: '1px solid var(--ae-amber)', borderLeft: '1px solid var(--ae-amber)' }} />
+      <div className="absolute bottom-[-1px] right-[-1px] w-2 h-2" style={{ borderBottom: '1px solid var(--ae-amber)', borderRight: '1px solid var(--ae-amber)' }} />
+
       {/* Header row */}
-      <div className="flex items-start justify-between gap-2">
+      <div
+        className="flex items-start justify-between gap-2 px-[13px] py-[11px]"
+        style={{ borderBottom: '1px solid var(--ae-border)' }}
+      >
         <div>
-          <h3 className="text-sm font-semibold text-white">{agent.name}</h3>
-          <p className="text-xs text-[#4b5563] mt-0.5">{agent.id}</p>
+          <h3 className="text-[13px]" style={{ color: 'var(--ae-text)' }}>{agent.name}</h3>
+          <p className="text-[10px]" style={{ color: 'var(--ae-text2)', marginTop: '2px' }}>{agent.id}</p>
         </div>
-        <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium flex items-center gap-1.5 shrink-0 ${statusBadgeClass(status)}`}>
-          <span className={`w-1.5 h-1.5 rounded-full inline-block ${statusDotClass(status)}`} />
+        <span
+          className="text-[10px] uppercase tracking-[0.08em] px-[6px] py-[2px] shrink-0"
+          style={{ border: '1px solid', ...statusBadgeStyle(status) }}
+        >
           {statusLabel(status)}
         </span>
       </div>
 
       {/* Model */}
-      <div className="text-xs text-[#4b5563] truncate" title={agent.model}>
+      <div
+        className="px-[13px] py-[9px] text-[10px] truncate"
+        style={{ color: 'var(--ae-text2)', borderBottom: '1px solid var(--ae-border)' }}
+        title={agent.model}
+      >
         {agent.model.replace('openrouter/', '')}
       </div>
 
       {/* Stats row */}
-      <div className="flex items-center gap-4 text-xs">
+      <div
+        className="flex items-center gap-[18px] px-[13px] py-[9px] text-[11px]"
+        style={{ color: 'var(--ae-text2)', borderBottom: '1px solid var(--ae-border)' }}
+      >
         <div>
-          <span className="text-[#4b5563]">Last active</span>
-          <span className="text-[#6b7280] ml-1">{relativeTime(liveState?.lastActiveAt ?? null)}</span>
+          Last active{' '}
+          <span style={{ color: 'var(--ae-text)' }}>{relativeTime(liveState?.lastActiveAt ?? null)}</span>
         </div>
         {todaySessionCount !== undefined && (
           <div>
-            <span className="text-[#4b5563]">Sessions</span>
-            <span className="text-[#6b7280] ml-1">{todaySessionCount}</span>
+            Sessions{' '}
+            <span style={{ color: 'var(--ae-text)' }}>{todaySessionCount}</span>
           </div>
         )}
         {todayCost !== undefined && (
           <div>
-            <span className="text-[#4b5563]">Cost</span>
-            <span className="text-[#6b7280] ml-1">${todayCost.toFixed(4)}</span>
+            Cost{' '}
+            <span style={{ color: 'var(--ae-text)' }}>${todayCost.toFixed(4)}</span>
           </div>
         )}
       </div>
 
-      {/* New Task button */}
-      <button
-        onClick={() => router.push(`/tasks?agent=${agent.id}`)}
-        className="mt-auto text-xs px-3 py-1.5 rounded border border-[#2a2a3e] text-[#6b7280] hover:text-white hover:border-[#3a3a4e] transition-colors text-left"
-      >
-        + New Task
-      </button>
+      {/* Buttons row */}
+      <div className="flex items-center gap-2 px-[13px] py-[10px]">
+        <button
+          onClick={() => router.push(`/tasks?agent=${agent.id}`)}
+          className="text-[10px] uppercase tracking-[0.08em] px-[12px] py-[5px] cursor-pointer transition-opacity hover:opacity-80"
+          style={{
+            fontFamily: 'var(--font-mono), "IBM Plex Mono", ui-monospace, monospace',
+            background: 'var(--ae-amber)',
+            color: 'var(--ae-void)',
+            border: 'none',
+          }}
+        >
+          + New Task
+        </button>
+      </div>
     </div>
   );
 }

@@ -84,48 +84,68 @@ export default function AgentSummaryTable({
       .finally(() => setLoading(false));
   }, []);
 
-  if (loading) return <div className="h-24 animate-pulse rounded bg-[#1e1e2e]" />;
-  if (error) return <p className="text-sm text-red-400">Failed to load agent summary: {error}</p>;
-  if (rows.length === 0) return <p className="text-sm text-[#6b7280]">No agent data.</p>;
+  if (loading) {
+    return (
+      <div
+        className="h-24 animate-pulse"
+        style={{ background: 'var(--ae-raised)', border: '1px solid var(--ae-border)' }}
+      />
+    );
+  }
+  if (error) {
+    return <p className="text-[11px]" style={{ color: 'var(--ae-red)' }}>Failed to load agent summary: {error}</p>;
+  }
+  if (rows.length === 0) {
+    return <p className="text-[11px]" style={{ color: 'var(--ae-text2)' }}>No agent data.</p>;
+  }
 
   return (
     <div className="overflow-x-auto">
-      <table className="w-full text-sm">
+      <table className="w-full">
         <thead>
-          <tr className="border-b border-[#1e1e2e] text-left text-xs text-[#6b7280]">
-            <th className="pb-2 pr-4">Agent</th>
-            <th className="pb-2 pr-4">Today</th>
-            <th className="pb-2 pr-4">This Week</th>
-            <th className="pb-2 pr-4">This Month</th>
-            <th className="pb-2 pr-4">Avg/Session</th>
-            <th className="pb-2 pr-4">Sessions</th>
+          <tr style={{ borderBottom: '1px solid var(--ae-border)' }}>
+            {['Agent', 'Today', 'This Week', 'This Month', 'Avg/Session', 'Sessions'].map((h) => (
+              <th
+                key={h}
+                className="pb-2 pr-4 text-left font-normal text-[10px] uppercase tracking-[0.10em]"
+                style={{ color: 'var(--ae-text3)' }}
+              >
+                {h}
+              </th>
+            ))}
           </tr>
         </thead>
         <tbody>
           {rows.map((row) => (
             <tr
               key={row.agentId}
-              onClick={() =>
-                onAgentFilter(activeAgent === row.agentId ? undefined : row.agentId)
-              }
-              className={`cursor-pointer border-b border-[#1e1e2e]/50 transition-colors hover:bg-[#1e1e2e]/40 ${
-                activeAgent === row.agentId ? 'bg-[#1e1e2e]/60' : ''
-              }`}
+              onClick={() => onAgentFilter(activeAgent === row.agentId ? undefined : row.agentId)}
+              className="cursor-pointer transition-colors"
+              style={{
+                borderBottom: '1px solid var(--ae-border)',
+                background: activeAgent === row.agentId ? 'var(--ae-raised)' : 'transparent',
+              }}
+              onMouseEnter={(e) => {
+                if (activeAgent !== row.agentId)
+                  (e.currentTarget as HTMLElement).style.background = 'var(--ae-surface)';
+              }}
+              onMouseLeave={(e) => {
+                (e.currentTarget as HTMLElement).style.background =
+                  activeAgent === row.agentId ? 'var(--ae-raised)' : 'transparent';
+              }}
             >
-              <td className="py-2 pr-4 font-mono text-[#c9d1d9]">{row.agentId}</td>
-              <td className="py-2 pr-4 text-[#9ca3af]">{usd(row.today)}</td>
+              <td className="py-2 pr-4 text-[11px]" style={{ color: 'var(--ae-text)' }}>{row.agentId}</td>
+              <td className="py-2 pr-4 text-[11px]" style={{ color: 'var(--ae-text2)' }}>{usd(row.today)}</td>
               <td className="py-2 pr-4">
                 <div className="flex items-center gap-2">
-                  <span className="text-[#9ca3af]">{usd(row.thisWeek)}</span>
+                  <span className="text-[11px]" style={{ color: 'var(--ae-text2)' }}>{usd(row.thisWeek)}</span>
                   <span className="inline-block h-8 w-16">
                     <ResponsiveContainer width="100%" height="100%">
-                      <LineChart
-                        data={row.weeklySparkline.map((v, i) => ({ i, v }))}
-                      >
+                      <LineChart data={row.weeklySparkline.map((v, i) => ({ i, v }))}>
                         <Line
                           type="monotone"
                           dataKey="v"
-                          stroke="#6366f1"
+                          stroke="#C8890A"
                           dot={false}
                           strokeWidth={1.5}
                         />
@@ -134,9 +154,9 @@ export default function AgentSummaryTable({
                   </span>
                 </div>
               </td>
-              <td className="py-2 pr-4 text-[#9ca3af]">{usd(row.thisMonth)}</td>
-              <td className="py-2 pr-4 text-[#9ca3af]">{usd(row.avgCostPerSession)}</td>
-              <td className="py-2 pr-4 text-[#9ca3af]">{row.sessionCount}</td>
+              <td className="py-2 pr-4 text-[11px]" style={{ color: 'var(--ae-text2)' }}>{usd(row.thisMonth)}</td>
+              <td className="py-2 pr-4 text-[11px]" style={{ color: 'var(--ae-text2)' }}>{usd(row.avgCostPerSession)}</td>
+              <td className="py-2 pr-4 text-[11px]" style={{ color: 'var(--ae-text2)' }}>{row.sessionCount}</td>
             </tr>
           ))}
         </tbody>

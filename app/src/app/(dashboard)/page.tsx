@@ -26,8 +26,15 @@ export default async function CommandCenterPage(): Promise<React.JSX.Element> {
   return (
     <div className="flex flex-col gap-6">
       <div>
-        <h1 className="text-xl font-semibold text-white">Command Center</h1>
-        <p className="text-sm text-[#4b5563] mt-0.5">Agent status and live activity feed</p>
+        <h1 className="text-[14px] font-[500]" style={{ color: 'var(--ae-text)' }}>
+          Command Center
+        </h1>
+        <p
+          className="text-[11px] tracking-[0.04em]"
+          style={{ color: 'var(--ae-text2)', marginTop: '3px' }}
+        >
+          Agent status and live activity feed
+        </p>
       </div>
 
       <ErrorBoundary label="Command Center">

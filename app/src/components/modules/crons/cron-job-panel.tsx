@@ -60,16 +60,64 @@ function relativeTime(iso: string): string {
   return `${Math.floor(hrs / 24)}d ago`;
 }
 
-const STATUS_BADGE: Record<CronJob['status'], string> = {
-  active: 'bg-emerald-500/20 text-emerald-400',
-  disabled: 'bg-[#1e1e2e] text-[#6b7280]',
-  running: 'bg-indigo-500/20 text-indigo-300',
+function cronStatusBadge(status: CronJob['status']): { cls: string; label: string } {
+  switch (status) {
+    case 'active':   return { cls: 'ae-badge ae-badge-active', label: 'ACTIVE'   };
+    case 'disabled': return { cls: 'ae-badge ae-badge-off',    label: 'DISABLED' };
+    case 'running':  return { cls: 'ae-badge ae-badge-active', label: 'RUNNING'  };
+  }
+}
+
+function runStatusBadge(status: string): string {
+  switch (status) {
+    case 'success': return 'ae-badge ae-badge-ok';
+    case 'failure': return 'ae-badge ae-badge-error';
+    case 'running': return 'ae-badge ae-badge-active';
+    default:        return 'ae-badge ae-badge-off';
+  }
+}
+
+const fieldLabelStyle: React.CSSProperties = {
+  fontSize: '10px',
+  letterSpacing: '0.10em',
+  textTransform: 'uppercase',
+  color: 'var(--ae-text2)',
+  marginBottom: '4px',
 };
 
-const RUN_STATUS_BADGE: Record<string, string> = {
-  success: 'bg-emerald-500/20 text-emerald-400',
-  failure: 'bg-red-500/20 text-red-400',
-  running: 'bg-indigo-500/20 text-indigo-300',
+const inputStyle: React.CSSProperties = {
+  width: '100%',
+  background: 'var(--ae-raised)',
+  border: '1px solid var(--ae-border)',
+  color: 'var(--ae-text)',
+  fontFamily: 'var(--font-mono), "IBM Plex Mono", ui-monospace, monospace',
+  fontSize: '12px',
+  padding: '6px 10px',
+  outline: 'none',
+};
+
+const btnPrimary: React.CSSProperties = {
+  fontFamily: 'var(--font-mono), "IBM Plex Mono", ui-monospace, monospace',
+  fontSize: '10px',
+  letterSpacing: '0.08em',
+  textTransform: 'uppercase',
+  padding: '5px 12px',
+  background: 'var(--ae-amber)',
+  color: 'var(--ae-void)',
+  border: 'none',
+  cursor: 'pointer',
+};
+
+const btnSecondary: React.CSSProperties = {
+  fontFamily: 'var(--font-mono), "IBM Plex Mono", ui-monospace, monospace',
+  fontSize: '10px',
+  letterSpacing: '0.08em',
+  textTransform: 'uppercase',
+  padding: '5px 12px',
+  background: 'transparent',
+  border: '1px solid var(--ae-border-hi)',
+  color: 'var(--ae-text2)',
+  cursor: 'pointer',
 };
 
 export default function CronJobPanel({ job, onShowHistory, onJobUpdated }: CronJobPanelProps): React.JSX.Element {
@@ -199,11 +247,23 @@ export default function CronJobPanel({ job, onShowHistory, onJobUpdated }: CronJ
     else if (pendingAction === 'prompt') void handleSavePrompt(totpToken);
   }
 
+  const statusBadge = cronStatusBadge(job.status);
+
   return (
-    <div className="bg-[#12121a] border border-[#1e1e2e] rounded-lg p-5 space-y-5">
+    <div
+      className="space-y-5 p-5"
+      style={{ background: 'var(--ae-surface)', border: '1px solid var(--ae-border)' }}
+    >
       {/* Toast */}
       {toast && (
-        <div className="fixed bottom-6 right-6 z-50 bg-[#1e1e2e] border border-[#3f3f5a] text-white text-sm px-4 py-2 rounded-lg shadow-lg">
+        <div
+          className="fixed bottom-6 right-6 z-50 text-[11px] px-4 py-2 shadow-lg"
+          style={{
+            background: 'var(--ae-raised)',
+            border: '1px solid var(--ae-border-hi)',
+            color: 'var(--ae-text)',
+          }}
+        >
           {toast}
         </div>
       )}
@@ -233,32 +293,35 @@ export default function CronJobPanel({ job, onShowHistory, onJobUpdated }: CronJ
       {/* Header */}
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h2 className="text-white font-semibold text-base">{job.name}</h2>
-          <div className="text-[#4b5563] text-xs font-mono mt-0.5">{job.id}</div>
+          <h2 className="text-[13px]" style={{ color: 'var(--ae-text)' }}>{job.name}</h2>
+          <div className="text-[10px] mt-[2px]" style={{ color: 'var(--ae-text2)' }}>{job.id}</div>
         </div>
-        <span className={`inline-flex items-center px-2.5 py-0.5 rounded text-xs font-medium ${STATUS_BADGE[job.status]}`}>
-          {job.status.toUpperCase()}
-        </span>
+        <span className={statusBadge.cls}>{statusBadge.label}</span>
       </div>
 
       {/* Schedule */}
       <div className="space-y-1.5">
-        <div className="text-[#6b7280] text-xs uppercase tracking-wide">Schedule</div>
+        <div style={fieldLabelStyle}>Schedule</div>
         {editingSchedule ? (
           <div className="space-y-2">
             <input
               type="text"
               value={scheduleInput}
               onChange={(e) => { setScheduleInput(e.target.value); setScheduleError(''); }}
-              className="w-full bg-[#0a0a0f] border border-[#1e1e2e] rounded px-3 py-1.5 text-white font-mono text-sm focus:outline-none focus:border-[#6366f1]"
+              style={{ ...inputStyle }}
+              onFocus={(e) => { (e.currentTarget as HTMLElement).style.borderColor = 'var(--ae-amber-dim)'; }}
+              onBlur={(e) => { (e.currentTarget as HTMLElement).style.borderColor = 'var(--ae-border)'; }}
               placeholder="0 5 * * *"
             />
-            {scheduleError && <p className="text-red-400 text-xs">{scheduleError}</p>}
+            {scheduleError && (
+              <p className="text-[10px]" style={{ color: 'var(--ae-red)' }}>{scheduleError}</p>
+            )}
             {scheduleInput && !scheduleError && (
-              <p className="text-[#6b7280] text-xs">{humanReadableSchedule(scheduleInput)}</p>
+              <p className="text-[10px]" style={{ color: 'var(--ae-text2)' }}>{humanReadableSchedule(scheduleInput)}</p>
             )}
             <div className="flex gap-2">
               <button
+                style={btnPrimary}
                 onClick={() => {
                   const trimmed = scheduleInput.trim();
                   if (!/^\S+(\s+\S+){4}$/.test(trimmed)) {
@@ -267,13 +330,12 @@ export default function CronJobPanel({ job, onShowHistory, onJobUpdated }: CronJ
                   }
                   setPendingAction('schedule');
                 }}
-                className="px-3 py-1 bg-[#6366f1] text-white text-xs rounded hover:bg-[#4f52c9] transition-colors"
               >
                 Save
               </button>
               <button
+                style={btnSecondary}
                 onClick={() => { setEditingSchedule(false); setScheduleInput(job.schedule); setScheduleError(''); }}
-                className="px-3 py-1 border border-[#1e1e2e] text-[#6b7280] text-xs rounded hover:text-white hover:border-[#3f3f5a] transition-colors"
               >
                 Cancel
               </button>
@@ -282,12 +344,15 @@ export default function CronJobPanel({ job, onShowHistory, onJobUpdated }: CronJ
         ) : (
           <div className="flex items-center gap-3">
             <div>
-              <div className="text-white text-sm font-mono">{job.schedule}</div>
-              <div className="text-[#6b7280] text-xs mt-0.5">{humanReadableSchedule(job.schedule)}</div>
+              <div className="text-[12px]" style={{ color: 'var(--ae-text)' }}>{job.schedule}</div>
+              <div className="text-[10px] mt-[2px]" style={{ color: 'var(--ae-text2)' }}>{humanReadableSchedule(job.schedule)}</div>
             </div>
             <button
+              className="ml-auto text-[10px] uppercase tracking-[0.06em] transition-colors"
+              style={{ color: 'var(--ae-text2)' }}
+              onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = 'var(--ae-amber)'; }}
+              onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.color = 'var(--ae-text2)'; }}
               onClick={() => { setEditingSchedule(true); setScheduleInput(job.schedule); }}
-              className="ml-auto text-[#6b7280] text-xs hover:text-[#6366f1] transition-colors"
             >
               Edit
             </button>
@@ -298,13 +363,13 @@ export default function CronJobPanel({ job, onShowHistory, onJobUpdated }: CronJ
       {/* Agent & model */}
       <div className="grid grid-cols-2 gap-4">
         <div>
-          <div className="text-[#6b7280] text-xs uppercase tracking-wide mb-1">Agent</div>
-          <div className="text-white text-sm">{job.agentId}</div>
+          <div style={fieldLabelStyle}>Agent</div>
+          <div className="text-[12px]" style={{ color: 'var(--ae-text)' }}>{job.agentId}</div>
         </div>
         {job.modelOverride && (
           <div>
-            <div className="text-[#6b7280] text-xs uppercase tracking-wide mb-1">Model Override</div>
-            <div className="text-white text-sm font-mono truncate" title={job.modelOverride}>
+            <div style={fieldLabelStyle}>Model Override</div>
+            <div className="text-[12px] truncate" style={{ color: 'var(--ae-text)' }} title={job.modelOverride}>
               {job.modelOverride.replace('openrouter/', '')}
             </div>
           </div>
@@ -313,26 +378,32 @@ export default function CronJobPanel({ job, onShowHistory, onJobUpdated }: CronJ
 
       {/* Prompt */}
       <div className="space-y-1.5">
-        <div className="text-[#6b7280] text-xs uppercase tracking-wide">Prompt</div>
+        <div style={fieldLabelStyle}>Prompt</div>
         {editingPrompt ? (
           <div className="space-y-2">
             <textarea
               value={promptInput}
               onChange={(e) => setPromptInput(e.target.value)}
               rows={6}
-              className="w-full bg-[#0a0a0f] border border-[#1e1e2e] rounded px-3 py-1.5 text-white font-mono text-sm focus:outline-none focus:border-[#6366f1] resize-y"
+              style={{ ...inputStyle, resize: 'vertical' }}
+              onFocus={(e) => { (e.currentTarget as HTMLElement).style.borderColor = 'var(--ae-amber-dim)'; }}
+              onBlur={(e) => { (e.currentTarget as HTMLElement).style.borderColor = 'var(--ae-border)'; }}
             />
             <div className="flex gap-2">
               <button
                 disabled={promptInput.trim() === (job.prompt ?? '')}
                 onClick={() => setPendingAction('prompt')}
-                className="px-3 py-1 bg-[#6366f1] text-white text-xs rounded hover:bg-[#4f52c9] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                style={{
+                  ...btnPrimary,
+                  opacity: promptInput.trim() === (job.prompt ?? '') ? 0.4 : 1,
+                  cursor: promptInput.trim() === (job.prompt ?? '') ? 'not-allowed' : 'pointer',
+                }}
               >
                 Save
               </button>
               <button
+                style={btnSecondary}
                 onClick={() => { setEditingPrompt(false); setPromptInput(job.prompt?.trim() ?? ''); }}
-                className="px-3 py-1 border border-[#1e1e2e] text-[#6b7280] text-xs rounded hover:text-white hover:border-[#3f3f5a] transition-colors"
               >
                 Cancel
               </button>
@@ -341,15 +412,21 @@ export default function CronJobPanel({ job, onShowHistory, onJobUpdated }: CronJ
         ) : (
           <div className="flex items-start gap-3">
             {job.prompt ? (
-              <pre className="flex-1 whitespace-pre-wrap overflow-auto max-h-48 text-white text-sm font-mono leading-relaxed">
+              <pre
+                className="flex-1 whitespace-pre-wrap overflow-auto max-h-48 text-[12px] leading-relaxed"
+                style={{ color: 'var(--ae-text)' }}
+              >
                 {job.prompt}
               </pre>
             ) : (
-              <span className="text-[#4b5563] text-sm">No prompt set</span>
+              <span className="text-[12px]" style={{ color: 'var(--ae-text3)' }}>No prompt set</span>
             )}
             <button
+              className="shrink-0 text-[10px] uppercase tracking-[0.06em] transition-colors"
+              style={{ color: 'var(--ae-text2)' }}
+              onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = 'var(--ae-amber)'; }}
+              onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.color = 'var(--ae-text2)'; }}
               onClick={() => { setEditingPrompt(true); setPromptInput(job.prompt?.trim() ?? ''); }}
-              className="shrink-0 text-[#6b7280] text-xs hover:text-[#6366f1] transition-colors"
             >
               Edit
             </button>
@@ -359,46 +436,52 @@ export default function CronJobPanel({ job, onShowHistory, onJobUpdated }: CronJ
 
       {/* Next run */}
       <div>
-        <div className="text-[#6b7280] text-xs uppercase tracking-wide mb-1">Next Run</div>
-        <div className="text-white text-sm">{computeNextRun(job.schedule)}</div>
+        <div style={fieldLabelStyle}>Next Run</div>
+        <div className="text-[12px]" style={{ color: 'var(--ae-text)' }}>{computeNextRun(job.schedule)}</div>
       </div>
 
       {/* Last run */}
       {job.lastRun ? (
         <div>
-          <div className="text-[#6b7280] text-xs uppercase tracking-wide mb-1">Last Run</div>
+          <div style={fieldLabelStyle}>Last Run</div>
           <div className="flex items-center gap-2">
-            <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${RUN_STATUS_BADGE[job.lastRun.status] ?? ''}`}>
-              {job.lastRun.status}
-            </span>
-            <span className="text-[#6b7280] text-xs">{relativeTime(job.lastRun.startedAt)}</span>
+            <span className={runStatusBadge(job.lastRun.status)}>{job.lastRun.status}</span>
+            <span className="text-[11px]" style={{ color: 'var(--ae-text2)' }}>{relativeTime(job.lastRun.startedAt)}</span>
             {job.lastRun.durationMs !== undefined && (
-              <span className="text-[#4b5563] text-xs">{(job.lastRun.durationMs / 1000).toFixed(1)}s</span>
+              <span className="text-[10px]" style={{ color: 'var(--ae-text3)' }}>
+                {(job.lastRun.durationMs / 1000).toFixed(1)}s
+              </span>
             )}
           </div>
         </div>
       ) : (
         <div>
-          <div className="text-[#6b7280] text-xs uppercase tracking-wide mb-1">Last Run</div>
-          <div className="text-[#4b5563] text-sm">No runs recorded</div>
+          <div style={fieldLabelStyle}>Last Run</div>
+          <div className="text-[12px]" style={{ color: 'var(--ae-text3)' }}>No runs recorded</div>
         </div>
       )}
 
       {/* Actions */}
-      <div className="flex flex-wrap gap-2 pt-1 border-t border-[#1e1e2e]">
+      <div
+        className="flex flex-wrap gap-2 pt-3"
+        style={{ borderTop: '1px solid var(--ae-border)' }}
+      >
         {/* Trigger */}
         <button
           disabled={triggerState === 'loading'}
           onClick={() => setPendingAction('trigger')}
-          className={`flex items-center gap-1.5 px-3 py-1.5 rounded text-sm font-medium transition-colors ${
-            triggerState === 'success'
-              ? 'bg-emerald-500/20 text-emerald-400'
+          className="text-[10px] uppercase tracking-[0.08em] px-[12px] py-[5px] transition-opacity"
+          style={{
+            fontFamily: 'var(--font-mono), "IBM Plex Mono", ui-monospace, monospace',
+            ...(triggerState === 'success'
+              ? { background: 'transparent', border: '1px solid var(--ae-green-dim)', color: 'var(--ae-green)' }
               : triggerState === 'error'
-              ? 'bg-red-500/20 text-red-400'
+              ? { background: 'transparent', border: '1px solid var(--ae-red-dim)', color: 'var(--ae-red)' }
               : triggerState === 'loading'
-              ? 'bg-[#1e1e2e] text-[#6b7280] cursor-wait'
-              : 'bg-[#6366f1] text-white hover:bg-[#4f52c9]'
-          }`}
+              ? { background: 'var(--ae-raised)', border: '1px solid var(--ae-border)', color: 'var(--ae-text3)', cursor: 'wait' }
+              : { background: 'var(--ae-amber)', border: 'none', color: 'var(--ae-void)', cursor: 'pointer' }
+            ),
+          }}
         >
           {triggerState === 'loading' ? '⟳ Running…' :
            triggerState === 'success' ? '✓ Triggered' :
@@ -409,15 +492,15 @@ export default function CronJobPanel({ job, onShowHistory, onJobUpdated }: CronJ
         {/* Enable / Disable toggle */}
         {job.status === 'disabled' ? (
           <button
+            style={btnSecondary}
             onClick={() => setPendingAction('enable')}
-            className="px-3 py-1.5 rounded text-sm border border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/10 transition-colors"
           >
             Enable
           </button>
         ) : (
           <button
+            style={btnSecondary}
             onClick={() => setPendingAction('disable')}
-            className="px-3 py-1.5 rounded text-sm border border-[#1e1e2e] text-[#6b7280] hover:text-red-400 hover:border-red-500/30 transition-colors"
           >
             Disable
           </button>
@@ -425,8 +508,8 @@ export default function CronJobPanel({ job, onShowHistory, onJobUpdated }: CronJ
 
         {/* Run history */}
         <button
+          style={{ ...btnSecondary, marginLeft: 'auto' }}
           onClick={onShowHistory}
-          className="px-3 py-1.5 rounded text-sm border border-[#1e1e2e] text-[#6b7280] hover:text-white hover:border-[#3f3f5a] transition-colors ml-auto"
         >
           Run History →
         </button>
@@ -434,7 +517,10 @@ export default function CronJobPanel({ job, onShowHistory, onJobUpdated }: CronJ
 
       {/* Trigger error banner */}
       {triggerState === 'error' && triggerError && (
-        <div className="p-2 bg-red-500/10 border border-red-500/20 rounded text-red-400 text-xs">
+        <div
+          className="p-2 text-[11px]"
+          style={{ background: 'var(--ae-surface)', border: '1px solid var(--ae-red-dim)', color: 'var(--ae-red)' }}
+        >
           {triggerError}
         </div>
       )}

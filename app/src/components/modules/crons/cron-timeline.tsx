@@ -99,6 +99,7 @@ function buildWeekColumns(
           Friday: 4, Saturday: 5, Sunday: 6,
         };
         const _ = localDay; void _;  // suppress unused var
+        void narrow2idx;
         const colIndex = dayMap[fullDay] ?? -1;
         if (colIndex === -1 || seenDays.has(colIndex)) continue;
         seenDays.add(colIndex);
@@ -127,11 +128,21 @@ function buildWeekColumns(
   return { dates, pillsByDay };
 }
 
-const STATUS_PILL: Record<CronJob['status'], string> = {
-  active: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
-  disabled: 'bg-[#1e1e2e] text-[#6b7280] border-[#2e2e3e]',
-  running: 'bg-indigo-500/20 text-indigo-300 border-indigo-500/30',
-};
+function pillStyle(job: CronJob, isSelected: boolean): React.CSSProperties {
+  if (job.status === 'disabled') {
+    return {
+      background: 'transparent',
+      border: isSelected ? '1px solid var(--ae-amber)' : '1px solid var(--ae-border)',
+      color: isSelected ? 'var(--ae-amber)' : 'var(--ae-text3)',
+    };
+  }
+  // active or running
+  return {
+    background: isSelected ? 'var(--ae-amber-dim)' : 'var(--ae-amber-faint)',
+    border: isSelected ? '1px solid var(--ae-amber)' : '1px solid var(--ae-amber-dim)',
+    color: isSelected ? 'var(--ae-amber-bright)' : 'var(--ae-amber)',
+  };
+}
 
 interface CronTimelineProps {
   jobs: CronJob[];
@@ -155,28 +166,48 @@ export default function CronTimeline({ jobs, selectedId, onSelect }: CronTimelin
 
   const todayIso = toIsoDate(today);
 
+  const navBtnStyle: React.CSSProperties = {
+    fontFamily: 'var(--font-mono), "IBM Plex Mono", ui-monospace, monospace',
+    background: 'transparent',
+    border: '1px solid var(--ae-border-hi)',
+    color: 'var(--ae-text2)',
+    fontSize: '10px',
+    letterSpacing: '0.06em',
+    padding: '3px 8px',
+    cursor: 'pointer',
+  };
+
   return (
-    <div className="bg-[#12121a] border border-[#1e1e2e] rounded-lg overflow-hidden">
+    <div style={{ background: 'var(--ae-void)', border: '1px solid var(--ae-border)' }}>
       {/* Header row */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-[#1e1e2e]">
-        <span className="text-white font-medium text-sm">Weekly Schedule</span>
+      <div
+        className="flex items-center justify-between px-4 py-3"
+        style={{ borderBottom: '1px solid var(--ae-border)' }}
+      >
+        <span className="ae-section-label">── Weekly Schedule ──────────────────</span>
         <div className="flex items-center gap-2">
-          <span className="text-[#6b7280] text-xs">{weekLabel}</span>
+          <span className="text-[10px]" style={{ color: 'var(--ae-text2)' }}>{weekLabel}</span>
           <button
+            style={navBtnStyle}
             onClick={() => setWeekStart((d) => { const n = new Date(d); n.setDate(d.getDate() - 7); return n; })}
-            className="px-2 py-1 text-xs text-[#6b7280] hover:text-white border border-[#1e1e2e] rounded hover:border-[#3f3f5a] transition-colors"
+            onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = 'var(--ae-text)'; }}
+            onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.color = 'var(--ae-text2)'; }}
           >
             ‹
           </button>
           <button
+            style={navBtnStyle}
             onClick={() => setWeekStart(getMondayOf(new Date()))}
-            className="px-2 py-1 text-xs text-[#6b7280] hover:text-white border border-[#1e1e2e] rounded hover:border-[#3f3f5a] transition-colors"
+            onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = 'var(--ae-text)'; }}
+            onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.color = 'var(--ae-text2)'; }}
           >
             Today
           </button>
           <button
+            style={navBtnStyle}
             onClick={() => setWeekStart((d) => { const n = new Date(d); n.setDate(d.getDate() + 7); return n; })}
-            className="px-2 py-1 text-xs text-[#6b7280] hover:text-white border border-[#1e1e2e] rounded hover:border-[#3f3f5a] transition-colors"
+            onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = 'var(--ae-text)'; }}
+            onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.color = 'var(--ae-text2)'; }}
           >
             ›
           </button>
@@ -184,17 +215,38 @@ export default function CronTimeline({ jobs, selectedId, onSelect }: CronTimelin
       </div>
 
       {/* Day columns */}
-      <div className="grid grid-cols-7 divide-x divide-[#1e1e2e]">
+      <div className="grid grid-cols-7" style={{ borderBottom: '1px solid var(--ae-border)' }}>
         {DAYS.map((day, i) => {
           const isToday = dates[i] === todayIso;
           const dateNum = dates[i]
             ? new Date(dates[i]! + 'T12:00:00').getDate()
             : '';
           return (
-            <div key={day} className="min-h-[120px]">
-              <div className={`px-2 py-2 text-center border-b border-[#1e1e2e] ${isToday ? 'bg-[#6366f1]/10' : ''}`}>
-                <div className={`text-[11px] font-medium ${isToday ? 'text-[#6366f1]' : 'text-[#6b7280]'}`}>{day}</div>
-                <div className={`text-[11px] mt-0.5 ${isToday ? 'text-white font-semibold' : 'text-[#4b5563]'}`}>
+            <div
+              key={day}
+              className="min-h-[120px]"
+              style={{ borderRight: i < 6 ? '1px solid var(--ae-border)' : undefined }}
+            >
+              <div
+                className="px-2 py-2 text-center"
+                style={{
+                  borderBottom: '1px solid var(--ae-border)',
+                  background: isToday ? 'var(--ae-raised)' : 'transparent',
+                }}
+              >
+                <div
+                  className="text-[11px] font-medium"
+                  style={{ color: isToday ? 'var(--ae-amber)' : 'var(--ae-text2)' }}
+                >
+                  {day}
+                </div>
+                <div
+                  className="text-[11px] mt-0.5"
+                  style={{
+                    color: isToday ? 'var(--ae-amber)' : 'var(--ae-text3)',
+                    fontWeight: isToday ? '600' : undefined,
+                  }}
+                >
                   {dateNum}
                 </div>
               </div>
@@ -204,11 +256,16 @@ export default function CronTimeline({ jobs, selectedId, onSelect }: CronTimelin
                     key={pill.job.id}
                     onClick={() => onSelect(pill.job.id)}
                     title={`${pill.job.name} — ${formatMinuteOfDay(pill.minuteOfDay)}`}
-                    className={`w-full text-left px-1.5 py-1 rounded border text-[10px] truncate transition-all ${STATUS_PILL[pill.job.status]} ${
-                      selectedId === pill.job.id
-                        ? 'ring-1 ring-[#6366f1] ring-offset-1 ring-offset-[#12121a]'
-                        : 'hover:brightness-125'
-                    }`}
+                    className="w-full text-left px-1.5 py-1 text-[10px] truncate transition-all"
+                    style={pillStyle(pill.job, selectedId === pill.job.id)}
+                    onMouseEnter={(e) => {
+                      if (selectedId !== pill.job.id) {
+                        (e.currentTarget as HTMLElement).style.filter = 'brightness(1.2)';
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      (e.currentTarget as HTMLElement).style.filter = '';
+                    }}
                   >
                     <div className="font-medium truncate leading-tight">{pill.job.name}</div>
                     <div className="opacity-70 leading-tight">{formatMinuteOfDay(pill.minuteOfDay)}</div>
