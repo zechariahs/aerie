@@ -109,6 +109,7 @@ function runMigrations(database: Database.Database): void {
   `);
 
   applyMigrationV1(database);
+  applyMigrationV2(database);
 }
 
 function applyMigrationV1(database: Database.Database): void {
@@ -157,6 +158,41 @@ function applyMigrationV1(database: Database.Database): void {
     ingestCronRuns();
   } catch (err) {
     console.error('[db] initial ingestion failed (non-fatal):', err);
+  }
+}
+
+function applyMigrationV2(database: Database.Database): void {
+  const current = (
+    database.prepare('SELECT MAX(version) AS v FROM schema_version').get() as { v: number | null }
+  ).v ?? 0;
+
+  if (current >= 2) return;
+
+  database.exec(`
+    CREATE TABLE IF NOT EXISTS agent_sessions (
+      id                 TEXT PRIMARY KEY,
+      agent_id           TEXT NOT NULL,
+      model              TEXT,
+      provider           TEXT,
+      started_at         TEXT,
+      input_tokens       INTEGER NOT NULL DEFAULT 0,
+      output_tokens      INTEGER NOT NULL DEFAULT 0,
+      cache_read_tokens  INTEGER NOT NULL DEFAULT 0,
+      total_tokens       INTEGER NOT NULL DEFAULT 0,
+      message_count      INTEGER NOT NULL DEFAULT 0
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_agent_sessions_date
+      ON agent_sessions (agent_id, started_at DESC);
+  `);
+
+  database.prepare('INSERT INTO schema_version (version) VALUES (2)').run();
+
+  try {
+    const { ingestAll } = require('./ingest') as typeof import('./ingest');
+    ingestAll();
+  } catch (err) {
+    console.error('[db] migration v2 ingestion failed (non-fatal):', err);
   }
 }
 

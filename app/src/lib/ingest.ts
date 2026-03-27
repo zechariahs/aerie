@@ -24,6 +24,17 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 
 let _ingesting = false;
 
+function buildProviderModelMap(providerModels: ProviderModel[]): Map<string, ProviderModel> {
+  const map = new Map<string, ProviderModel>();
+  for (const pm of providerModels) {
+    if (UUID_RE.test(pm.id)) {
+      map.set(`${pm.provider}/${pm.id}`, pm);
+      map.set(pm.id, pm);
+    }
+  }
+  return map;
+}
+
 /**
  * Resolves a raw model/provider pair to a canonical human-readable model ID.
  * UUID model IDs (e.g. nexos UUIDs) are resolved via the provider registry.
@@ -185,37 +196,235 @@ function ingestFile(
 }
 
 /**
+ * Accumulates token usage from parsed session JSONL lines into the agent_sessions table.
+ * Handles both single-session files (UUID-named) and multi-session files (sessions.json).
+ * Sessions are delimited by `type: "session"` lines; all subsequent lines belong to that session.
+ */
+function processSessionLines(
+  lines: string[],
+  agentId: string,
+  providerModelMap: Map<string, ProviderModel>,
+): void {
+  const db = getDb();
+
+  interface SessionAccum {
+    id: string;
+    startedAt: string;
+    model: string | null;
+    provider: string | null;
+    inputTokens: number;
+    outputTokens: number;
+    cacheReadTokens: number;
+    totalTokens: number;
+    messageCount: number;
+  }
+
+  const completed: SessionAccum[] = [];
+  let current: SessionAccum | null = null;
+
+  for (const line of lines) {
+    let obj: Record<string, unknown>;
+    try { obj = JSON.parse(line) as Record<string, unknown>; } catch { continue; }
+
+    const type = typeof obj['type'] === 'string' ? obj['type'] : null;
+
+    if (type === 'session') {
+      if (current && current.messageCount > 0) completed.push(current);
+      current = {
+        id: typeof obj['id'] === 'string' ? obj['id'] : crypto.randomUUID(),
+        startedAt: typeof obj['timestamp'] === 'string' ? obj['timestamp'] : new Date().toISOString(),
+        model: null,
+        provider: null,
+        inputTokens: 0,
+        outputTokens: 0,
+        cacheReadTokens: 0,
+        totalTokens: 0,
+        messageCount: 0,
+      };
+    } else if (current === null) {
+      continue;
+    } else if (type === 'model_change') {
+      if (typeof obj['modelId'] === 'string') current.model = obj['modelId'];
+      if (typeof obj['provider'] === 'string') current.provider = obj['provider'];
+    } else if (type === 'message') {
+      const msg =
+        typeof obj['message'] === 'object' && obj['message'] !== null
+          ? (obj['message'] as Record<string, unknown>)
+          : null;
+      if (!msg || msg['role'] !== 'assistant') continue;
+
+      const usage =
+        typeof msg['usage'] === 'object' && msg['usage'] !== null
+          ? (msg['usage'] as Record<string, unknown>)
+          : null;
+      if (!usage) continue;
+
+      const input = typeof usage['input'] === 'number' ? usage['input'] : 0;
+      const output = typeof usage['output'] === 'number' ? usage['output'] : 0;
+      const cacheRead = typeof usage['cacheRead'] === 'number' ? usage['cacheRead'] : 0;
+      const total =
+        typeof usage['totalTokens'] === 'number'
+          ? usage['totalTokens']
+          : input + output + cacheRead;
+
+      current.inputTokens += input;
+      current.outputTokens += output;
+      current.cacheReadTokens += cacheRead;
+      current.totalTokens += total;
+      current.messageCount++;
+
+      // Prefer model from message body if present (most specific)
+      if (typeof msg['model'] === 'string') {
+        current.model = msg['model'];
+      }
+      if (typeof msg['provider'] === 'string') {
+        current.provider = msg['provider'];
+      }
+    }
+  }
+
+  if (current && current.messageCount > 0) completed.push(current);
+  if (completed.length === 0) return;
+
+  const upsert = db.prepare(`
+    INSERT OR REPLACE INTO agent_sessions
+      (id, agent_id, model, provider, started_at,
+       input_tokens, output_tokens, cache_read_tokens, total_tokens, message_count)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+
+  db.transaction(() => {
+    for (const sess of completed) {
+      const modelId = sess.model
+        ? resolveModelId(sess.model, sess.provider ?? undefined, providerModelMap)
+        : 'unknown';
+      upsert.run(
+        sess.id, agentId, modelId, sess.provider, sess.startedAt,
+        sess.inputTokens, sess.outputTokens, sess.cacheReadTokens,
+        sess.totalTokens, sess.messageCount,
+      );
+    }
+  })();
+}
+
+/**
+ * Ingests a single agent session file (UUID-named .jsonl or sessions.json).
+ * Re-reads the full file when it grows — session state accumulates across all lines.
+ */
+function ingestSessionFile(
+  filePath: string,
+  agentId: string,
+  providerModelMap: Map<string, ProviderModel>,
+): void {
+  const db = getDb();
+
+  let stat: fs.Stats;
+  try { stat = fs.statSync(filePath); } catch { return; }
+
+  const stateRow = db
+    .prepare('SELECT last_offset FROM ingestion_state WHERE file_path = ?')
+    .get(filePath) as { last_offset: number } | undefined;
+
+  const lastOffset = stateRow?.last_offset ?? 0;
+  if (stat.size <= lastOffset) return;
+
+  // Read full file — session token totals must be computed from all lines
+  const text = fs.readFileSync(filePath, 'utf8');
+  const parts = text.split('\n');
+  const safeLines = text.endsWith('\n')
+    ? parts.filter((l) => l.trim())
+    : parts.slice(0, -1).filter((l) => l.trim());
+
+  if (safeLines.length === 0) return;
+
+  processSessionLines(safeLines, agentId, providerModelMap);
+
+  db.prepare(
+    `INSERT OR REPLACE INTO ingestion_state (file_path, last_offset, updated_at)
+     VALUES (?, ?, datetime('now'))`,
+  ).run(filePath, stat.size);
+}
+
+/**
+ * Ingests all agent session JSONL files from agents/<agentId>/sessions/.
+ */
+function ingestAgentSessions(
+  clawDir: string,
+  providerModelMap: Map<string, ProviderModel>,
+): void {
+  const agentsDir = path.join(clawDir, 'agents');
+
+  let agents: string[];
+  try { agents = fs.readdirSync(agentsDir); } catch { return; }
+
+  for (const agentId of agents) {
+    const sessionsDir = path.join(agentsDir, agentId, 'sessions');
+    let files: string[];
+    try { files = fs.readdirSync(sessionsDir); } catch { continue; }
+
+    // Process UUID-named .jsonl files and sessions.json; skip .deleted files
+    const targets = files.filter(
+      (f) => f.indexOf('deleted') === -1 && (f.endsWith('.jsonl') || f === 'sessions.json'),
+    );
+
+    for (const file of targets) {
+      try {
+        ingestSessionFile(path.join(sessionsDir, file), agentId, providerModelMap);
+      } catch (err) {
+        console.error(`[ingest] failed to ingest session ${agentId}/${file}:`, err);
+      }
+    }
+  }
+}
+
+/**
  * Ingests all cron run JSONL files into mc.db.
  * Safe to call synchronously at startup or from a background interval.
  */
 export function ingestCronRuns(): void {
+  const clawDir = process.env['OPENCLAW_DIR'] ?? '/openclaw';
+  const jobs = readCronJobsFile();
+  if (jobs.length === 0) return;
+
+  const { providerModels } = readOpenClawConfig();
+  const providerModelMap = buildProviderModelMap(providerModels);
+
+  for (const job of jobs) {
+    const filePath = path.join(clawDir, 'cron', 'runs', `${job.id}.jsonl`);
+    try {
+      ingestFile(filePath, job.id, job.agentId, job.payload?.model, providerModelMap);
+    } catch (err) {
+      console.error(`[ingest] failed to ingest ${job.id}:`, err);
+    }
+  }
+}
+
+/**
+ * Ingests all cron runs and agent sessions. The _ingesting guard prevents
+ * concurrent runs (e.g. if a background interval fires while startup is still running).
+ */
+export function ingestAll(): void {
   if (_ingesting) return;
   _ingesting = true;
 
   try {
     const clawDir = process.env['OPENCLAW_DIR'] ?? '/openclaw';
-    const jobs = readCronJobsFile();
-    if (jobs.length === 0) return;
-
     const { providerModels } = readOpenClawConfig();
+    const providerModelMap = buildProviderModelMap(providerModels);
 
-    // Build UUID → ProviderModel lookup map
-    const providerModelMap = new Map<string, ProviderModel>();
-    for (const pm of providerModels) {
-      if (UUID_RE.test(pm.id)) {
-        providerModelMap.set(`${pm.provider}/${pm.id}`, pm);
-        providerModelMap.set(pm.id, pm);
-      }
-    }
-
+    // Cron runs
+    const jobs = readCronJobsFile();
     for (const job of jobs) {
       const filePath = path.join(clawDir, 'cron', 'runs', `${job.id}.jsonl`);
       try {
         ingestFile(filePath, job.id, job.agentId, job.payload?.model, providerModelMap);
       } catch (err) {
-        console.error(`[ingest] failed to ingest ${job.id}:`, err);
+        console.error(`[ingest] failed to ingest cron ${job.id}:`, err);
       }
     }
+
+    // Agent sessions
+    ingestAgentSessions(clawDir, providerModelMap);
   } finally {
     _ingesting = false;
   }
@@ -230,7 +439,7 @@ export function startIngestion(): void {
 
   setInterval(() => {
     try {
-      ingestCronRuns();
+      ingestAll();
     } catch (err) {
       console.error('[ingest] background pass failed:', err);
     }
