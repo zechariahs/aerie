@@ -31,6 +31,19 @@ import type { ActivityEvent, AgentState, GatewayStatus } from '@/types';
 export const activityBus = new EventEmitter();
 activityBus.setMaxListeners(100); // allow many concurrent SSE clients
 
+// In-memory ring buffer — replayed to new SSE clients on connect
+const REPLAY_BUFFER_SIZE = 100;
+const replayBuffer: ActivityEvent[] = [];
+
+function pushReplay(event: ActivityEvent): void {
+  replayBuffer.push(event);
+  if (replayBuffer.length > REPLAY_BUFFER_SIZE) replayBuffer.shift();
+}
+
+export function getReplayBuffer(): ActivityEvent[] {
+  return [...replayBuffer];
+}
+
 // ---------------------------------------------------------------------------
 // Shared mutable state (read by /api/gateway/status)
 // ---------------------------------------------------------------------------
@@ -112,6 +125,7 @@ function startFixtureStream(): void {
     // Stamp current time so the feed looks live
     const live: ActivityEvent = { ...event, timestamp: new Date().toISOString() };
     lastEventAt = Date.now();
+    pushReplay(live);
     activityBus.emit('event', live);
     updateAgentState(live);
   }, 3000);
@@ -325,6 +339,7 @@ function connect(): void {
     lastEventAt = Date.now();
     updateAgentState(event);
     persistCronRun(event);
+    pushReplay(event);
     activityBus.emit('event', event);
   });
 
