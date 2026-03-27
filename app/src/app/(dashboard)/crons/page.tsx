@@ -17,17 +17,22 @@ export default function CronsPage(): React.JSX.Element {
     <div className="space-y-1">
       <div className="flex items-center justify-between mb-4">
         <div>
-          <h1 className="text-xl font-semibold text-white">Cron Manager</h1>
-          <p className="text-sm text-[#6b7280] mt-0.5">
+          <h1 className="text-[14px] font-[500]" style={{ color: 'var(--ae-text)' }}>
+            Cron Manager
+          </h1>
+          <p className="text-[11px] tracking-[0.04em]" style={{ color: 'var(--ae-text2)', marginTop: '3px' }}>
             {jobs.length} job{jobs.length !== 1 ? 's' : ''} · America/Chicago
           </p>
         </div>
       </div>
 
       {jobs.length === 0 ? (
-        <div className="bg-[#12121a] border border-[#1e1e2e] rounded-lg p-8 text-center space-y-2">
-          <p className="text-white font-medium">No cron jobs found</p>
-          <p className="text-[#6b7280] text-sm">
+        <div
+          className="p-8 text-center space-y-2"
+          style={{ background: 'var(--ae-surface)', border: '1px solid var(--ae-border)' }}
+        >
+          <p className="text-[13px]" style={{ color: 'var(--ae-text)' }}>No cron jobs found</p>
+          <p className="text-[11px]" style={{ color: 'var(--ae-text2)' }}>
             {process.env['USE_FIXTURES'] === 'true'
               ? 'Fixture file not found. Create fixtures/crons.json.'
               : 'Could not read openclaw.json — check that the /openclaw volume is mounted correctly.'}

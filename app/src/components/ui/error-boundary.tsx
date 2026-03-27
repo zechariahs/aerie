@@ -37,11 +37,26 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
   override render(): React.ReactNode {
     if (this.state.error) {
       return (
-        <div className="rounded border border-red-900/50 bg-red-950/20 p-4">
-          <p className="text-sm font-semibold text-red-400">{this.props.label} — render error</p>
-          <p className="mt-1 text-xs text-[#6b7280]">{this.state.error.message}</p>
+        <div
+          style={{
+            border: '1px solid var(--ae-red-dim)',
+            background: 'var(--ae-surface)',
+            padding: '14px',
+          }}
+        >
+          <p className="text-[11px] uppercase tracking-[0.08em]" style={{ color: 'var(--ae-red)' }}>
+            {this.props.label} — render error
+          </p>
+          <p className="text-[11px] mt-1" style={{ color: 'var(--ae-text2)' }}>
+            {this.state.error.message}
+          </p>
           <button
-            className="mt-3 text-xs text-[#6b7280] underline hover:text-white"
+            className="text-[10px] uppercase tracking-[0.08em] mt-3 px-[12px] py-[5px] transition-opacity hover:opacity-80"
+            style={{
+              border: '1px solid var(--ae-red-dim)',
+              color: 'var(--ae-red)',
+              fontFamily: 'var(--font-mono), "IBM Plex Mono", ui-monospace, monospace',
+            }}
             onClick={() => this.setState({ error: undefined })}
           >
             Retry

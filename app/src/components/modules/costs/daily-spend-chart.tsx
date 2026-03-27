@@ -11,19 +11,14 @@ import {
   XAxis,
   YAxis,
   Tooltip,
-  Legend,
+  CartesianGrid,
   ResponsiveContainer,
 } from 'recharts';
 import type { DailyAgentCost } from '@/types';
 import { basePath } from '@/lib/client-url';
 
-const MODEL_COLORS: Record<string, string> = {
-  'openrouter/moonshotai/kimi-k2-0905': '#6366f1',
-  'openrouter/anthropic/claude-haiku-4-5': '#22d3ee',
-  'openrouter/anthropic/claude-sonnet-4-5': '#f59e0b',
-};
-
-const DEFAULT_COLOR = '#8b5cf6';
+// Amber palette — assigned round-robin per model, no purple
+const MODEL_PALETTE = ['#C8890A', '#5C3E04', '#E0A018', '#281C02'];
 
 interface ChartRow {
   date: string;
@@ -69,17 +64,20 @@ export default function DailySpendChart({ days = 30 }: DailySpendChartProps): Re
   }, [days]);
 
   if (loading) {
-    return <div className="h-56 animate-pulse rounded bg-[#1e1e2e]" />;
-  }
-
-  if (error) {
     return (
-      <p className="text-sm text-red-400">Failed to load daily spend: {error}</p>
+      <div
+        className="h-56 animate-pulse"
+        style={{ background: 'var(--ae-raised)', border: '1px solid var(--ae-border)' }}
+      />
     );
   }
 
+  if (error) {
+    return <p className="text-[11px]" style={{ color: 'var(--ae-red)' }}>Failed to load daily spend: {error}</p>;
+  }
+
   if (data.length === 0) {
-    return <p className="text-sm text-[#6b7280]">No cost data available.</p>;
+    return <p className="text-[11px]" style={{ color: 'var(--ae-text2)' }}>No cost data available.</p>;
   }
 
   // Pivot data: one row per date, columns per model
@@ -98,50 +96,69 @@ export default function DailySpendChart({ days = 30 }: DailySpendChartProps): Re
   );
 
   return (
-    <ResponsiveContainer width="100%" height={224}>
-      <BarChart data={chartData} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
-        <XAxis
-          dataKey="date"
-          tickFormatter={shortDate}
-          tick={{ fill: '#6b7280', fontSize: 11 }}
-          axisLine={false}
-          tickLine={false}
-          interval="preserveStartEnd"
-        />
-        <YAxis
-          tickFormatter={(v: number) => `$${v.toFixed(3)}`}
-          tick={{ fill: '#6b7280', fontSize: 11 }}
-          axisLine={false}
-          tickLine={false}
-          width={58}
-        />
-        <Tooltip
-          contentStyle={{
-            background: '#12121a',
-            border: '1px solid #1e1e2e',
-            borderRadius: 6,
-            fontSize: 12,
-          }}
-          labelStyle={{ color: '#c9d1d9' }}
-          formatter={(value: number, name: string) => [
-            formatUsd(value),
-            shortModel(name),
-          ]}
-        />
-        <Legend
-          formatter={shortModel}
-          wrapperStyle={{ fontSize: 11, color: '#9ca3af' }}
-        />
-        {modelIds.map((modelId) => (
-          <Bar
-            key={modelId}
-            dataKey={modelId}
-            stackId="cost"
-            fill={MODEL_COLORS[modelId] ?? DEFAULT_COLOR}
-            radius={modelId === modelIds[modelIds.length - 1] ? [2, 2, 0, 0] : undefined}
+    <div>
+      {/* Legend — mono text labels, no color swatches */}
+      {modelIds.length > 1 && (
+        <div className="flex flex-wrap gap-3 mb-3">
+          {modelIds.map((id, i) => (
+            <span key={id} className="flex items-center gap-1.5 text-[10px]" style={{ color: 'var(--ae-text2)' }}>
+              <span
+                className="inline-block w-2 h-2 shrink-0"
+                style={{ background: MODEL_PALETTE[i % MODEL_PALETTE.length] }}
+              />
+              {shortModel(id)}
+            </span>
+          ))}
+        </div>
+      )}
+
+      <ResponsiveContainer width="100%" height={224}>
+        <BarChart data={chartData} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
+          <CartesianGrid
+            vertical={false}
+            stroke="#281C02"
+            strokeWidth={1}
           />
-        ))}
-      </BarChart>
-    </ResponsiveContainer>
+          <XAxis
+            dataKey="date"
+            tickFormatter={shortDate}
+            tick={{ fill: '#363430', fontSize: 9 }}
+            axisLine={false}
+            tickLine={false}
+            interval="preserveStartEnd"
+          />
+          <YAxis
+            tickFormatter={(v: number) => `$${v.toFixed(3)}`}
+            tick={{ fill: '#363430', fontSize: 9 }}
+            axisLine={false}
+            tickLine={false}
+            width={58}
+          />
+          <Tooltip
+            contentStyle={{
+              background: '#0C0E0B',
+              border: '1px solid #1C201A',
+              borderRadius: 0,
+              fontSize: 11,
+              fontFamily: '"IBM Plex Mono", ui-monospace, monospace',
+            }}
+            labelStyle={{ color: '#C8C4B0' }}
+            itemStyle={{ color: '#686858' }}
+            formatter={(value: number, name: string) => [
+              formatUsd(value),
+              shortModel(name),
+            ]}
+          />
+          {modelIds.map((modelId, i) => (
+            <Bar
+              key={modelId}
+              dataKey={modelId}
+              stackId="cost"
+              fill={MODEL_PALETTE[i % MODEL_PALETTE.length]}
+            />
+          ))}
+        </BarChart>
+      </ResponsiveContainer>
+    </div>
   );
 }

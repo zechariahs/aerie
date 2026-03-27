@@ -21,8 +21,11 @@ function Panel({
   children: React.ReactNode;
 }): React.JSX.Element {
   return (
-    <section className="rounded border border-[#1e1e2e] bg-[#12121a] p-4">
-      <h2 className="mb-4 text-sm font-semibold text-[#c9d1d9]">{title}</h2>
+    <section
+      className="p-4"
+      style={{ background: 'var(--ae-surface)', border: '1px solid var(--ae-border)' }}
+    >
+      <p className="ae-section-label mb-4">── {title} ────────────────────────</p>
       {children}
     </section>
   );
@@ -33,7 +36,11 @@ export default function CostsPage(): React.JSX.Element {
 
   return (
     <div className="space-y-4">
-      <h1 className="text-xl font-semibold text-white">Cost &amp; Token Tracking</h1>
+      <div>
+        <h1 className="text-[14px] font-[500]" style={{ color: 'var(--ae-text)' }}>
+          Cost &amp; Token Tracking
+        </h1>
+      </div>
 
       <ModuleErrorBoundary title="Daily Spend Chart">
         <Panel title="Daily Spend (last 30 days)">
@@ -63,7 +70,7 @@ export default function CostsPage(): React.JSX.Element {
         <Panel
           title={
             agentFilter
-              ? `Session Inspector — filtered: ${agentFilter}`
+              ? `Session Inspector — ${agentFilter}`
               : 'Session Inspector'
           }
         >
