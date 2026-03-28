@@ -355,7 +355,15 @@ function startWatcher(): void {
     `${OPENCLAW_DATA_DIR}/agents/*/sessions/*.jsonl`,
   ];
 
-  const watcher = chokidar.watch(globs, { persistent: true, ignoreInitial: false });
+  // usePolling: inotify events are unreliable on Docker-managed mounts and some
+  // Linux VPS filesystems. Polling checks for changes every 1 s — slightly more
+  // CPU than inotify but guaranteed to work on any filesystem.
+  const watcher = chokidar.watch(globs, {
+    persistent: true,
+    ignoreInitial: false,
+    usePolling: true,
+    interval: 1000,
+  });
 
   // Track whether the initial directory scan has finished.
   // Files added BEFORE ready are pre-existing — skip their history.
