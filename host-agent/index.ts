@@ -372,11 +372,13 @@ function startWatcher(): void {
   watcher.on('ready', () => { watcherReady = true; });
 
   watcher.on('add', (filePath: string) => {
+    console.log(`[host-agent] watcher add: ${filePath} (ready=${watcherReady})`);
     if (!watcherReady) {
       // Startup scan — set cursor to end so we don't replay existing history.
       try {
         const stat = fs.statSync(filePath);
         fileOffsets.set(filePath, stat.size);
+        console.log(`[host-agent] startup file offset set to ${stat.size}: ${filePath}`);
       } catch {
         fileOffsets.set(filePath, 0);
       }
@@ -403,7 +405,9 @@ function startWatcher(): void {
   });
 
   watcher.on('change', (filePath: string) => {
+    console.log(`[host-agent] watcher change: ${filePath}`);
     const text = readNewBytes(filePath);
+    console.log(`[host-agent] new bytes read: ${text.length} chars from ${filePath}`);
     if (!text) return;
     const lines = text.split('\n');
     for (const line of lines) {
