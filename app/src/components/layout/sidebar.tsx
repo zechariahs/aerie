@@ -13,7 +13,7 @@ const navItems = [
   { href: '/crons', label: 'Cron Manager' },
   { href: '/costs', label: 'Cost & Tokens' },
   { href: '/tasks', label: 'Task Board' },
-  { href: '/workspace', label: 'Workspace' },
+  { href: '/agents', label: 'Agents' },
   { href: '/claude-loop', label: 'Claude Loop' },
   { href: '/vps-health', label: 'VPS Health' },
   { href: '/security', label: 'Security' },

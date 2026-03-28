@@ -326,6 +326,84 @@ export interface DriveFile {
   webViewLink: string;
 }
 
+// ── Agent Management (new) ────────────────────────────────────────────────────
+
+/** Full agent config entry from `openclaw agents list --json`. */
+export interface AgentConfig {
+  id: string;
+  name?: string;
+  workspace?: string;
+  agentDir?: string;
+  default?: boolean;
+  model?: string;
+  identity?: {
+    name?: string;
+    theme?: string;
+    emoji?: string;
+    avatar?: string;
+  };
+  sandbox?: { mode?: string; scope?: string };
+  tools?: { allow?: string[]; deny?: string[] };
+  groupChat?: { mentionPatterns?: string[] };
+}
+
+/** A channel binding from `openclaw agents bindings --json`. */
+export interface AgentBinding {
+  channel: string;
+  accountId?: string;
+  peer?: string;
+  agentId?: string;
+}
+
+/** A single session entry from `openclaw sessions --json`. */
+export interface AgentSession {
+  key: string;
+  model?: string;
+  lastActiveAt?: string;
+  active?: boolean;
+}
+
+/** Result shape returned by GET /api/agents/sessions. */
+export interface AgentSessionsResult {
+  sessions: AgentSession[];
+  activeSessions: AgentSession[];
+  storePath: string;
+}
+
+/** A model entry in the allowlist. */
+export interface AllowedModel {
+  ref: string;
+  alias?: string;
+}
+
+/** Provider auth status row. */
+export interface ModelAuthStatus {
+  provider: string;
+  status: string;
+}
+
+/** Result of `openclaw models status --agent <id> --json`. */
+export interface AgentModelsStatus {
+  primary?: string;
+  fallbacks?: string[];
+  allowlist?: AllowedModel[];
+  auth?: ModelAuthStatus[];
+  imageModel?: string;
+  imageGenerationModel?: string;
+}
+
+/** Metadata for one file in an agent's standard workspace file set. */
+export interface AgentWorkspaceFileInfo {
+  name: string;
+  exists: boolean;
+  sizeChars?: number;
+  modifiedAt?: string;
+  isDirectory?: boolean;
+  fileCount?: number;
+  latestDate?: string;
+  files?: string[];
+}
+
 // ── Command Center / Activity Feed (Module 1) ─────────────────────────────────
 
 /** Event types emitted by the Gateway and broadcast to SSE clients. */
