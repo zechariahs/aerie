@@ -479,6 +479,41 @@ function buildSummary(type: ActivityEvent['type'], msg: Record<string, unknown>)
  * Safe to call multiple times — only one connection is maintained.
  * In fixture mode, streams synthetic events every 3s instead.
  */
+/**
+ * Seeds agentStates from the most recent cron_run per agent_id so that
+ * agent cards show IDLE + real last-active time instead of OFFLINE after
+ * a server restart.
+ */
+function seedAgentStatesFromHistory(): void {
+  try {
+    const db = (require('./db') as typeof import('./db')).getDb();
+    // Pick the most recent finished run per agent_id
+    const rows = db.prepare(`
+      SELECT agent_id, MAX(COALESCE(finished_at, started_at)) AS last_at
+      FROM cron_runs
+      WHERE agent_id IS NOT NULL AND agent_id != ''
+      GROUP BY agent_id
+    `).all() as Array<{ agent_id: string; last_at: string }>;
+
+    const g = getG();
+    for (const row of rows) {
+      if (!g.agentStates.has(row.agent_id)) {
+        g.agentStates.set(row.agent_id, {
+          agentId: row.agent_id,
+          status: 'IDLE',
+          lastActiveAt: row.last_at,
+          currentSessionId: null,
+        });
+      }
+    }
+    if (rows.length > 0) {
+      console.log(`[gateway-bridge] seeded ${rows.length} agent state(s) from cron history`);
+    }
+  } catch (err) {
+    console.error('[gateway-bridge] failed to seed agent states from history:', err);
+  }
+}
+
 export function ensureBridgeStarted(): void {
   const g = getG();
   if (g.bridgeStarted) return;
@@ -490,6 +525,7 @@ export function ensureBridgeStarted(): void {
     return;
   }
 
+  seedAgentStatesFromHistory();
   connect();
 }
 
