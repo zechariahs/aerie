@@ -193,11 +193,12 @@ interface FilterState {
 
 interface FilterBarProps {
   agentIds: string[];
+  cronNames: Map<string, string>;
   filter: FilterState;
   onChange: (f: FilterState) => void;
 }
 
-function FilterBar({ agentIds, filter, onChange }: FilterBarProps): React.JSX.Element {
+function FilterBar({ agentIds, cronNames, filter, onChange }: FilterBarProps): React.JSX.Element {
   function toggleType(t: ActivityEventType): void {
     const next = new Set(filter.types);
     if (next.has(t)) next.delete(t);
@@ -222,7 +223,7 @@ function FilterBar({ agentIds, filter, onChange }: FilterBarProps): React.JSX.El
         >
           <option value="">All agents</option>
           {agentIds.map((id) => (
-            <option key={id} value={id}>{id}</option>
+            <option key={id} value={id}>{cronNames.get(id) ?? id}</option>
           ))}
         </select>
       )}
@@ -283,6 +284,7 @@ export function ActivityFeed({ gatewayStatus, configuredAgentIds }: ActivityFeed
   const [events, setEvents] = useState<ActivityEvent[]>([]);
   const [filter, setFilter] = useState<FilterState>({ agentId: '', types: new Set() });
   const [hideSensitive, setHideSensitive] = useState<boolean>(false);
+  const [cronNames, setCronNames] = useState<Map<string, string>>(new Map());
   const bottomRef = useRef<HTMLDivElement>(null);
 
   // Read hide-sensitive cookie on mount and on each render (cookie may change via status strip)
@@ -318,6 +320,22 @@ export function ActivityFeed({ gatewayStatus, configuredAgentIds }: ActivityFeed
     };
 
     return () => es.close();
+  }, []);
+
+  // Fetch cron job names for display (id → name map)
+  useEffect(() => {
+    void (async () => {
+      try {
+        const res = await fetch(basePath + '/api/crons');
+        if (!res.ok) return;
+        const json = (await res.json()) as { data: Array<{ id: string; name: string }> };
+        const map = new Map<string, string>();
+        for (const job of json.data ?? []) map.set(job.id, job.name);
+        setCronNames(map);
+      } catch {
+        // Non-fatal — UUIDs will show as fallback
+      }
+    })();
   }, []);
 
   // Pre-populate feed with recent historical cron runs on mount
@@ -365,7 +383,7 @@ export function ActivityFeed({ gatewayStatus, configuredAgentIds }: ActivityFeed
         </div>
       )}
       {/* Filter bar */}
-      <FilterBar agentIds={agentIds} filter={filter} onChange={setFilter} />
+      <FilterBar agentIds={agentIds} cronNames={cronNames} filter={filter} onChange={setFilter} />
 
       {/* Feed list */}
       <div className="flex flex-col min-h-48">
@@ -400,7 +418,7 @@ export function ActivityFeed({ gatewayStatus, configuredAgentIds }: ActivityFeed
               {/* Agent ID (when multiple agents present) */}
               {agentIds.length > 1 && (
                 <span className="text-[10px] shrink-0" style={{ color: 'var(--ae-text3)' }}>
-                  {event.agentId}
+                  {cronNames.get(event.agentId) ?? event.agentId}
                 </span>
               )}
 
