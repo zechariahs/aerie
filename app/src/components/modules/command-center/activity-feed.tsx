@@ -296,7 +296,7 @@ export function ActivityFeed({ gatewayStatus, configuredAgentIds }: ActivityFeed
 
   // Connect to SSE endpoint — independent of gateway status (source is host agent)
   useEffect(() => {
-    const es = new EventSource('/api/events');
+    const es = new EventSource(basePath + '/api/events');
 
     es.onmessage = (e) => {
       try {
