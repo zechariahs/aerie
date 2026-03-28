@@ -28,7 +28,7 @@ export async function middleware(request: NextRequest): Promise<NextResponse> {
   const csp = [
     `default-src 'self'`,
     `script-src ${scriptSrc}`,
-    `style-src 'self' 'nonce-${nonce}'`,
+    `style-src 'self' 'unsafe-inline'`,
     `img-src 'self' data: blob:`,
     `font-src 'self'`,
     `connect-src 'self'`,
