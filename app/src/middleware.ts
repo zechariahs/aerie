@@ -39,9 +39,14 @@ export async function middleware(request: NextRequest): Promise<NextResponse> {
   ].join('; ');
 
   // Auth guard — unauthenticated requests to protected routes → /login
+  // API routes get a 401 JSON response instead of an HTML redirect so that
+  // fetch/EventSource callers receive a machine-readable error (not a login page).
   if (!isPublicPath(pathname)) {
     const session = await getSession(request);
     if (!session) {
+      if (pathname.startsWith('/api/')) {
+        return new NextResponse('Unauthorized', { status: 401 });
+      }
       const loginUrl = request.nextUrl.clone();
       loginUrl.pathname = '/login';
       const response = NextResponse.redirect(loginUrl);
