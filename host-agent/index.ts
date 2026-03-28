@@ -407,7 +407,7 @@ function collectJsonlFiles(): string[] {
  * on this filesystem (glob resolution produced no events).
  *
  * Every POLL_INTERVAL ms:
- *  - Discover all .jsonl files under cron/runs/ and agents/*/sessions/
+ *  - Discover all .jsonl files under cron/runs/ and agents/<id>/sessions/
  *  - For known files: read and emit any new bytes since last offset
  *  - For newly seen files: set cursor to current EOF (don't replay history)
  *    UNLESS it's the very first poll after startup (isFirstPoll=true), in
