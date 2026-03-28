@@ -170,6 +170,8 @@ function startFixtureStream(): void {
 // ---------------------------------------------------------------------------
 
 function updateAgentState(event: ActivityEvent): void {
+  // Skip synthetic fallback IDs — they don't represent real agents
+  if (event.agentId === 'unknown') return;
   const g = getG();
   const existing = g.agentStates.get(event.agentId) ?? {
     agentId: event.agentId,
@@ -423,9 +425,10 @@ function transformGatewayMessage(msg: Record<string, unknown>): ActivityEvent | 
     'tool.call', 'message.sent', 'error',
   ]);
 
-  const type = knownTypes.has(rawType)
-    ? (rawType as ActivityEvent['type'])
-    : 'error';
+  // Drop unrecognised message types entirely — mapping them to 'error' creates
+  // phantom ERROR states for 'unknown' agents in the status strip.
+  if (!knownTypes.has(rawType)) return null;
+  const type = rawType as ActivityEvent['type'];
 
   const agentId =
     typeof msg['agentId'] === 'string' ? msg['agentId'] :
