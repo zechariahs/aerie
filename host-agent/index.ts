@@ -13,7 +13,10 @@ import fs from 'fs';
 import chokidar from 'chokidar';
 
 const PORT = parseInt(process.env['HOST_AGENT_PORT'] ?? '3101', 10);
-const BIND_ADDRESS = process.env['HOST_AGENT_BIND'] ?? '127.0.0.1';
+// Bind to all interfaces so Docker containers can reach us via host.docker.internal.
+// Security is enforced by the isAllowedIp() check in the request handler, which
+// restricts to loopback and Docker bridge ranges (172.16.0.0/12) only.
+const BIND_ADDRESS = process.env['HOST_AGENT_BIND'] ?? '0.0.0.0';
 const HOST_AGENT_TOKEN = process.env['HOST_AGENT_TOKEN'];
 const OPENCLAW_DATA_DIR = process.env['OPENCLAW_DATA_DIR'] ?? '/docker/openclaw-v5t3/data/.openclaw';
 
