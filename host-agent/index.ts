@@ -10,7 +10,6 @@
 import http from 'http';
 import { execFile } from 'child_process';
 import fs from 'fs';
-import chokidar from 'chokidar';
 
 const PORT = parseInt(process.env['HOST_AGENT_PORT'] ?? '3101', 10);
 // Bind to all interfaces so Docker containers can reach us via host.docker.internal.
@@ -348,87 +347,112 @@ function emitToClients(envelope: SseEnvelope): void {
   }
 }
 
-/** Start chokidar watcher for cron run and session JSONL files. */
+/** Emit all new lines from a JSONL file since its last read offset. */
+function processFile(filePath: string): void {
+  const text = readNewBytes(filePath);
+  if (!text) return;
+  for (const line of text.split('\n')) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+    let obj: Record<string, unknown>;
+    try {
+      obj = JSON.parse(trimmed) as Record<string, unknown>;
+    } catch {
+      console.error('[host-agent] unparseable JSONL line in', filePath);
+      continue;
+    }
+    emitToClients(buildEnvelope(obj, filePath));
+  }
+}
+
+/**
+ * Collect all .jsonl files under the two watched directory patterns.
+ * Returns absolute paths.
+ */
+function collectJsonlFiles(): string[] {
+  const files: string[] = [];
+
+  // cron/runs/*.jsonl
+  const cronRunsDir = `${OPENCLAW_DATA_DIR}/cron/runs`;
+  try {
+    for (const name of fs.readdirSync(cronRunsDir)) {
+      if (name.endsWith('.jsonl')) files.push(`${cronRunsDir}/${name}`);
+    }
+  } catch {
+    // Directory may not exist yet
+  }
+
+  // agents/*/sessions/*.jsonl
+  const agentsDir = `${OPENCLAW_DATA_DIR}/agents`;
+  try {
+    for (const agentId of fs.readdirSync(agentsDir)) {
+      const sessionsDir = `${agentsDir}/${agentId}/sessions`;
+      try {
+        for (const name of fs.readdirSync(sessionsDir)) {
+          if (name.endsWith('.jsonl')) files.push(`${sessionsDir}/${name}`);
+        }
+      } catch {
+        // No sessions dir for this agent yet
+      }
+    }
+  } catch {
+    // Agents directory may not exist yet
+  }
+
+  return files;
+}
+
+/**
+ * Manual poll-based file watcher. Replaces chokidar which failed silently
+ * on this filesystem (glob resolution produced no events).
+ *
+ * Every POLL_INTERVAL ms:
+ *  - Discover all .jsonl files under cron/runs/ and agents/*/sessions/
+ *  - For known files: read and emit any new bytes since last offset
+ *  - For newly seen files: set cursor to current EOF (don't replay history)
+ *    UNLESS it's the very first poll after startup (isFirstPoll=true), in
+ *    which case we always skip history for all pre-existing files.
+ */
 function startWatcher(): void {
-  const globs = [
-    `${OPENCLAW_DATA_DIR}/cron/runs/*.jsonl`,
-    `${OPENCLAW_DATA_DIR}/agents/*/sessions/*.jsonl`,
-  ];
+  const POLL_INTERVAL = 1000; // ms
+  let isFirstPoll = true;
 
-  // usePolling: inotify events are unreliable on Docker-managed mounts and some
-  // Linux VPS filesystems. Polling checks for changes every 1 s — slightly more
-  // CPU than inotify but guaranteed to work on any filesystem.
-  const watcher = chokidar.watch(globs, {
-    persistent: true,
-    ignoreInitial: false,
-    usePolling: true,
-    interval: 1000,
-  });
+  const poll = (): void => {
+    const files = collectJsonlFiles();
 
-  // Track whether the initial directory scan has finished.
-  // Files added BEFORE ready are pre-existing — skip their history.
-  // Files added AFTER ready are newly created at runtime — read them immediately.
-  let watcherReady = false;
-  watcher.on('ready', () => { watcherReady = true; });
-
-  watcher.on('add', (filePath: string) => {
-    console.log(`[host-agent] watcher add: ${filePath} (ready=${watcherReady})`);
-    if (!watcherReady) {
-      // Startup scan — set cursor to end so we don't replay existing history.
-      try {
-        const stat = fs.statSync(filePath);
-        fileOffsets.set(filePath, stat.size);
-        console.log(`[host-agent] startup file offset set to ${stat.size}: ${filePath}`);
-      } catch {
-        fileOffsets.set(filePath, 0);
+    for (const filePath of files) {
+      if (!fileOffsets.has(filePath)) {
+        // Newly discovered file
+        try {
+          const stat = fs.statSync(filePath);
+          if (isFirstPoll) {
+            // Pre-existing at startup — skip history
+            fileOffsets.set(filePath, stat.size);
+          } else {
+            // Created since last poll — read from byte 0
+            fileOffsets.set(filePath, 0);
+            processFile(filePath);
+          }
+        } catch {
+          fileOffsets.set(filePath, 0);
+        }
+      } else {
+        // Known file — emit any new bytes
+        processFile(filePath);
       }
-      return;
     }
 
-    // New file created at runtime (e.g. first run of a cron job).
-    // Start from byte 0 and emit any content already written.
-    fileOffsets.set(filePath, 0);
-    const text = readNewBytes(filePath);
-    if (!text) return;
-    for (const line of text.split('\n')) {
-      const trimmed = line.trim();
-      if (!trimmed) continue;
-      let obj: Record<string, unknown>;
-      try {
-        obj = JSON.parse(trimmed) as Record<string, unknown>;
-      } catch {
-        console.error('[host-agent] unparseable JSONL line in', filePath);
-        continue;
-      }
-      emitToClients(buildEnvelope(obj, filePath));
+    if (isFirstPoll) {
+      console.log(`[host-agent] initial scan found ${files.length} JSONL file(s)`);
+      isFirstPoll = false;
     }
-  });
+  };
 
-  watcher.on('change', (filePath: string) => {
-    console.log(`[host-agent] watcher change: ${filePath}`);
-    const text = readNewBytes(filePath);
-    console.log(`[host-agent] new bytes read: ${text.length} chars from ${filePath}`);
-    if (!text) return;
-    const lines = text.split('\n');
-    for (const line of lines) {
-      const trimmed = line.trim();
-      if (!trimmed) continue;
-      let obj: Record<string, unknown>;
-      try {
-        obj = JSON.parse(trimmed) as Record<string, unknown>;
-      } catch {
-        console.error('[host-agent] unparseable JSONL line in', filePath);
-        continue;
-      }
-      emitToClients(buildEnvelope(obj, filePath));
-    }
-  });
+  // Run immediately, then on interval
+  poll();
+  setInterval(poll, POLL_INTERVAL);
 
-  watcher.on('error', (err: unknown) => {
-    console.error('[host-agent] watcher error:', err);
-  });
-
-  console.log(`[host-agent] watching JSONL files under ${OPENCLAW_DATA_DIR}`);
+  console.log(`[host-agent] polling JSONL files under ${OPENCLAW_DATA_DIR} every ${POLL_INTERVAL}ms`);
 }
 
 /** Send a heartbeat ping to all SSE clients every 30s. */
