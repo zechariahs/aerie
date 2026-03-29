@@ -1957,19 +1957,21 @@ function AgentDetail({
       </div>
 
       {/* Tab content */}
-      <div className="flex-1 overflow-auto">
+      <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
         {selectedTab === 'overview' && (
-          <OverviewTab
-            agent={agent}
-            gatewayStatus={gatewayStatus}
-            gatewayLoading={gatewayLoading}
-            onIdentitySaved={onIdentitySaved}
-          />
+          <div className="flex-1 overflow-auto">
+            <OverviewTab
+              agent={agent}
+              gatewayStatus={gatewayStatus}
+              gatewayLoading={gatewayLoading}
+              onIdentitySaved={onIdentitySaved}
+            />
+          </div>
         )}
         {selectedTab === 'workspace' && <WorkspaceTab agent={agent} />}
-        {selectedTab === 'sessions' && <SessionsTab agent={agent} />}
-        {selectedTab === 'bindings' && <BindingsTab agent={agent} bindings={bindings} />}
-        {selectedTab === 'models' && <ModelsTab agent={agent} />}
+        {selectedTab === 'sessions' && <div className="flex-1 overflow-auto"><SessionsTab agent={agent} /></div>}
+        {selectedTab === 'bindings' && <div className="flex-1 overflow-auto"><BindingsTab agent={agent} bindings={bindings} /></div>}
+        {selectedTab === 'models' && <div className="flex-1 overflow-auto"><ModelsTab agent={agent} /></div>}
       </div>
     </div>
   );
@@ -2076,7 +2078,7 @@ function AgentsContent(): React.JSX.Element {
   const selectedAgent = agents.find((a) => a.id === selectedId) ?? null;
 
   return (
-    <div className="flex h-full min-h-0" style={{ border: '1px solid var(--ae-border)' }}>
+    <div className="flex flex-1 min-h-0" style={{ border: '1px solid var(--ae-border)' }}>
       {/* Mobile: dropdown agent selector (< 768px) */}
       <div className="md:hidden w-full absolute top-0 left-0 z-10 px-3 py-2" style={{ borderBottom: '1px solid var(--ae-border)', background: 'var(--ae-surface)' }}>
         <select

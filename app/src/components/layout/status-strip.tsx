@@ -197,7 +197,7 @@ export function StatusStrip(): React.JSX.Element {
       {/* Per-agent names + error badges — hidden on mobile */}
       {gatewayData && gatewayData.agentStates.length > 0 && (
         <span className="hidden md:flex items-center gap-2 shrink-0">
-          {gatewayData.agentStates.map((agent) => (
+          {gatewayData.agentStates.filter((agent) => agentNames.has(agent.agentId)).map((agent) => (
             <span
               key={agent.agentId}
               className="flex items-center gap-1"
