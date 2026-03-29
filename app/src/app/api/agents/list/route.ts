@@ -15,7 +15,7 @@ import { execFile } from 'child_process';
 import { promisify } from 'util';
 import { getSession } from '@/lib/session';
 import { errorResponse, successResponse } from '@/lib/api-response';
-import { getOpenclawExec } from '@/lib/openclaw-exec';
+import { getOpenclawExec, translateOpenclawPath } from '@/lib/openclaw-exec';
 import type { AgentConfig } from '@/types';
 
 export const dynamic = 'force-dynamic';
@@ -42,19 +42,31 @@ async function runJsonCommand(clawArgs: string[]): Promise<{ data: unknown; stde
   }
 }
 
+function translateAgentPaths(agent: AgentConfig): AgentConfig {
+  return {
+    ...agent,
+    workspace: agent.workspace ? translateOpenclawPath(agent.workspace) : agent.workspace,
+    agentDir: agent.agentDir ? translateOpenclawPath(agent.agentDir) : agent.agentDir,
+  };
+}
+
 function extractAgentList(data: unknown): AgentConfig[] {
-  if (Array.isArray(data)) return data as AgentConfig[];
-  if (typeof data === 'object' && data !== null) {
+  let agents: AgentConfig[] = [];
+  if (Array.isArray(data)) {
+    agents = data as AgentConfig[];
+  } else if (typeof data === 'object' && data !== null) {
     const obj = data as Record<string, unknown>;
-    if (Array.isArray(obj['list'])) return obj['list'] as AgentConfig[];
-    if (Array.isArray(obj['agents'])) return obj['agents'] as AgentConfig[];
-    const agents = obj['agents'];
-    if (typeof agents === 'object' && agents !== null) {
-      const a = agents as Record<string, unknown>;
-      if (Array.isArray(a['list'])) return a['list'] as AgentConfig[];
+    if (Array.isArray(obj['list'])) agents = obj['list'] as AgentConfig[];
+    else if (Array.isArray(obj['agents'])) agents = obj['agents'] as AgentConfig[];
+    else {
+      const agentsVal = obj['agents'];
+      if (typeof agentsVal === 'object' && agentsVal !== null) {
+        const a = agentsVal as Record<string, unknown>;
+        if (Array.isArray(a['list'])) agents = a['list'] as AgentConfig[];
+      }
     }
   }
-  return [];
+  return agents.map(translateAgentPaths);
 }
 
 export async function GET(): Promise<Response> {

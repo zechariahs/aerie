@@ -40,6 +40,7 @@ services:
       - OPENCLAW_DIR=/openclaw
       - OPENCLAW_GATEWAY_URL=${OPENCLAW_GATEWAY_URL}
       - OPENCLAW_CONTAINER_NAME=${OPENCLAW_CONTAINER_NAME}
+      - OPENCLAW_CONTAINER_DIR=${OPENCLAW_CONTAINER_DIR:-/data/.openclaw}
       # HOST_AGENT_URL uses host.docker.internal to reach the host-level agent
       - HOST_AGENT_URL=http://host.docker.internal:3101
     networks:
