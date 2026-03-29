@@ -12,6 +12,7 @@ import { execFile } from 'child_process';
 import { promisify } from 'util';
 import { getSession } from '@/lib/session';
 import { errorResponse, successResponse } from '@/lib/api-response';
+import { getOpenclawExec } from '@/lib/openclaw-exec';
 
 export const dynamic = 'force-dynamic';
 
@@ -54,11 +55,8 @@ export async function GET(request: Request): Promise<Response> {
   }
 
   try {
-    const { stdout } = await execFileAsync(
-      'openclaw',
-      ['sessions', 'cleanup', '--agent', agentId, '--dry-run', '--json'],
-      { timeout: 15_000 },
-    );
+    const { bin, args } = getOpenclawExec(['sessions', 'cleanup', '--agent', agentId, '--dry-run', '--json']);
+    const { stdout } = await execFileAsync(bin, args, { timeout: 15_000 });
     let parsed: unknown;
     try {
       parsed = JSON.parse(stdout.trim());
