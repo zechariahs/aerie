@@ -13,6 +13,7 @@ import { basePath } from '@/lib/client-url';
 
 type ApiGatewayStatus = { data: GatewayStatusResponse };
 type ApiCostSummary = { data: CostSummary };
+type ApiAgentDescriptors = { data: { id: string; name: string }[] };
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -82,6 +83,7 @@ function setHideCookie(hide: boolean): void {
 export function StatusStrip(): React.JSX.Element {
   const [clock, setClock] = useState<string>(ctClock());
   const [gatewayData, setGatewayData] = useState<GatewayStatusResponse | null>(null);
+  const [agentNames, setAgentNames] = useState<Map<string, string>>(new Map());
   const [thisMonthSpend, setThisMonthSpend] = useState<number | null>(null);
   const [hideSensitive, setHideSensitive] = useState<boolean>(false);
 
@@ -94,6 +96,18 @@ export function StatusStrip(): React.JSX.Element {
   // Read hide-sensitive cookie on mount
   useEffect(() => {
     setHideSensitive(readHideCookie());
+  }, []);
+
+  // Fetch agent names once on mount (file read, no CLI)
+  useEffect(() => {
+    fetch(basePath + '/api/agents/descriptors')
+      .then((res) => res.json() as Promise<ApiAgentDescriptors>)
+      .then((json) => {
+        const map = new Map<string, string>();
+        for (const a of json.data ?? []) map.set(a.id, a.name);
+        setAgentNames(map);
+      })
+      .catch(() => { /* fail silently — IDs will display as-is */ });
   }, []);
 
   // Poll /api/gateway/status every 10s
@@ -193,7 +207,9 @@ export function StatusStrip(): React.JSX.Element {
                 className="w-[6px] h-[6px] rounded-full inline-block shrink-0"
                 style={{ background: agentDotColor(agent.status) }}
               />
-              <span style={{ color: 'var(--ae-text2)' }}>{agent.agentId}</span>
+              <span style={{ color: 'var(--ae-text2)' }}>
+                {agentNames.get(agent.agentId) ?? agent.agentId}
+              </span>
               {agent.status === 'ERROR' && (
                 <span
                   className="text-[10px] tracking-[0.06em]"

@@ -576,7 +576,9 @@ function WorkspaceTab({ agent }: WorkspaceTabProps): React.JSX.Element {
     return (
       <div className="flex flex-col h-full">
         {subTabBar}
-        <WorkspaceBrowsePanel agent={agent} />
+        <div className="flex-1 min-h-0">
+          <WorkspaceBrowsePanel agent={agent} />
+        </div>
       </div>
     );
   }
