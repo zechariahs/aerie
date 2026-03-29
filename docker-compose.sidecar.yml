@@ -27,12 +27,19 @@ services:
       - ${OPENCLAW_DATA_PATH}:/openclaw:ro
       # Aerie's own persistent data (tasks, audit log, brief history)
       - aerie_data:/app/data
+      # Docker socket — allows api/agents routes to exec into the openclaw container.
+      - /var/run/docker.sock:/var/run/docker.sock
+    group_add:
+      # GID of the docker socket on the host (stat -c '%g' /var/run/docker.sock).
+      # Set DOCKER_GID in the shell or /docker/aerie/.env before running compose.
+      - "${DOCKER_GID}"
     env_file:
       - ./app/.env.production
     environment:
       - NODE_ENV=production
       - OPENCLAW_DIR=/openclaw
       - OPENCLAW_GATEWAY_URL=${OPENCLAW_GATEWAY_URL}
+      - OPENCLAW_CONTAINER_NAME=${OPENCLAW_CONTAINER_NAME}
       # HOST_AGENT_URL uses host.docker.internal to reach the host-level agent
       - HOST_AGENT_URL=http://host.docker.internal:3101
     networks:

@@ -13,6 +13,7 @@ import { execFile } from 'child_process';
 import { promisify } from 'util';
 import { getSession } from '@/lib/session';
 import { errorResponse, successResponse } from '@/lib/api-response';
+import { getOpenclawExec } from '@/lib/openclaw-exec';
 
 export const dynamic = 'force-dynamic';
 
@@ -72,7 +73,8 @@ export async function POST(request: Request): Promise<Response> {
   if (emoji) args.push('--emoji', emoji.trim());
 
   try {
-    await execFileAsync('openclaw', args, { timeout: 10_000 });
+    const { bin, args: execArgs } = getOpenclawExec(args);
+    await execFileAsync(bin, execArgs, { timeout: 10_000 });
     return successResponse({ ok: true });
   } catch (err) {
     const e = err as NodeJS.ErrnoException & { stderr?: string };

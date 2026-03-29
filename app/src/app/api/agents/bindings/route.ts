@@ -12,15 +12,17 @@ import { execFile } from 'child_process';
 import { promisify } from 'util';
 import { getSession } from '@/lib/session';
 import { errorResponse, successResponse } from '@/lib/api-response';
+import { getOpenclawExec } from '@/lib/openclaw-exec';
 import type { AgentBinding } from '@/types';
 
 export const dynamic = 'force-dynamic';
 
 const execFileAsync = promisify(execFile);
 
-async function runJsonCommand(args: string[]): Promise<{ data: unknown; stderr?: string }> {
+async function runJsonCommand(clawArgs: string[]): Promise<{ data: unknown; stderr?: string }> {
   try {
-    const { stdout } = await execFileAsync('openclaw', args, { timeout: 15_000 });
+    const { bin, args } = getOpenclawExec(clawArgs);
+    const { stdout } = await execFileAsync(bin, args, { timeout: 15_000 });
     const parsed = JSON.parse(stdout.trim()) as unknown;
     return { data: parsed };
   } catch (err) {
