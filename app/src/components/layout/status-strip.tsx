@@ -195,31 +195,34 @@ export function StatusStrip(): React.JSX.Element {
       )}
 
       {/* Per-agent names + error badges — hidden on mobile */}
-      {gatewayData && gatewayData.agentStates.length > 0 && (
+      {agentNames.size > 0 && (
         <span className="hidden md:flex items-center gap-2 shrink-0">
-          {gatewayData.agentStates.filter((agent) => agentNames.has(agent.agentId)).map((agent) => (
-            <span
-              key={agent.agentId}
-              className="flex items-center gap-1"
-              title={`${agent.agentId}: ${agent.status}`}
-            >
+          {Array.from(agentNames.entries()).map(([id, name]) => {
+            const gwStatesMap = new Map((gatewayData?.agentStates ?? []).map((s) => [s.agentId, s]));
+            const liveState = gwStatesMap.get(id);
+            const status: AgentStatus = liveState?.status ?? 'OFFLINE';
+            return (
               <span
-                className="w-[6px] h-[6px] rounded-full inline-block shrink-0"
-                style={{ background: agentDotColor(agent.status) }}
-              />
-              <span style={{ color: 'var(--ae-text2)' }}>
-                {agentNames.get(agent.agentId) ?? agent.agentId}
-              </span>
-              {agent.status === 'ERROR' && (
+                key={id}
+                className="flex items-center gap-1"
+                title={`${id}: ${status}`}
+              >
                 <span
-                  className="text-[10px] tracking-[0.06em]"
-                  style={{ color: 'var(--ae-red)' }}
-                >
-                  [ERR]
-                </span>
-              )}
-            </span>
-          ))}
+                  className="w-[6px] h-[6px] rounded-full inline-block shrink-0"
+                  style={{ background: agentDotColor(status) }}
+                />
+                <span style={{ color: 'var(--ae-text2)' }}>{name}</span>
+                {status === 'ERROR' && (
+                  <span
+                    className="text-[10px] tracking-[0.06em]"
+                    style={{ color: 'var(--ae-red)' }}
+                  >
+                    [ERR]
+                  </span>
+                )}
+              </span>
+            );
+          })}
         </span>
       )}
 
