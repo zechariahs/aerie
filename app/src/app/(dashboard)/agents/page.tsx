@@ -20,6 +20,9 @@ import type {
   AgentModelsStatus,
   AgentWorkspaceFileInfo,
   GatewayStatusResponse,
+  WorkspaceTreeData,
+  WorkspaceTreeNode,
+  WorkspaceSearchResult,
 } from '@/types';
 
 // ---------------------------------------------------------------------------
@@ -404,6 +407,7 @@ interface EditorState {
 
 function WorkspaceTab({ agent }: WorkspaceTabProps): React.JSX.Element {
   const workspacePath = agent.workspace;
+  const [view, setView] = useState<'standard' | 'browse'>('standard');
 
   const [files, setFiles] = useState<AgentWorkspaceFileInfo[] | null>(null);
   const [loading, setLoading] = useState(true);
@@ -544,27 +548,66 @@ function WorkspaceTab({ agent }: WorkspaceTabProps): React.JSX.Element {
     );
   }
 
+  const subTabBar = (
+    <div className="flex gap-1 px-3 py-2 flex-shrink-0" style={{ borderBottom: '1px solid var(--ae-border)' }}>
+      {(['standard', 'browse'] as const).map((v) => (
+        <button
+          key={v}
+          onClick={() => setView(v)}
+          className="text-[10px] uppercase tracking-[0.08em]"
+          style={{
+            background: 'none',
+            border: 'none',
+            borderBottom: view === v ? '2px solid var(--ae-amber)' : '2px solid transparent',
+            color: view === v ? 'var(--ae-amber)' : 'var(--ae-text2)',
+            cursor: 'pointer',
+            padding: '2px 8px 4px',
+            fontFamily: '"IBM Plex Mono", ui-monospace, monospace',
+            fontSize: 10,
+          }}
+        >
+          {v}
+        </button>
+      ))}
+    </div>
+  );
+
+  if (view === 'browse') {
+    return (
+      <div className="flex flex-col h-full">
+        {subTabBar}
+        <WorkspaceBrowsePanel agent={agent} />
+      </div>
+    );
+  }
+
   if (loading) {
     return (
-      <div className="p-4 space-y-2">
-        {[1, 2, 3, 4, 5].map((i) => (
-          <div key={i} className="h-7 rounded" style={{ background: 'var(--ae-raised)' }} />
-        ))}
+      <div className="flex flex-col h-full">
+        {subTabBar}
+        <div className="p-4 space-y-2">
+          {[1, 2, 3, 4, 5].map((i) => (
+            <div key={i} className="h-7 rounded" style={{ background: 'var(--ae-raised)' }} />
+          ))}
+        </div>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="p-4 flex flex-col gap-2">
-        <div className="text-[11px]" style={{ color: 'var(--ae-red)' }}>{error}</div>
-        <button
-          onClick={() => { void fetchFiles(); }}
-          className="text-[11px] w-fit"
-          style={{ color: 'var(--ae-amber)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
-        >
-          Retry
-        </button>
+      <div className="flex flex-col h-full">
+        {subTabBar}
+        <div className="p-4 flex flex-col gap-2">
+          <div className="text-[11px]" style={{ color: 'var(--ae-red)' }}>{error}</div>
+          <button
+            onClick={() => { void fetchFiles(); }}
+            className="text-[11px] w-fit"
+            style={{ color: 'var(--ae-amber)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
+          >
+            Retry
+          </button>
+        </div>
       </div>
     );
   }
@@ -573,7 +616,9 @@ function WorkspaceTab({ agent }: WorkspaceTabProps): React.JSX.Element {
   const bootstrapInfo = fileMap.get('BOOTSTRAP.md');
 
   return (
-    <div className="p-4 space-y-5">
+    <div className="flex flex-col h-full">
+      {subTabBar}
+      <div className="flex-1 overflow-y-auto p-4 space-y-5">
       {/* BOOTSTRAP.md warning */}
       {bootstrapInfo?.exists && (
         <div className="px-3 py-2 text-[11px] flex items-center justify-between gap-3" style={{ background: 'var(--ae-raised)', border: '1px solid var(--ae-warn)', color: 'var(--ae-warn)' }}>
@@ -754,6 +799,433 @@ function WorkspaceTab({ agent }: WorkspaceTabProps): React.JSX.Element {
           </div>
         </div>
       )}
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// WorkspaceBrowsePanel
+// ---------------------------------------------------------------------------
+
+interface BrowseEditorState {
+  relPath: string;
+  content: string;
+  original: string;
+  saving: boolean;
+  error: string | null;
+}
+
+function renderTreeNodes(
+  nodes: WorkspaceTreeNode[],
+  depth: number,
+  expandedDirs: Set<string>,
+  onToggle: (path: string) => void,
+  onOpen: (path: string) => void,
+): React.JSX.Element[] {
+  return nodes.flatMap((node) => {
+    const indent = depth * 14;
+    if (node.type === 'directory') {
+      const expanded = expandedDirs.has(node.path);
+      return [
+        <div
+          key={node.path}
+          className="flex items-center gap-1 py-[3px] text-[11px] cursor-pointer select-none"
+          style={{ paddingLeft: 12 + indent }}
+          onClick={() => onToggle(node.path)}
+        >
+          <span style={{ color: 'var(--ae-text3)', width: 10, flexShrink: 0 }}>{expanded ? '▼' : '▶'}</span>
+          <span style={{ color: 'var(--ae-amber)', fontFamily: 'monospace' }}>{node.name}/</span>
+        </div>,
+        ...(expanded && node.children
+          ? renderTreeNodes(node.children, depth + 1, expandedDirs, onToggle, onOpen)
+          : []),
+      ];
+    }
+    return [
+      <div
+        key={node.path}
+        className="flex items-center gap-1 py-[3px] text-[11px] cursor-pointer"
+        style={{ paddingLeft: 12 + indent }}
+        onClick={() => onOpen(node.path)}
+      >
+        <span style={{ color: 'var(--ae-text3)', width: 10, flexShrink: 0 }}> </span>
+        <span style={{ color: 'var(--ae-text)', fontFamily: 'monospace' }}>{node.name}</span>
+      </div>,
+    ];
+  });
+}
+
+function WorkspaceBrowsePanel({ agent }: { agent: AgentConfig }): React.JSX.Element {
+  const workspacePath = agent.workspace;
+
+  const [treeData, setTreeData] = useState<WorkspaceTreeData | null>(null);
+  const [treeLoading, setTreeLoading] = useState(true);
+  const [treeError, setTreeError] = useState<string | null>(null);
+  const [expandedDirs, setExpandedDirs] = useState<Set<string>>(new Set());
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<WorkspaceSearchResult[] | null>(null);
+  const [searchLoading, setSearchLoading] = useState(false);
+  const [viewFile, setViewFile] = useState<{ relPath: string; content: string } | null>(null);
+  const [viewLoading, setViewLoading] = useState(false);
+  const [browseEditor, setBrowseEditor] = useState<BrowseEditorState | null>(null);
+  const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
+  const [newFileMode, setNewFileMode] = useState(false);
+  const [newFilePath, setNewFilePath] = useState('');
+
+  const fetchTree = useCallback(async () => {
+    if (!workspacePath) return;
+    setTreeLoading(true);
+    setTreeError(null);
+    try {
+      const res = await fetch(
+        basePath + `/api/agents/workspace/tree?workspacePath=${encodeURIComponent(workspacePath)}`,
+      );
+      const json = (await res.json()) as { data?: WorkspaceTreeData; error?: string };
+      if (!res.ok) { setTreeError(json.error ?? 'Failed to load tree'); return; }
+      setTreeData(json.data ?? { pinned: [], tree: [] });
+    } catch (err) {
+      setTreeError(String(err));
+    } finally {
+      setTreeLoading(false);
+    }
+  }, [workspacePath]);
+
+  useEffect(() => { void fetchTree(); }, [fetchTree]);
+
+  // Debounced search
+  useEffect(() => {
+    if (searchQuery.length < 2) { setSearchResults(null); return; }
+    const timer = setTimeout(() => {
+      if (!workspacePath) return;
+      setSearchLoading(true);
+      fetch(
+        basePath + `/api/agents/workspace/search?workspacePath=${encodeURIComponent(workspacePath)}&q=${encodeURIComponent(searchQuery)}`,
+      )
+        .then((res) => res.json() as Promise<{ data?: WorkspaceSearchResult[]; error?: string }>)
+        .then((json) => { setSearchResults(json.data ?? []); })
+        .catch(() => { setSearchResults([]); })
+        .finally(() => { setSearchLoading(false); });
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [searchQuery, workspacePath]);
+
+  async function openFile(relPath: string): Promise<void> {
+    if (!workspacePath) return;
+    setViewLoading(true);
+    setViewFile(null);
+    try {
+      const res = await fetch(
+        basePath + `/api/agents/workspace/browse?workspacePath=${encodeURIComponent(workspacePath)}&relPath=${encodeURIComponent(relPath)}`,
+      );
+      const json = (await res.json()) as { data?: { content: string }; error?: string };
+      if (!res.ok) { alert(json.error ?? 'Failed to read file'); return; }
+      setViewFile({ relPath, content: json.data?.content ?? '' });
+    } catch (err) {
+      alert(String(err));
+    } finally {
+      setViewLoading(false);
+    }
+  }
+
+  async function saveBrowseFile(): Promise<void> {
+    if (!browseEditor || !workspacePath) return;
+    setBrowseEditor((e) => e ? { ...e, saving: true, error: null } : e);
+    try {
+      const res = await fetch(basePath + '/api/agents/workspace/browse', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ workspacePath, relPath: browseEditor.relPath, content: browseEditor.content }),
+      });
+      const json = (await res.json()) as { error?: string };
+      if (!res.ok) {
+        setBrowseEditor((e) => e ? { ...e, saving: false, error: json.error ?? 'Save failed' } : e);
+        return;
+      }
+      const saved = { relPath: browseEditor.relPath, content: browseEditor.content };
+      setBrowseEditor(null);
+      setViewFile({ relPath: saved.relPath, content: saved.content });
+      void fetchTree();
+    } catch (err) {
+      setBrowseEditor((e) => e ? { ...e, saving: false, error: String(err) } : e);
+    }
+  }
+
+  async function deleteFile(relPath: string): Promise<void> {
+    if (!workspacePath) return;
+    try {
+      const res = await fetch(
+        basePath + `/api/agents/workspace/browse?workspacePath=${encodeURIComponent(workspacePath)}&relPath=${encodeURIComponent(relPath)}`,
+        { method: 'DELETE' },
+      );
+      const json = (await res.json()) as { error?: string };
+      if (!res.ok) { alert(json.error ?? 'Delete failed'); return; }
+      setDeleteConfirm(null);
+      setViewFile(null);
+      void fetchTree();
+    } catch (err) {
+      alert(String(err));
+    }
+  }
+
+  async function createFile(relPath: string): Promise<void> {
+    if (!workspacePath || !relPath.trim()) return;
+    const cleanPath = relPath.trim();
+    try {
+      const res = await fetch(basePath + '/api/agents/workspace/browse', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ workspacePath, relPath: cleanPath, content: '' }),
+      });
+      const json = (await res.json()) as { error?: string };
+      if (!res.ok) { alert(json.error ?? 'Create failed'); return; }
+      setNewFileMode(false);
+      setNewFilePath('');
+      void fetchTree();
+      setBrowseEditor({ relPath: cleanPath, content: '', original: '', saving: false, error: null });
+    } catch (err) {
+      alert(String(err));
+    }
+  }
+
+  function toggleDir(relPath: string): void {
+    setExpandedDirs((prev) => {
+      const next = new Set(prev);
+      if (next.has(relPath)) next.delete(relPath);
+      else next.add(relPath);
+      return next;
+    });
+  }
+
+  // Editor overlay
+  if (browseEditor) {
+    return (
+      <div className="flex flex-col h-full">
+        <div
+          className="flex items-center gap-2 px-3 py-2 flex-shrink-0 text-[11px]"
+          style={{ borderBottom: '1px solid var(--ae-border)' }}
+        >
+          <span style={{ color: 'var(--ae-text2)', flex: 1 }}>
+            Editing <span style={{ color: 'var(--ae-text)', fontFamily: 'monospace' }}>{browseEditor.relPath}</span>
+          </span>
+          <button
+            onClick={() => { void saveBrowseFile(); }}
+            disabled={browseEditor.saving}
+            className="disabled:opacity-50"
+            style={{ ...INPUT_STYLE, background: 'var(--ae-amber)', color: 'var(--ae-void)', border: 'none', padding: '4px 12px', cursor: browseEditor.saving ? 'wait' : 'pointer' }}
+          >
+            {browseEditor.saving ? 'Saving…' : 'Save'}
+          </button>
+          <button
+            onClick={() => {
+              if (browseEditor.content !== browseEditor.original && !confirm('Discard unsaved changes?')) return;
+              setBrowseEditor(null);
+            }}
+            style={{ ...INPUT_STYLE, padding: '4px 10px', cursor: 'pointer' }}
+          >
+            Cancel
+          </button>
+        </div>
+        {browseEditor.error && (
+          <div className="px-3 py-2 text-[11px]" style={{ background: 'var(--ae-raised)', borderBottom: '1px solid var(--ae-border)', color: 'var(--ae-red)' }}>
+            {browseEditor.error}
+          </div>
+        )}
+        <textarea
+          value={browseEditor.content}
+          onChange={(e) => setBrowseEditor((prev) => prev ? { ...prev, content: e.target.value } : prev)}
+          className="flex-1 resize-none p-4 text-[11px] focus:outline-none"
+          style={{ background: 'var(--ae-raised)', color: 'var(--ae-text)', fontFamily: '"IBM Plex Mono", ui-monospace, monospace' }}
+          spellCheck={false}
+        />
+      </div>
+    );
+  }
+
+  // File viewer
+  if (viewFile) {
+    return (
+      <div className="flex flex-col h-full">
+        <div
+          className="flex items-center gap-2 px-3 py-2 flex-shrink-0 text-[11px]"
+          style={{ borderBottom: '1px solid var(--ae-border)' }}
+        >
+          <button
+            onClick={() => setViewFile(null)}
+            style={{ color: 'var(--ae-amber)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontFamily: 'monospace' }}
+          >
+            ←
+          </button>
+          <span className="flex-1 font-mono" style={{ color: 'var(--ae-text2)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {viewFile.relPath}
+          </span>
+          <button
+            onClick={() => setBrowseEditor({ relPath: viewFile.relPath, content: viewFile.content, original: viewFile.content, saving: false, error: null })}
+            className="text-[10px]"
+            style={{ color: 'var(--ae-amber)', background: 'none', border: 'none', cursor: 'pointer' }}
+          >
+            Edit
+          </button>
+          <button
+            onClick={() => setDeleteConfirm(viewFile.relPath)}
+            className="text-[10px]"
+            style={{ color: 'var(--ae-red)', background: 'none', border: 'none', cursor: 'pointer' }}
+          >
+            Delete
+          </button>
+        </div>
+        <div className="flex-1 overflow-y-auto p-4">
+          <pre
+            className="text-[11px] whitespace-pre-wrap break-words"
+            style={{ color: 'var(--ae-text)', fontFamily: '"IBM Plex Mono", ui-monospace, monospace' }}
+          >
+            {viewFile.content}
+          </pre>
+        </div>
+        {deleteConfirm && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: 'rgba(0,0,0,0.7)' }}>
+            <div className="w-80 p-5 space-y-4" style={{ background: 'var(--ae-surface)', border: '1px solid var(--ae-border)' }}>
+              <p className="text-[12px]" style={{ color: 'var(--ae-text)' }}>
+                Delete <span className="font-mono">{deleteConfirm}</span>? This cannot be undone.
+              </p>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => { void deleteFile(deleteConfirm); }}
+                  className="text-[11px]"
+                  style={{ background: 'var(--ae-red)', color: 'white', border: 'none', cursor: 'pointer', padding: '6px 16px' }}
+                >
+                  Delete
+                </button>
+                <button
+                  onClick={() => setDeleteConfirm(null)}
+                  className="text-[11px]"
+                  style={{ ...INPUT_STYLE, padding: '6px 16px', cursor: 'pointer' }}
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // Main browse panel
+  return (
+    <div className="flex flex-col h-full">
+      <div className="px-3 py-2 flex-shrink-0" style={{ borderBottom: '1px solid var(--ae-border)' }}>
+        <input
+          type="text"
+          placeholder="Search workspace files…"
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="w-full text-[11px]"
+          style={{ ...INPUT_STYLE, width: '100%', padding: '4px 8px' }}
+        />
+      </div>
+
+      <div className="flex-1 overflow-y-auto">
+        {searchQuery.length >= 2 ? (
+          searchLoading ? (
+            <div className="p-3 text-[11px]" style={{ color: 'var(--ae-text3)' }}>Searching…</div>
+          ) : searchResults && searchResults.length === 0 ? (
+            <div className="p-3 text-[11px]" style={{ color: 'var(--ae-text3)' }}>No matches.</div>
+          ) : (
+            <div>
+              {(searchResults ?? []).map((r) => (
+                <div
+                  key={r.path}
+                  className="px-3 py-2 cursor-pointer text-[11px]"
+                  style={{ borderBottom: '1px solid var(--ae-border)' }}
+                  onClick={() => { void openFile(r.path); }}
+                >
+                  <div className="font-mono" style={{ color: 'var(--ae-amber)' }}>{r.path}</div>
+                  <div className="mt-1 truncate" style={{ color: 'var(--ae-text2)' }}>{r.excerpt}</div>
+                  <div className="mt-[2px] text-[10px]" style={{ color: 'var(--ae-text3)' }}>
+                    {r.matchCount} match{r.matchCount !== 1 ? 'es' : ''}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )
+        ) : treeLoading ? (
+          <div className="p-3 space-y-1">
+            {[1, 2, 3, 4, 5].map((i) => (
+              <div key={i} className="h-6 rounded" style={{ background: 'var(--ae-raised)' }} />
+            ))}
+          </div>
+        ) : treeError ? (
+          <div className="p-3 flex flex-col gap-2">
+            <div className="text-[11px]" style={{ color: 'var(--ae-red)' }}>{treeError}</div>
+            <button
+              onClick={() => { void fetchTree(); }}
+              className="text-[11px] w-fit"
+              style={{ color: 'var(--ae-amber)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
+            >
+              Retry
+            </button>
+          </div>
+        ) : (
+          <div className="py-1">
+            {(treeData?.pinned.length ?? 0) > 0 && (
+              <>
+                <div className="px-3 py-1 text-[10px] uppercase tracking-[0.1em]" style={{ color: 'var(--ae-text3)' }}>
+                  pinned
+                </div>
+                {renderTreeNodes(treeData!.pinned, 0, expandedDirs, toggleDir, (p) => { void openFile(p); })}
+                <div className="my-1" style={{ borderTop: '1px solid var(--ae-border)' }} />
+              </>
+            )}
+            {renderTreeNodes(treeData?.tree ?? [], 0, expandedDirs, toggleDir, (p) => { void openFile(p); })}
+            {viewLoading && (
+              <div className="px-3 py-2 text-[11px]" style={{ color: 'var(--ae-text3)' }}>Loading…</div>
+            )}
+          </div>
+        )}
+      </div>
+
+      <div className="px-3 py-2 flex-shrink-0" style={{ borderTop: '1px solid var(--ae-border)' }}>
+        {newFileMode ? (
+          <div className="flex gap-2 items-center">
+            <input
+              type="text"
+              placeholder="path/to/new-file.md"
+              value={newFilePath}
+              onChange={(e) => setNewFilePath(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') { void createFile(newFilePath); }
+                if (e.key === 'Escape') { setNewFileMode(false); setNewFilePath(''); }
+              }}
+              autoFocus
+              className="flex-1 text-[11px]"
+              style={{ ...INPUT_STYLE, padding: '3px 6px' }}
+            />
+            <button
+              onClick={() => { void createFile(newFilePath); }}
+              className="text-[10px]"
+              style={{ ...INPUT_STYLE, background: 'var(--ae-amber)', color: 'var(--ae-void)', border: 'none', cursor: 'pointer', padding: '3px 8px' }}
+            >
+              Create
+            </button>
+            <button
+              onClick={() => { setNewFileMode(false); setNewFilePath(''); }}
+              className="text-[10px]"
+              style={{ ...INPUT_STYLE, cursor: 'pointer', padding: '3px 8px' }}
+            >
+              Cancel
+            </button>
+          </div>
+        ) : (
+          <button
+            onClick={() => setNewFileMode(true)}
+            className="text-[10px]"
+            style={{ color: 'var(--ae-text2)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
+          >
+            + New file
+          </button>
+        )}
+      </div>
     </div>
   );
 }
