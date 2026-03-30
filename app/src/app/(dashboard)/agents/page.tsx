@@ -14,6 +14,10 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { ErrorBoundary } from '@/components/ui/error-boundary';
 import { basePath } from '@/lib/client-url';
 import { marked } from 'marked';
+
+// Disable raw HTML pass-through in the marked renderer to prevent XSS from
+// workspace .md files that may contain inline HTML (e.g. <img onerror=...>).
+marked.use({ renderer: { html(): string { return ''; } } });
 import type {
   AgentConfig,
   AgentBinding,
