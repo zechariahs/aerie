@@ -1921,7 +1921,7 @@ function AgentDetail({
   agent, bindings, selectedTab, gatewayStatus, gatewayLoading, onTabChange, onIdentitySaved,
 }: AgentDetailProps): React.JSX.Element {
   return (
-    <div className="flex flex-col flex-1 min-w-0">
+    <div className="flex flex-col flex-1 min-w-0 min-h-0">
       {/* Tab bar */}
       <div
         className="flex items-center px-3 pt-2 gap-0 flex-shrink-0"
