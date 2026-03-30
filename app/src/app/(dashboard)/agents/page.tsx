@@ -13,6 +13,7 @@ import React, {
 import { useRouter, useSearchParams } from 'next/navigation';
 import { ErrorBoundary } from '@/components/ui/error-boundary';
 import { basePath } from '@/lib/client-url';
+import { marked } from 'marked';
 import type {
   AgentConfig,
   AgentBinding,
@@ -874,6 +875,7 @@ function WorkspaceBrowsePanel({ agent }: { agent: AgentConfig }): React.JSX.Elem
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
   const [newFileMode, setNewFileMode] = useState(false);
   const [newFilePath, setNewFilePath] = useState('');
+  const [previewMode, setPreviewMode] = useState(true);
 
   const fetchTree = useCallback(async () => {
     if (!workspacePath) return;
@@ -914,6 +916,7 @@ function WorkspaceBrowsePanel({ agent }: { agent: AgentConfig }): React.JSX.Elem
 
   async function openFile(relPath: string): Promise<void> {
     if (!workspacePath) return;
+    setPreviewMode(true);
     setViewLoading(true);
     setViewFile(null);
     try {
@@ -1061,6 +1064,15 @@ function WorkspaceBrowsePanel({ agent }: { agent: AgentConfig }): React.JSX.Elem
           <span className="flex-1 font-mono" style={{ color: 'var(--ae-text2)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
             {viewFile.relPath}
           </span>
+          {viewFile.relPath.endsWith('.md') && (
+            <button
+              onClick={() => setPreviewMode((p) => !p)}
+              className="text-[10px]"
+              style={{ color: 'var(--ae-cyan)', background: 'none', border: 'none', cursor: 'pointer' }}
+            >
+              {previewMode ? 'Raw' : 'Preview'}
+            </button>
+          )}
           <button
             onClick={() => setBrowseEditor({ relPath: viewFile.relPath, content: viewFile.content, original: viewFile.content, saving: false, error: null })}
             className="text-[10px]"
@@ -1077,12 +1089,19 @@ function WorkspaceBrowsePanel({ agent }: { agent: AgentConfig }): React.JSX.Elem
           </button>
         </div>
         <div className="flex-1 overflow-y-auto p-4">
-          <pre
-            className="text-[11px] whitespace-pre-wrap break-words"
-            style={{ color: 'var(--ae-text)', fontFamily: '"IBM Plex Mono", ui-monospace, monospace' }}
-          >
-            {viewFile.content}
-          </pre>
+          {viewFile.relPath.endsWith('.md') && previewMode ? (
+            <div
+              className="markdown-preview"
+              dangerouslySetInnerHTML={{ __html: marked.parse(viewFile.content, { async: false }) as string }}
+            />
+          ) : (
+            <pre
+              className="text-[11px] whitespace-pre-wrap break-words"
+              style={{ color: 'var(--ae-text)', fontFamily: '"IBM Plex Mono", ui-monospace, monospace' }}
+            >
+              {viewFile.content}
+            </pre>
+          )}
         </div>
         {deleteConfirm && (
           <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: 'rgba(0,0,0,0.7)' }}>
