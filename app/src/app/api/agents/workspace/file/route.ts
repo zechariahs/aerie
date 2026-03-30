@@ -18,6 +18,7 @@ import fs from 'fs';
 import path from 'path';
 import { getSession } from '@/lib/session';
 import { errorResponse, successResponse } from '@/lib/api-response';
+import { writeFileViaExec, deleteFileViaExec } from '@/lib/openclaw-exec';
 
 export const dynamic = 'force-dynamic';
 
@@ -109,7 +110,7 @@ export async function POST(request: Request): Promise<Response> {
   const fullPath = path.join(workspacePath, filename);
 
   try {
-    fs.writeFileSync(fullPath, content, 'utf-8');
+    await writeFileViaExec(fullPath, content);
     return successResponse({ ok: true });
   } catch (err) {
     return errorResponse(`Failed to write file: ${String(err)}`, 500);
@@ -141,7 +142,7 @@ export async function DELETE(request: Request): Promise<Response> {
   }
 
   try {
-    fs.unlinkSync(fullPath);
+    await deleteFileViaExec(fullPath);
     return successResponse({ ok: true });
   } catch (err) {
     return errorResponse(`Failed to delete file: ${String(err)}`, 500);
