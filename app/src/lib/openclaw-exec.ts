@@ -34,13 +34,12 @@ export function getOpenclawExec(clawArgs: string[]): { bin: string; args: string
  * does not accidentally match "/data/.openclaw-backup/...".
  */
 export function translateOpenclawPath(p: string): string {
-  const containerDir = process.env['OPENCLAW_CONTAINER_DIR'] ?? '/data/.openclaw';
+  // Normalize both dirs via path.resolve so trailing slashes don't corrupt the slice.
+  const containerDir = path.resolve(process.env['OPENCLAW_CONTAINER_DIR'] ?? '/data/.openclaw');
   const aerieMountDir = process.env['OPENCLAW_DIR'] ?? '/openclaw';
 
   const normalized = path.resolve(p);
-  const containerBase = containerDir.endsWith(path.sep)
-    ? containerDir
-    : containerDir + path.sep;
+  const containerBase = containerDir + path.sep;
 
   if (normalized === containerDir) {
     return aerieMountDir;

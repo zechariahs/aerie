@@ -16,27 +16,55 @@ import { basePath } from '@/lib/client-url';
 import { Marked } from 'marked';
 
 /**
- * Renders workspace Markdown to safe HTML using a scoped Marked instance so
- * the global `marked` singleton is never mutated (which would affect any other
- * caller that imports `marked` on the same page load).
+ * Returns true for URL schemes that are safe to render in an <a href> or
+ * <img src>. Relative URLs (no scheme) are always safe. Only an explicit
+ * allowlist of absolute schemes is permitted.
+ */
+function isSafeUrl(href: string | null | undefined): boolean {
+  if (!href) return false;
+  const trimmed = href.trim();
+  // Relative URLs (no scheme present) are safe.
+  if (!/^[a-zA-Z][\w+.-]*:/.test(trimmed)) return true;
+  const lower = trimmed.toLowerCase();
+  return (
+    lower.startsWith('http:') ||
+    lower.startsWith('https:') ||
+    lower.startsWith('mailto:') ||
+    lower.startsWith('tel:')
+  );
+}
+
+/**
+ * Module-level Marked instance — created once and reused across all renders
+ * so we don't pay parser-construction overhead on every call.
  *
  * Safety:
  *  - Raw HTML blocks are stripped (html renderer returns '') to block
  *    <script>/<img onerror=...> style injections.
- *  - href/src attributes are post-processed to remove javascript:, data:, and
- *    vbscript: protocols, covering link/image-based XSS vectors.
+ *  - Link and image URLs are validated at render time against an explicit
+ *    scheme allowlist (http, https, mailto, tel, relative). Unsafe schemes
+ *    (javascript:, data:, vbscript:, etc.) are rejected: links render as
+ *    plain text and images render as their alt text.
  */
-function renderWorkspaceMarkdown(content: string): string {
-  const md = new Marked({
-    renderer: {
-      html(): string { return ''; },
+const workspaceMarkdownParser = new Marked({
+  renderer: {
+    html(): string { return ''; },
+    link(token: { href?: string | null; title?: string | null; text?: string }): string {
+      if (!isSafeUrl(token.href)) return token.text ?? '';
+      const titleAttr = token.title ? ` title="${token.title}"` : '';
+      return `<a href="${token.href}"${titleAttr}>${token.text ?? ''}</a>`;
     },
-  });
-  const html = md.parse(content, { async: false }) as string;
-  // Strip unsafe URL schemes from href and src attributes.
-  return html.replace(/\b(href|src)\s*=\s*"[^"]*"/gi, (attr) =>
-    /\b(?:href|src)\s*=\s*"(?:javascript|data|vbscript):/i.test(attr) ? '' : attr,
-  );
+    image(token: { href?: string | null; title?: string | null; text?: string }): string {
+      if (!isSafeUrl(token.href)) return token.text ? `<span>${token.text}</span>` : '';
+      const altAttr = token.text ? ` alt="${token.text}"` : '';
+      const titleAttr = token.title ? ` title="${token.title}"` : '';
+      return `<img src="${token.href}"${altAttr}${titleAttr} />`;
+    },
+  },
+});
+
+function renderWorkspaceMarkdown(content: string): string {
+  return workspaceMarkdownParser.parse(content, { async: false }) as string;
 }
 import type {
   AgentConfig,
