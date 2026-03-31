@@ -10,8 +10,8 @@
 
 | Phase | Name | Status |
 |-------|------|--------|
-| 1 | Schema + Auth | ✅ Complete — awaiting approval to open Phase 2 |
-| 2 | API | Not started |
+| 1 | Schema + Auth | ✅ Complete |
+| 2 | API | ✅ Complete — awaiting approval to open Phase 3 |
 | 3 | UI | Not started |
 | 4 | Executor Cron | Not started |
 
@@ -53,29 +53,29 @@
 
 ## FORWARD-IMPACT
 
-### Phase 2 notes (for next planning session):
+### Phase 2 — Completed (commit 34904e2)
 
-- `clarification_questions` and `clarification_responses` are stored as JSON strings in
-  SQLite and parsed to `string[]` in rowToTask. Phase 2's PUT /api/tasks/[id] must
-  serialize incoming `string[]` to JSON before writing.
+Files created:
+- `app/src/app/api/tasks/agent/route.ts` — GET /api/tasks/agent
+- `app/src/app/api/tasks/model-tiers/route.ts` — GET/PUT /api/tasks/model-tiers
 
-- The `grouped` response from GET /api/tasks now includes a `needs_clarification` key
-  (empty array). Phase 2's GET /api/tasks/agent endpoint is a separate route that does
-  not use the grouped structure.
+Files modified:
+- `app/src/app/api/tasks/route.ts` — CreateTaskBody extended; INSERT writes source/capability_tier
+- `app/src/app/api/tasks/[id]/route.ts` — UpdateTaskBody extended; UPDATE writes 7 new fields
 
-- `DELETE /api/tasks/[id]` was intentionally left as session+TOTP only (no API key).
-  Agents cannot delete tasks per spec §3.
+### Phase 3 notes (for next planning session):
 
-- Auth pattern used in Phase 1: `isAgentRequest()` checks exact `Bearer <key>` match
-  against `AGENT_API_KEY` env var. Same function to be used in Phase 2 new routes.
+- `resolved_model` field on AgentTask (in /api/tasks/agent) is `string | undefined`.
+  For `auto` tier it is always `undefined` — executor resolves per §5 heuristic.
 
-- `GET /api/settings` accepts session OR API key (agent needs to read active hours at
-  cron runtime). Spec §13 says "session + TOTP" for the endpoint pair, but the agent
-  executor clearly needs read access — this design matches spec intent.
+- The `VALID_TIERS` and `VALID_CLARIFICATION_STATES` arrays are defined locally in
+  `[id]/route.ts`. No changes needed to types.ts.
 
-- `model_tiers` env seeding only happens at migration time (app start). If env vars
-  change after migration, they are NOT re-seeded. Use PUT /api/tasks/model-tiers
-  (Phase 2) to update at runtime.
+- `clarification_questions` / `clarification_responses` arrive from the API as
+  `string[] | undefined` and the detail panel should render them that way.
+
+- `needs_clarification` column is in COLUMN_LABELS but NOT in VISIBLE_COLUMNS yet —
+  Phase 3 adds it there and handles the display.
 
 ---
 
