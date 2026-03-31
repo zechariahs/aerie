@@ -3,6 +3,7 @@
 
 import { spawn } from 'child_process';
 import fs from 'fs';
+import path from 'path';
 
 /**
  * Returns the binary and args to use for an openclaw CLI invocation.
@@ -28,20 +29,57 @@ export function getOpenclawExec(clawArgs: string[]): { bin: string; args: string
  *
  * OPENCLAW_CONTAINER_DIR: path prefix inside the openclaw container (default /data/.openclaw)
  * OPENCLAW_DIR:           where that directory is mounted in Aerie    (default /openclaw)
+ *
+ * Uses a boundary-safe separator check so a containerDir of "/data/.openclaw"
+ * does not accidentally match "/data/.openclaw-backup/...".
  */
+export function translateOpenclawPath(p: string): string {
+  // Normalize both dirs via path.resolve so trailing slashes don't corrupt the slice.
+  const containerDir = path.resolve(process.env['OPENCLAW_CONTAINER_DIR'] ?? '/data/.openclaw');
+  const aerieMountDir = process.env['OPENCLAW_DIR'] ?? '/openclaw';
+
+  const normalized = path.resolve(p);
+  const containerBase = containerDir + path.sep;
+
+  if (normalized === containerDir) {
+    return aerieMountDir;
+  }
+
+  if (normalized.startsWith(containerBase)) {
+    return aerieMountDir + normalized.slice(containerDir.length);
+  }
+
+  return p;
+}
+
 /**
  * Translates an Aerie mount path back to the equivalent path inside the
- * openclaw container. This is the reverse of translateOpenclawPath.
+ * openclaw container (the reverse of translateOpenclawPath).
+ *
+ * Both the mount dir and the input path are normalized via path.resolve so
+ * that trailing slashes in OPENCLAW_DIR do not corrupt the resulting path.
+ *
+ * Performs a boundary-safe containment check: the resolved absPath must be
+ * strictly within OPENCLAW_DIR (or equal to it). Throws if it is not, so
+ * docker exec commands never target arbitrary container paths.
  *
  * Example: /openclaw/workspace → /data/.openclaw/workspace
  */
 function toContainerPath(absPath: string): string {
-  const aerieMountDir = process.env['OPENCLAW_DIR'] ?? '/openclaw';
-  const containerDir = process.env['OPENCLAW_CONTAINER_DIR'] ?? '/data/.openclaw';
-  if (absPath.startsWith(aerieMountDir)) {
-    return containerDir + absPath.slice(aerieMountDir.length);
+  // path.resolve strips any trailing separator, making the length-based slice safe.
+  const aerieMountDir = path.resolve(process.env['OPENCLAW_DIR'] ?? '/openclaw');
+  const containerDir = path.resolve(process.env['OPENCLAW_CONTAINER_DIR'] ?? '/data/.openclaw');
+
+  const normalized = path.resolve(absPath);
+  const mountBase = aerieMountDir + path.sep;
+
+  if (!normalized.startsWith(mountBase) && normalized !== aerieMountDir) {
+    throw new Error(
+      `Path ${normalized} is not within the OpenClaw mount directory (${aerieMountDir})`,
+    );
   }
-  return absPath;
+
+  return containerDir + normalized.slice(aerieMountDir.length);
 }
 
 /**
@@ -63,15 +101,36 @@ export function writeFileViaExec(absPath: string, content: string): Promise<void
     const child = spawn('docker', ['exec', '-i', container, 'tee', containerPath], {
       stdio: ['pipe', 'ignore', 'pipe'],
     });
+
+    let settled = false;
+    const resolveOnce = () => {
+      if (settled) return;
+      settled = true;
+      resolve();
+    };
+    const rejectOnce = (err: unknown) => {
+      if (settled) return;
+      settled = true;
+      reject(err instanceof Error ? err : new Error(String(err)));
+    };
+
     let stderr = '';
     child.stderr.on('data', (chunk: unknown) => { stderr += String(chunk); });
-    child.on('error', reject);
+    child.on('error', rejectOnce);
+    child.stdin.on('error', rejectOnce);
     child.on('close', (code: number | null) => {
-      if (code === 0) resolve();
-      else reject(new Error(`docker exec tee exited ${code}: ${stderr.trim()}`));
+      if (code === 0) resolveOnce();
+      else rejectOnce(new Error(`docker exec tee exited ${code}: ${stderr.trim()}`));
     });
-    child.stdin.write(content, 'utf-8');
-    child.stdin.end();
+
+    try {
+      if (!child.killed) {
+        child.stdin.write(content, 'utf-8');
+        child.stdin.end();
+      }
+    } catch (err) {
+      rejectOnce(err);
+    }
   });
 }
 
@@ -121,13 +180,4 @@ export function mkdirViaExec(absPath: string): Promise<void> {
       else reject(new Error(`docker exec mkdir exited ${code}: ${stderr.trim()}`));
     });
   });
-}
-
-export function translateOpenclawPath(p: string): string {
-  const containerDir = process.env['OPENCLAW_CONTAINER_DIR'] ?? '/data/.openclaw';
-  const aerieMountDir = process.env['OPENCLAW_DIR'] ?? '/openclaw';
-  if (p.startsWith(containerDir)) {
-    return aerieMountDir + p.slice(containerDir.length);
-  }
-  return p;
 }

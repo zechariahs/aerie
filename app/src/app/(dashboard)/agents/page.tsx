@@ -13,7 +13,73 @@ import React, {
 import { useRouter, useSearchParams } from 'next/navigation';
 import { ErrorBoundary } from '@/components/ui/error-boundary';
 import { basePath } from '@/lib/client-url';
-import { marked } from 'marked';
+import { Marked } from 'marked';
+
+/** Escapes special HTML characters for safe injection into attributes and text. */
+function escapeHtml(s: string): string {
+  return s
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+/**
+ * Returns true for URL schemes that are safe to render in an <a href> or
+ * <img src>. Relative URLs (no scheme) are always safe. Only an explicit
+ * allowlist of absolute schemes is permitted.
+ */
+function isSafeUrl(href: string | null | undefined): boolean {
+  if (!href) return false;
+  const trimmed = href.trim();
+  // Relative URLs (no scheme present) are safe.
+  if (!/^[a-zA-Z][\w+.-]*:/.test(trimmed)) return true;
+  const lower = trimmed.toLowerCase();
+  return (
+    lower.startsWith('http:') ||
+    lower.startsWith('https:') ||
+    lower.startsWith('mailto:') ||
+    lower.startsWith('tel:')
+  );
+}
+
+/**
+ * Module-level Marked instance — created once and reused across all renders
+ * so we don't pay parser-construction overhead on every call.
+ *
+ * Safety:
+ *  - Raw HTML blocks are stripped (html renderer returns '') to block
+ *    <script>/<img onerror=...> style injections.
+ *  - Link and image URLs are validated at render time against an explicit
+ *    scheme allowlist (http, https, mailto, tel, relative). Unsafe schemes
+ *    (javascript:, data:, vbscript:, etc.) are rejected: links render as
+ *    plain text and images render as their alt text.
+ *  - All attribute values and text content are HTML-escaped to prevent
+ *    injection via crafted hrefs (e.g. `http://x" onmouseover="...`) or
+ *    link labels containing raw HTML tags.
+ */
+const workspaceMarkdownParser = new Marked({
+  renderer: {
+    html(): string { return ''; },
+    link(token: { href?: string | null; title?: string | null; text?: string }): string {
+      if (!isSafeUrl(token.href)) return escapeHtml(token.text ?? '');
+      const href = escapeHtml(token.href!);
+      const titleAttr = token.title ? ` title="${escapeHtml(token.title)}"` : '';
+      return `<a href="${href}"${titleAttr}>${escapeHtml(token.text ?? '')}</a>`;
+    },
+    image(token: { href?: string | null; title?: string | null; text?: string }): string {
+      if (!isSafeUrl(token.href)) return token.text ? `<span>${escapeHtml(token.text)}</span>` : '';
+      const src = escapeHtml(token.href!);
+      const altAttr = ` alt="${escapeHtml(token.text ?? '')}"`;
+      const titleAttr = token.title ? ` title="${escapeHtml(token.title)}"` : '';
+      return `<img src="${src}"${altAttr}${titleAttr} />`;
+    },
+  },
+});
+
+function renderWorkspaceMarkdown(content: string): string {
+  return workspaceMarkdownParser.parse(content, { async: false }) as string;
+}
 import type {
   AgentConfig,
   AgentBinding,
@@ -1092,7 +1158,7 @@ function WorkspaceBrowsePanel({ agent }: { agent: AgentConfig }): React.JSX.Elem
           {viewFile.relPath.endsWith('.md') && previewMode ? (
             <div
               className="markdown-preview"
-              dangerouslySetInnerHTML={{ __html: marked.parse(viewFile.content, { async: false }) as string }}
+              dangerouslySetInnerHTML={{ __html: renderWorkspaceMarkdown(viewFile.content) }}
             />
           ) : (
             <pre
