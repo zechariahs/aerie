@@ -8,6 +8,7 @@ export const TASK_COLUMNS: TaskStatus[] = [
   'inbox',
   'assigned',
   'in_progress',
+  'needs_clarification',
   'review',
   'done',
   'archived',

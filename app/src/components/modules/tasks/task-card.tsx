@@ -85,9 +85,30 @@ export function TaskCard({ task, index, isSelected, onClick }: TaskCardProps): R
                     {task.assigned_agent}
                   </span>
                 )}
+                {task.capability_tier === 'reasoning' && (
+                  <span className="ae-badge ae-badge-warn">reasoning</span>
+                )}
+                {task.capability_tier === 'fast' && (
+                  <span className="ae-badge ae-badge-off">fast</span>
+                )}
+                {task.capability_tier === 'auto' && (
+                  <span className="ae-badge ae-badge-off" style={{ fontStyle: 'italic' }}>auto</span>
+                )}
+                {task.source === 'agent' && (
+                  <span className="ae-badge" style={{ color: 'var(--ae-cyan)', borderColor: 'var(--ae-cyan)' }}>[agent]</span>
+                )}
+                {task.source === 'api' && (
+                  <span className="ae-badge ae-badge-off">[api]</span>
+                )}
               </div>
             </div>
           </div>
+          {task.clarification_state === 'pending_board' && (
+            <span
+              className="absolute top-1 right-1 text-[9px] animate-pulse"
+              style={{ color: 'var(--ae-warn)' }}
+            >?</span>
+          )}
         </div>
       )}
     </Draggable>

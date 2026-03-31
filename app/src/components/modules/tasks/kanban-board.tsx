@@ -25,7 +25,7 @@ const COLUMN_LABELS: Record<TaskStatus, string> = {
   archived: 'Archived',
 };
 
-const VISIBLE_COLUMNS: TaskStatus[] = ['inbox', 'assigned', 'in_progress', 'review', 'done'];
+const VISIBLE_COLUMNS: TaskStatus[] = ['inbox', 'assigned', 'in_progress', 'needs_clarification', 'review', 'done'];
 
 /**
  * Full Kanban board with drag-and-drop, task detail panel, and new-task form.
@@ -226,7 +226,10 @@ export function KanbanBoard(): React.JSX.Element {
                   <div key={col} className="flex flex-col w-48 flex-shrink-0">
                     {/* Column header — amber dash-label pattern */}
                     <div className="flex items-center justify-between mb-2 px-1">
-                      <span className="ae-section-label">── {COLUMN_LABELS[col]} ───</span>
+                      <span
+                        className="ae-section-label"
+                        style={col === 'needs_clarification' ? { color: 'var(--ae-warn)' } : undefined}
+                      >── {COLUMN_LABELS[col]} ───</span>
                       <span
                         className="text-[10px] px-1.5 py-0.5"
                         style={{
