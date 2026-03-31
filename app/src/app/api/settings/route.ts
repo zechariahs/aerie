@@ -4,22 +4,7 @@
 import { getSession, isAgentRequest, validateTotpFromRequest } from '@/lib/auth';
 import { getDb, writeAuditLog } from '@/lib/db';
 import { errorResponse, successResponse } from '@/lib/api-response';
-
-interface SettingsRow {
-  key: string;
-  value: string;
-  updated_at: string;
-}
-
-function getAllSettings(): Record<string, string> {
-  const db = getDb();
-  const rows = db.prepare('SELECT key, value FROM settings').all() as SettingsRow[];
-  const result: Record<string, string> = {};
-  for (const row of rows) {
-    result[row.key] = row.value;
-  }
-  return result;
-}
+import { getAllSettings } from '@/lib/settings';
 
 /**
  * GET /api/settings
