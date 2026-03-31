@@ -447,15 +447,19 @@ export function TaskDetailPanel({
               <div className="text-[10px]">
                 <span style={{ color: 'var(--ae-text3)' }}>Artifact: </span>
                 {task.output_artifact_url ? (
-                  <a
-                    href={task.output_artifact_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="no-underline hover:underline break-all"
-                    style={{ color: 'var(--ae-cyan)' }}
-                  >
-                    {task.output_artifact_url}
-                  </a>
+                  /^https?:\/\//i.test(task.output_artifact_url) ? (
+                    <a
+                      href={task.output_artifact_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="no-underline hover:underline break-all"
+                      style={{ color: 'var(--ae-cyan)' }}
+                    >
+                      {task.output_artifact_url}
+                    </a>
+                  ) : (
+                    <span className="break-all" style={{ color: 'var(--ae-text2)' }}>{task.output_artifact_url}</span>
+                  )
                 ) : (
                   <span style={{ color: 'var(--ae-text2)' }}>—</span>
                 )}

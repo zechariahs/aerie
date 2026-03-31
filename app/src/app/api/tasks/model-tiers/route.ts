@@ -55,9 +55,9 @@ export async function PUT(request: Request): Promise<Response> {
     return errorResponse('TOTP required', 403);
   }
 
-  let body: Partial<Record<'fast' | 'default' | 'reasoning', string>>;
+  let body: Partial<Record<'fast' | 'default' | 'reasoning', string | null>>;
   try {
-    body = (await request.json()) as Partial<Record<'fast' | 'default' | 'reasoning', string>>;
+    body = (await request.json()) as Partial<Record<'fast' | 'default' | 'reasoning', string | null>>;
   } catch {
     return errorResponse('Invalid JSON body', 400);
   }
@@ -67,11 +67,15 @@ export async function PUT(request: Request): Promise<Response> {
     `INSERT INTO model_tiers (tier, model_id) VALUES (?, ?)
      ON CONFLICT(tier) DO UPDATE SET model_id = excluded.model_id, updated_at = datetime('now')`,
   );
+  const clear = db.prepare('DELETE FROM model_tiers WHERE tier = ?');
 
   const validTiers = ['fast', 'default', 'reasoning'] as const;
   for (const tier of validTiers) {
+    if (!(tier in body)) continue;
     const modelId = body[tier];
-    if (typeof modelId === 'string' && modelId.trim() !== '') {
+    if (modelId === null || (typeof modelId === 'string' && modelId.trim() === '')) {
+      clear.run(tier);
+    } else if (typeof modelId === 'string') {
       upsert.run(tier, modelId.trim());
     }
   }
