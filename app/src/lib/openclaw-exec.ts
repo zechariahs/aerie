@@ -29,19 +29,36 @@ export function getOpenclawExec(clawArgs: string[]): { bin: string; args: string
  *
  * OPENCLAW_CONTAINER_DIR: path prefix inside the openclaw container (default /data/.openclaw)
  * OPENCLAW_DIR:           where that directory is mounted in Aerie    (default /openclaw)
+ *
+ * Uses a boundary-safe separator check so a containerDir of "/data/.openclaw"
+ * does not accidentally match "/data/.openclaw-backup/...".
  */
 export function translateOpenclawPath(p: string): string {
   const containerDir = process.env['OPENCLAW_CONTAINER_DIR'] ?? '/data/.openclaw';
   const aerieMountDir = process.env['OPENCLAW_DIR'] ?? '/openclaw';
-  if (p.startsWith(containerDir)) {
-    return aerieMountDir + p.slice(containerDir.length);
+
+  const normalized = path.resolve(p);
+  const containerBase = containerDir.endsWith(path.sep)
+    ? containerDir
+    : containerDir + path.sep;
+
+  if (normalized === containerDir) {
+    return aerieMountDir;
   }
+
+  if (normalized.startsWith(containerBase)) {
+    return aerieMountDir + normalized.slice(containerDir.length);
+  }
+
   return p;
 }
 
 /**
  * Translates an Aerie mount path back to the equivalent path inside the
  * openclaw container (the reverse of translateOpenclawPath).
+ *
+ * Both the mount dir and the input path are normalized via path.resolve so
+ * that trailing slashes in OPENCLAW_DIR do not corrupt the resulting path.
  *
  * Performs a boundary-safe containment check: the resolved absPath must be
  * strictly within OPENCLAW_DIR (or equal to it). Throws if it is not, so
@@ -50,13 +67,12 @@ export function translateOpenclawPath(p: string): string {
  * Example: /openclaw/workspace → /data/.openclaw/workspace
  */
 function toContainerPath(absPath: string): string {
-  const aerieMountDir = process.env['OPENCLAW_DIR'] ?? '/openclaw';
+  // path.resolve strips any trailing separator, making the length-based slice safe.
+  const aerieMountDir = path.resolve(process.env['OPENCLAW_DIR'] ?? '/openclaw');
   const containerDir = process.env['OPENCLAW_CONTAINER_DIR'] ?? '/data/.openclaw';
 
   const normalized = path.resolve(absPath);
-  const mountBase = aerieMountDir.endsWith(path.sep)
-    ? aerieMountDir
-    : aerieMountDir + path.sep;
+  const mountBase = aerieMountDir + path.sep;
 
   if (!normalized.startsWith(mountBase) && normalized !== aerieMountDir) {
     throw new Error(
