@@ -107,6 +107,9 @@ export function TaskCard({ task, index, isSelected, onClick }: TaskCardProps): R
             <span
               className="absolute top-1 right-1 text-[9px] animate-pulse"
               style={{ color: 'var(--ae-warn)' }}
+              role="img"
+              aria-label="Clarification needed"
+              title="Clarification needed"
             >?</span>
           )}
         </div>

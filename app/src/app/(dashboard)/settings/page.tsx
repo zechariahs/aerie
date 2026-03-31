@@ -107,38 +107,48 @@ export default function SettingsPage(): React.JSX.Element {
   }
 
   async function saveActiveHours(token: string): Promise<void> {
-    const res = await fetch(`${basePath}/api/settings`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json', 'X-TOTP-Token': token },
-      body: JSON.stringify({
-        AGENT_ACTIVE_START: activeStart,
-        AGENT_ACTIVE_END: activeEnd,
-        AGENT_TIMEZONE: timezone,
-      }),
-    });
-    if (res.ok) {
-      showToast('Active hours saved');
-    } else {
-      const err = (await res.json()) as { error: string };
-      showToast(`Error: ${err.error}`);
+    try {
+      const res = await fetch(`${basePath}/api/settings`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', 'X-TOTP-Token': token },
+        body: JSON.stringify({
+          AGENT_ACTIVE_START: activeStart,
+          AGENT_ACTIVE_END: activeEnd,
+          AGENT_TIMEZONE: timezone,
+        }),
+      });
+      if (res.ok) {
+        showToast('Active hours saved');
+      } else {
+        let msg = 'Failed to save active hours';
+        try { const err = (await res.json()) as { error?: string }; if (err.error) msg = `Error: ${err.error}`; } catch { /* ignore */ }
+        showToast(msg);
+      }
+    } catch {
+      showToast('Failed to save active hours');
     }
   }
 
   async function saveModelTiers(token: string): Promise<void> {
-    const res = await fetch(`${basePath}/api/tasks/model-tiers`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json', 'X-TOTP-Token': token },
-      body: JSON.stringify({
-        fast: fastModel || undefined,
-        default: defaultModel || undefined,
-        reasoning: reasoningModel || undefined,
-      }),
-    });
-    if (res.ok) {
-      showToast('Model tiers saved');
-    } else {
-      const err = (await res.json()) as { error: string };
-      showToast(`Error: ${err.error}`);
+    try {
+      const res = await fetch(`${basePath}/api/tasks/model-tiers`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', 'X-TOTP-Token': token },
+        body: JSON.stringify({
+          fast: fastModel || null,
+          default: defaultModel || null,
+          reasoning: reasoningModel || null,
+        }),
+      });
+      if (res.ok) {
+        showToast('Model tiers saved');
+      } else {
+        let msg = 'Failed to save model tiers';
+        try { const err = (await res.json()) as { error?: string }; if (err.error) msg = `Error: ${err.error}`; } catch { /* ignore */ }
+        showToast(msg);
+      }
+    } catch {
+      showToast('Failed to save model tiers');
     }
   }
 
