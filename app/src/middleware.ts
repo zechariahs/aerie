@@ -11,6 +11,11 @@ function isPublicPath(pathname: string): boolean {
   return PUBLIC_PATHS.has(pathname);
 }
 
+function hasBearerToken(request: NextRequest): boolean {
+  const auth = request.headers.get('authorization');
+  return auth !== null && auth.startsWith('Bearer ');
+}
+
 export async function middleware(request: NextRequest): Promise<NextResponse> {
   const { pathname } = request.nextUrl;
 
@@ -41,7 +46,7 @@ export async function middleware(request: NextRequest): Promise<NextResponse> {
   // Auth guard — unauthenticated requests to protected routes → /login
   // API routes get a 401 JSON response instead of an HTML redirect so that
   // fetch/EventSource callers receive a machine-readable error (not a login page).
-  if (!isPublicPath(pathname)) {
+  if (!isPublicPath(pathname) && !hasBearerToken(request)) {
     const session = await getSession(request);
     if (!session) {
       if (pathname.startsWith('/api/')) {
