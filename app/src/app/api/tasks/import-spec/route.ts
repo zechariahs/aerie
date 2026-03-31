@@ -60,8 +60,8 @@ export async function POST(request: Request): Promise<Response> {
 
   const db = getDb();
   db.prepare(
-    `INSERT INTO tasks (id, title, description, status, priority, tag, assigned_agent, due_date, linked_output, created_at, updated_at)
-     VALUES (?, ?, ?, 'inbox', 'P3', NULL, NULL, NULL, ?, ?, ?)`,
+    `INSERT INTO tasks (id, title, description, status, priority, tag, assigned_agent, due_date, linked_output, source, capability_tier, clarification_state, created_at, updated_at)
+     VALUES (?, ?, ?, 'inbox', 'P3', NULL, NULL, NULL, ?, 'manual', 'default', 'none', ?, ?)`,
   ).run(id, body.title.trim(), description ?? null, body.driveUrl ?? null, now, now);
 
   db.prepare(
