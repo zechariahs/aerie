@@ -12,7 +12,7 @@
 |-------|------|--------|
 | 1 | Schema + Auth | ✅ Complete |
 | 2 | API | ✅ Complete — awaiting approval to open Phase 3 |
-| 3 | UI | Not started |
+| 3 | UI | ✅ Complete — awaiting approval to open Phase 4 |
 | 4 | Executor Cron | Not started |
 
 ---
@@ -63,7 +63,30 @@ Files modified:
 - `app/src/app/api/tasks/route.ts` — CreateTaskBody extended; INSERT writes source/capability_tier
 - `app/src/app/api/tasks/[id]/route.ts` — UpdateTaskBody extended; UPDATE writes 7 new fields
 
-### Phase 3 notes (for next planning session):
+## PHASE 3 — Completed
+
+**Commit:** `95709d5`
+
+### Files modified:
+- `app/src/lib/task-columns.ts` — inserted `needs_clarification` between `in_progress` and `review`
+- `app/src/components/modules/tasks/kanban-board.tsx` — added `needs_clarification` to `VISIBLE_COLUMNS`; warn color on column header
+- `app/src/components/modules/tasks/task-card.tsx` — tier badges (reasoning/fast/auto), source badges (agent/api), pulsing `?` for `clarification_state === 'pending_board'`
+- `app/src/components/modules/tasks/task-detail-panel.tsx` — Clarification Thread Q&A section with Submit Responses; Execution Info section (session ID, summary, artifact link)
+- `app/src/components/modules/tasks/new-task-form.tsx` — Capability Tier selector (default/fast/reasoning/auto)
+- `app/src/components/layout/sidebar.tsx` — added `{ href: '/settings', label: 'Settings' }` to `navItems`
+
+### Files created:
+- `app/src/app/(dashboard)/settings/page.tsx` — Settings page: Active Hours (AGENT_ACTIVE_START/END/TIMEZONE via /api/settings) + Model Tiers (fast/default/reasoning via /api/tasks/model-tiers), both TOTP-gated
+
+### Stopping conditions confirmed:
+- `pnpm lint` → ✅ No ESLint warnings or errors
+- `pnpm typecheck` → ✅ No new errors
+
+---
+
+## FORWARD-IMPACT
+
+### Phase 4 notes (for next planning session):
 
 - `resolved_model` field on AgentTask (in /api/tasks/agent) is `string | undefined`.
   For `auto` tier it is always `undefined` — executor resolves per §5 heuristic.
