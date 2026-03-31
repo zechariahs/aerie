@@ -409,7 +409,12 @@ export function TaskDetailPanel({
               ))}
             </div>
             <button
-              disabled={saving || (task.clarification_state === 'resolved' && editResponses.every((r) => r.trim() !== ''))}
+              disabled={
+                saving ||
+                !(task.clarification_questions ?? []).every((_, idx) => (editResponses[idx] ?? '').trim() !== '') ||
+                (task.clarification_state === 'resolved' &&
+                  (task.clarification_questions ?? []).every((_, idx) => (editResponses[idx] ?? '').trim() !== ''))
+              }
               onClick={() => onRequestTotp(() => { void submitResponses(totpToken); })}
               className="w-full text-[10px] uppercase tracking-[0.08em] disabled:opacity-40 mt-2"
               style={{

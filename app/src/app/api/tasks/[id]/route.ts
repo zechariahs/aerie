@@ -212,6 +212,21 @@ export async function PUT(request: Request, { params }: RouteContext): Promise<R
     return errorResponse('Invalid clarification_state value', 400);
   }
 
+  if (
+    body.clarification_questions !== undefined &&
+    (!Array.isArray(body.clarification_questions) ||
+      !body.clarification_questions.every((item) => typeof item === 'string'))
+  ) {
+    return errorResponse('clarification_questions must be an array of strings', 400);
+  }
+  if (
+    body.clarification_responses !== undefined &&
+    (!Array.isArray(body.clarification_responses) ||
+      !body.clarification_responses.every((item) => typeof item === 'string'))
+  ) {
+    return errorResponse('clarification_responses must be an array of strings', 400);
+  }
+
   const now = new Date().toISOString();
   const prevStatus = existing.status as TaskStatus;
   const newStatus = body.status ?? prevStatus;

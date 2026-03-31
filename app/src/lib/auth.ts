@@ -4,6 +4,7 @@
 // Node.js-only auth helpers — argon2 and otplib are native modules that cannot
 // run on the Edge runtime. Import from session.ts for edge-safe session operations.
 
+import { timingSafeEqual } from 'crypto';
 import { SignJWT, jwtVerify } from 'jose';
 import { authenticator } from 'otplib';
 import type { TempTokenPayload } from '@/types';
@@ -101,8 +102,14 @@ export async function verifyTempToken(token: string): Promise<TempTokenPayload |
 export function isAgentRequest(request: Request): boolean {
   const key = process.env['AGENT_API_KEY'];
   if (!key) return false;
-  const auth = request.headers.get('authorization') ?? '';
-  return auth === `Bearer ${key}`;
+  const auth = (request.headers.get('authorization') ?? '').trim();
+  const expected = `Bearer ${key}`;
+  if (auth.length !== expected.length) return false;
+  try {
+    return timingSafeEqual(Buffer.from(auth), Buffer.from(expected));
+  } catch {
+    return false;
+  }
 }
 
 /**

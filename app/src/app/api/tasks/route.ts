@@ -109,7 +109,6 @@ interface CreateTaskBody {
   tag?: TaskTag;
   assigned_agent?: string;
   due_date?: string;
-  source?: TaskSource;
   capability_tier?: TaskCapabilityTier;
 }
 
@@ -150,10 +149,8 @@ export async function POST(request: Request): Promise<Response> {
     ? (body.priority as TaskPriority)
     : 'P3';
 
-  const validSources: TaskSource[] = ['manual', 'agent', 'api'];
-  const source: TaskSource = agentAuthed
-    ? (validSources.includes(body.source as TaskSource) ? (body.source as TaskSource) : 'agent')
-    : (validSources.includes(body.source as TaskSource) ? (body.source as TaskSource) : 'manual');
+  // Derive source solely from auth to prevent spoofing.
+  const source: TaskSource = agentAuthed ? 'agent' : 'manual';
 
   const validTiers: TaskCapabilityTier[] = ['fast', 'default', 'reasoning', 'auto'];
   const capabilityTier: TaskCapabilityTier = validTiers.includes(
