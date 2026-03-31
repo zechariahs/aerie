@@ -219,6 +219,9 @@ function applyMigrationV3(database: Database.Database): void {
     try { database.exec(sql); } catch { /* column already exists */ }
   }
 
+  // Index on tasks(status) — used by the agent queue endpoint filter.
+  try { database.exec('CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks (status)'); } catch { /* already exists */ }
+
   database.exec(`
     CREATE TABLE IF NOT EXISTS model_tiers (
       tier       TEXT PRIMARY KEY,
