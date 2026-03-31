@@ -17,6 +17,7 @@ const navItems = [
   { href: '/claude-loop', label: 'Claude Loop' },
   { href: '/vps-health', label: 'VPS Health' },
   { href: '/security', label: 'Security' },
+  { href: '/settings', label: 'Settings' },
 ] as const;
 
 interface NavListProps {

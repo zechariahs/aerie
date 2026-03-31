@@ -4,7 +4,7 @@
 'use client';
 
 import { useState } from 'react';
-import type { Task, TaskPriority, TaskTag } from '@/types';
+import type { Task, TaskCapabilityTier, TaskPriority, TaskTag } from '@/types';
 import { basePath } from '@/lib/client-url';
 
 interface NewTaskFormProps {
@@ -35,6 +35,7 @@ export function NewTaskForm({ totpToken, onCreated, onCancel, onRequestTotp }: N
   const [tag, setTag] = useState<TaskTag | ''>('');
   const [assignedAgent, setAssignedAgent] = useState('');
   const [dueDate, setDueDate] = useState('');
+  const [capabilityTier, setCapabilityTier] = useState<TaskCapabilityTier>('default');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
@@ -60,6 +61,7 @@ export function NewTaskForm({ totpToken, onCreated, onCancel, onRequestTotp }: N
           tag: tag || undefined,
           assigned_agent: assignedAgent.trim() || undefined,
           due_date: dueDate || undefined,
+          capability_tier: capabilityTier,
         }),
       });
 
@@ -187,6 +189,22 @@ export function NewTaskForm({ totpToken, onCreated, onCancel, onRequestTotp }: N
                 onBlur={blurBorder}
               />
             </div>
+          </div>
+
+          <div>
+            <label className="block text-[10px] uppercase tracking-[0.14em] mb-1" style={{ color: 'var(--ae-text3)' }}>Capability Tier</label>
+            <select
+              value={capabilityTier}
+              onChange={(e) => setCapabilityTier(e.target.value as TaskCapabilityTier)}
+              style={inputStyle}
+              onFocus={focusAmber}
+              onBlur={blurBorder}
+            >
+              <option value="default">Default</option>
+              <option value="fast">Fast</option>
+              <option value="reasoning">Reasoning</option>
+              <option value="auto">Auto</option>
+            </select>
           </div>
 
           {error && <p className="text-[11px]" style={{ color: 'var(--ae-red)' }}>{error}</p>}
