@@ -6,30 +6,28 @@ import { getDb, writeAuditLog } from '@/lib/db';
 import { errorResponse, successResponse } from '@/lib/api-response';
 import { rowToTask, type TaskRow } from '@/lib/task-mappers';
 import { scoreTask } from '@/lib/task-scoring';
+import { getAllSettings } from '@/lib/settings';
 
-interface SettingsRow {
-  key: string;
-  value: string;
-}
-
-function getAllSettings(): Record<string, string> {
-  const db = getDb();
-  const rows = db.prepare('SELECT key, value FROM settings').all() as SettingsRow[];
-  const out: Record<string, string> = {};
-  for (const row of rows) out[row.key] = row.value;
-  return out;
-}
-
-/** Normalises a time string to zero-padded "HH:MM", e.g. "9:05" → "09:05". */
-function normaliseTime(t: string): string {
-  const [h = '0', m = '0'] = t.split(':');
-  return `${h.padStart(2, '0')}:${m.padStart(2, '0')}`;
+/**
+ * Parses and validates a 24h time string to zero-padded "HH:MM".
+ * Returns null for invalid input (e.g. "99:99", "ab:cd", minutes > 59).
+ */
+function parseTime(t: string): string | null {
+  const match = /^(\d{1,2}):(\d{2})$/.exec(t.trim());
+  if (!match) return null;
+  const h = parseInt(match[1]!, 10);
+  const m = parseInt(match[2]!, 10);
+  // Allow 24:00 as an end-of-day sentinel; reject anything else out of range.
+  if (h > 24 || m > 59 || (h === 24 && m !== 0)) return null;
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
 }
 
 /**
  * Returns true if the current wall-clock time in the configured IANA timezone
  * falls within [AGENT_ACTIVE_START, AGENT_ACTIVE_END). Handles overnight windows
  * (e.g. "22:00"–"06:00").  Defaults to always-active when settings are absent.
+ * Invalid time values fall back to safe defaults (00:00 / 24:00).
+ * Invalid IANA timezone falls back to UTC while still enforcing the window.
  */
 function isWithinActiveHours(settings: Record<string, string>): boolean {
   const rawStart = settings['AGENT_ACTIVE_START'];
@@ -38,8 +36,8 @@ function isWithinActiveHours(settings: Record<string, string>): boolean {
   // If neither bound is configured, the executor runs at any hour.
   if (!rawStart && !rawEnd) return true;
 
-  const start = normaliseTime(rawStart ?? '00:00');
-  const end   = rawEnd ? normaliseTime(rawEnd) : '24:00';
+  const start = (rawStart ? parseTime(rawStart) : null) ?? '00:00';
+  const end   = (rawEnd   ? parseTime(rawEnd)   : null) ?? '24:00';
   const tz    = settings['AGENT_TIMEZONE'] ?? 'UTC';
 
   let parts: Intl.DateTimeFormatPart[];
@@ -71,10 +69,12 @@ function isWithinActiveHours(settings: Record<string, string>): boolean {
  * Agent API key required — no session fallback.
  *
  * Enforces the active-hours gate, then atomically claims the highest-scored
- * inbox task and returns it to the caller.
+ * inbox task and returns it to the caller.  On a claim race, automatically
+ * retries against the next-best candidate so a single lost race does not idle
+ * the executor for a full cron interval.
  *
  * Response shapes:
- *   { skip: true,  reason: 'outside_active_hours' | 'no_tasks' | 'claimed_by_peer' }
+ *   { skip: true,  reason: 'outside_active_hours' | 'no_tasks' }
  *   { skip: false, task: Task }
  */
 export async function POST(request: Request): Promise<Response> {
@@ -103,42 +103,37 @@ export async function POST(request: Request): Promise<Response> {
     return successResponse({ skip: true, reason: 'no_tasks' });
   }
 
-  // ── Score and pick the top task ──────────────────────────────────────────
+  // ── Score all candidates, sort descending ────────────────────────────────
   const now = new Date();
-  let bestRow: TaskRow = rows[0]!;
-  let bestScore = scoreTask(rowToTask(rows[0]!), now);
+  const scored = rows
+    .map((row) => ({ row, score: scoreTask(rowToTask(row), now) }))
+    .sort((a, b) => b.score - a.score);
 
-  for (let i = 1; i < rows.length; i++) {
-    const s = scoreTask(rowToTask(rows[i]!), now);
-    if (s > bestScore) {
-      bestScore = s;
-      bestRow = rows[i]!;
-    }
-  }
-
-  // ── Atomic claim (AND status='inbox' prevents double-claim) ─────────────
+  // ── Attempt to claim each candidate in score order ────────────────────────
+  // If a peer claims the top candidate between SELECT and UPDATE, try the next
+  // best rather than skipping the entire cron interval.
   const sessionId = crypto.randomUUID();
   const claimedAt = new Date().toISOString();
 
   const claimTaskTx = db.transaction(
-    (taskId: number, sessionId: string, claimedAt: string): { claimed: boolean; claimedRow: TaskRow | undefined } => {
+    (taskId: string, sid: string, ts: string): { claimed: boolean; claimedRow: TaskRow | undefined } => {
       const result = db
         .prepare(
           `UPDATE tasks
               SET status = 'assigned', execution_session_id = ?, updated_at = ?
             WHERE id = ? AND status = 'inbox'`,
         )
-        .run(sessionId, claimedAt, taskId);
+        .run(sid, ts, taskId);
 
       if (result.changes === 0) {
         return { claimed: false, claimedRow: undefined };
       }
 
-      // ── Record status transition ───────────────────────────────────────────
+      // ── Record status transition ─────────────────────────────────────────
       db.prepare(
         `INSERT INTO task_status_changes (task_id, from_status, to_status, changed_at)
          VALUES (?, 'inbox', 'assigned', ?)`,
-      ).run(taskId, claimedAt);
+      ).run(taskId, ts);
 
       writeAuditLog({
         action: 'task.executor.claim',
@@ -154,17 +149,18 @@ export async function POST(request: Request): Promise<Response> {
     },
   );
 
-  const txResult = claimTaskTx(bestRow.id, sessionId, claimedAt);
-
-  if (!txResult.claimed) {
-    // Race condition — another instance already claimed this task
-    return successResponse({ skip: true, reason: 'claimed_by_peer' });
+  for (const { row } of scored) {
+    const txResult = claimTaskTx(row.id, sessionId, claimedAt);
+    if (txResult.claimed) {
+      if (!txResult.claimedRow) {
+        // Extremely unlikely: task deleted between UPDATE and SELECT
+        return successResponse({ skip: true, reason: 'no_tasks' });
+      }
+      return successResponse({ skip: false, task: rowToTask(txResult.claimedRow) });
+    }
+    // claimed_by_peer — continue to next candidate
   }
 
-  const claimed = txResult.claimedRow;
-  if (!claimed) {
-    // Extremely unlikely: task deleted between UPDATE and SELECT
-    return successResponse({ skip: true, reason: 'no_tasks' });
-  }
-  return successResponse({ skip: false, task: rowToTask(claimed) });
+  // All candidates were claimed by peers between the SELECT and UPDATE
+  return successResponse({ skip: true, reason: 'no_tasks' });
 }
