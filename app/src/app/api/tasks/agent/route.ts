@@ -5,6 +5,7 @@ import { isAgentRequest } from '@/lib/auth';
 import { getDb } from '@/lib/db';
 import { errorResponse, successResponse } from '@/lib/api-response';
 import { rowToTask, type TaskRow } from '@/lib/task-mappers';
+import { scoreTask } from '@/lib/task-scoring';
 import type { Task, TaskStatus } from '@/types';
 
 interface ModelTierRow {
@@ -15,37 +16,6 @@ interface ModelTierRow {
 interface AgentTask extends Task {
   resolved_model: string | undefined;
   score?: number;
-}
-
-/**
- * Scores a task based on priority and due-date proximity.
- * Higher score = higher priority for executor.
- *
- * +50  if P1, +30 if P2, +10 if P3, +0 if P4
- * +100 if overdue (due_date < now)
- * +40  if due within 4h (and not overdue)
- * +20  if due within 24h (and not within 4h)
- */
-function scoreTask(task: Task, now: Date): number {
-  let score = 0;
-
-  if (task.priority === 'P1') score += 50;
-  else if (task.priority === 'P2') score += 30;
-  else if (task.priority === 'P3') score += 10;
-
-  if (task.due_date) {
-    const dueMs = new Date(task.due_date).getTime();
-    const nowMs = now.getTime();
-    if (dueMs < nowMs) {
-      score += 100;
-    } else {
-      const diffMs = dueMs - nowMs;
-      if (diffMs <= 4 * 3600 * 1000) score += 40;
-      else if (diffMs <= 24 * 3600 * 1000) score += 20;
-    }
-  }
-
-  return score;
 }
 
 const VALID_AGENT_STATUSES: TaskStatus[] = [
