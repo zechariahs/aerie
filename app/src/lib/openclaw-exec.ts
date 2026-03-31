@@ -68,7 +68,7 @@ export function translateOpenclawPath(p: string): string {
 function toContainerPath(absPath: string): string {
   // path.resolve strips any trailing separator, making the length-based slice safe.
   const aerieMountDir = path.resolve(process.env['OPENCLAW_DIR'] ?? '/openclaw');
-  const containerDir = process.env['OPENCLAW_CONTAINER_DIR'] ?? '/data/.openclaw';
+  const containerDir = path.resolve(process.env['OPENCLAW_CONTAINER_DIR'] ?? '/data/.openclaw');
 
   const normalized = path.resolve(absPath);
   const mountBase = aerieMountDir + path.sep;

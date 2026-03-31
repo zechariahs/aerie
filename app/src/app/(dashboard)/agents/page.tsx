@@ -15,6 +15,15 @@ import { ErrorBoundary } from '@/components/ui/error-boundary';
 import { basePath } from '@/lib/client-url';
 import { Marked } from 'marked';
 
+/** Escapes special HTML characters for safe injection into attributes and text. */
+function escapeHtml(s: string): string {
+  return s
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
 /**
  * Returns true for URL schemes that are safe to render in an <a href> or
  * <img src>. Relative URLs (no scheme) are always safe. Only an explicit
@@ -45,20 +54,25 @@ function isSafeUrl(href: string | null | undefined): boolean {
  *    scheme allowlist (http, https, mailto, tel, relative). Unsafe schemes
  *    (javascript:, data:, vbscript:, etc.) are rejected: links render as
  *    plain text and images render as their alt text.
+ *  - All attribute values and text content are HTML-escaped to prevent
+ *    injection via crafted hrefs (e.g. `http://x" onmouseover="...`) or
+ *    link labels containing raw HTML tags.
  */
 const workspaceMarkdownParser = new Marked({
   renderer: {
     html(): string { return ''; },
     link(token: { href?: string | null; title?: string | null; text?: string }): string {
-      if (!isSafeUrl(token.href)) return token.text ?? '';
-      const titleAttr = token.title ? ` title="${token.title}"` : '';
-      return `<a href="${token.href}"${titleAttr}>${token.text ?? ''}</a>`;
+      if (!isSafeUrl(token.href)) return escapeHtml(token.text ?? '');
+      const href = escapeHtml(token.href!);
+      const titleAttr = token.title ? ` title="${escapeHtml(token.title)}"` : '';
+      return `<a href="${href}"${titleAttr}>${escapeHtml(token.text ?? '')}</a>`;
     },
     image(token: { href?: string | null; title?: string | null; text?: string }): string {
-      if (!isSafeUrl(token.href)) return token.text ? `<span>${token.text}</span>` : '';
-      const altAttr = token.text ? ` alt="${token.text}"` : '';
-      const titleAttr = token.title ? ` title="${token.title}"` : '';
-      return `<img src="${token.href}"${altAttr}${titleAttr} />`;
+      if (!isSafeUrl(token.href)) return token.text ? `<span>${escapeHtml(token.text)}</span>` : '';
+      const src = escapeHtml(token.href!);
+      const altAttr = ` alt="${escapeHtml(token.text ?? '')}"`;
+      const titleAttr = token.title ? ` title="${escapeHtml(token.title)}"` : '';
+      return `<img src="${src}"${altAttr}${titleAttr} />`;
     },
   },
 });
