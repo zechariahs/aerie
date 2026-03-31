@@ -39,7 +39,7 @@ function isWithinActiveHours(settings: Record<string, string>): boolean {
   if (!rawStart && !rawEnd) return true;
 
   const start = normaliseTime(rawStart ?? '00:00');
-  const end   = normaliseTime(rawEnd   ?? '23:59');
+  const end   = rawEnd ? normaliseTime(rawEnd) : '24:00';
   const tz    = settings['AGENT_TIMEZONE'] ?? 'UTC';
 
   let parts: Intl.DateTimeFormatPart[];
@@ -48,8 +48,10 @@ function isWithinActiveHours(settings: Record<string, string>): boolean {
       timeZone: tz, hour: '2-digit', minute: '2-digit', hour12: false,
     }).formatToParts(new Date());
   } catch {
-    // Invalid IANA timezone — fall back to allowing execution
-    return true;
+    // Invalid IANA timezone — fall back to UTC while still enforcing the window
+    parts = new Intl.DateTimeFormat('en-GB', {
+      timeZone: 'UTC', hour: '2-digit', minute: '2-digit', hour12: false,
+    }).formatToParts(new Date());
   }
 
   const h   = parts.find((p) => p.type === 'hour')?.value   ?? '00';
@@ -72,7 +74,7 @@ function isWithinActiveHours(settings: Record<string, string>): boolean {
  * inbox task and returns it to the caller.
  *
  * Response shapes:
- *   { skip: true,  reason: 'outside_active_hours' | 'no_tasks' }
+ *   { skip: true,  reason: 'outside_active_hours' | 'no_tasks' | 'claimed_by_peer' }
  *   { skip: false, task: Task }
  */
 export async function POST(request: Request): Promise<Response> {
@@ -92,7 +94,8 @@ export async function POST(request: Request): Promise<Response> {
   // ── Fetch candidates (bounded, priority-ordered) ─────────────────────────
   const rows = db
     .prepare(
-      'SELECT * FROM tasks WHERE status = ? ORDER BY priority ASC, due_date ASC NULLS LAST LIMIT 50',
+      // Use a larger bounded candidate set so scoreTask() can surface due-soon items.
+      'SELECT * FROM tasks WHERE status = ? ORDER BY priority ASC, due_date ASC NULLS LAST LIMIT 500',
     )
     .all('inbox') as TaskRow[];
 
@@ -117,35 +120,48 @@ export async function POST(request: Request): Promise<Response> {
   const sessionId = crypto.randomUUID();
   const claimedAt = new Date().toISOString();
 
-  const result = db
-    .prepare(
-      `UPDATE tasks
-          SET status = 'assigned', execution_session_id = ?, updated_at = ?
-        WHERE id = ? AND status = 'inbox'`,
-    )
-    .run(sessionId, claimedAt, bestRow.id);
+  const claimTaskTx = db.transaction(
+    (taskId: number, sessionId: string, claimedAt: string): { claimed: boolean; claimedRow: TaskRow | undefined } => {
+      const result = db
+        .prepare(
+          `UPDATE tasks
+              SET status = 'assigned', execution_session_id = ?, updated_at = ?
+            WHERE id = ? AND status = 'inbox'`,
+        )
+        .run(sessionId, claimedAt, taskId);
 
-  if (result.changes === 0) {
+      if (result.changes === 0) {
+        return { claimed: false, claimedRow: undefined };
+      }
+
+      // ── Record status transition ───────────────────────────────────────────
+      db.prepare(
+        `INSERT INTO task_status_changes (task_id, from_status, to_status, changed_at)
+         VALUES (?, 'inbox', 'assigned', ?)`,
+      ).run(taskId, claimedAt);
+
+      writeAuditLog({
+        action: 'task.executor.claim',
+        resource: `task:${taskId}`,
+        result: 'success',
+        ip,
+        userAgent,
+      });
+
+      // Re-fetch to return the fully updated row
+      const claimedRow = db.prepare('SELECT * FROM tasks WHERE id = ?').get(taskId) as TaskRow | undefined;
+      return { claimed: true, claimedRow };
+    },
+  );
+
+  const txResult = claimTaskTx(bestRow.id, sessionId, claimedAt);
+
+  if (!txResult.claimed) {
     // Race condition — another instance already claimed this task
     return successResponse({ skip: true, reason: 'claimed_by_peer' });
   }
 
-  // ── Record status transition ─────────────────────────────────────────────
-  db.prepare(
-    `INSERT INTO task_status_changes (task_id, from_status, to_status, changed_at)
-     VALUES (?, 'inbox', 'assigned', ?)`,
-  ).run(bestRow.id, claimedAt);
-
-  writeAuditLog({
-    action: 'task.executor.claim',
-    resource: `task:${bestRow.id}`,
-    result: 'success',
-    ip,
-    userAgent,
-  });
-
-  // Re-fetch to return the fully updated row
-  const claimed = db.prepare('SELECT * FROM tasks WHERE id = ?').get(bestRow.id) as TaskRow | undefined;
+  const claimed = txResult.claimedRow;
   if (!claimed) {
     // Extremely unlikely: task deleted between UPDATE and SELECT
     return successResponse({ skip: true, reason: 'no_tasks' });
