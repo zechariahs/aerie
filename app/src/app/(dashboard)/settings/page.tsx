@@ -42,7 +42,6 @@ export default function SettingsPage(): React.JSX.Element {
 
   // TOTP dialog state
   const [totpOpen, setTotpOpen] = useState(false);
-  const [totpToken, setTotpToken] = useState('');
   const pendingActionRef = useRef<((token: string) => void) | undefined>(undefined);
 
   const showToast = useCallback((msg: string) => {
@@ -93,7 +92,6 @@ export default function SettingsPage(): React.JSX.Element {
   }
 
   function onTotpConfirm(token: string): void {
-    setTotpToken(token);
     setTotpOpen(false);
     if (pendingActionRef.current) {
       pendingActionRef.current(token);

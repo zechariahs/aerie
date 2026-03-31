@@ -105,12 +105,12 @@ interface UpdateTaskBody {
   linked_output?: string | null;
   comment?: string;
   capability_tier?: TaskCapabilityTier;
-  clarification_questions?: string[];
-  clarification_responses?: string[];
+  clarification_questions?: string[] | null;
+  clarification_responses?: string[] | null;
   clarification_state?: TaskClarificationState;
-  execution_session_id?: string;
-  output_summary?: string;
-  output_artifact_url?: string;
+  execution_session_id?: string | null;
+  output_summary?: string | null;
+  output_artifact_url?: string | null;
 }
 
 /**
@@ -164,6 +164,7 @@ export async function PUT(request: Request, { params }: RouteContext): Promise<R
 
   if (
     body.clarification_questions !== undefined &&
+    body.clarification_questions !== null &&
     (!Array.isArray(body.clarification_questions) ||
       !body.clarification_questions.every((item) => typeof item === 'string'))
   ) {
@@ -171,25 +172,31 @@ export async function PUT(request: Request, { params }: RouteContext): Promise<R
   }
   if (
     body.clarification_responses !== undefined &&
+    body.clarification_responses !== null &&
     (!Array.isArray(body.clarification_responses) ||
       !body.clarification_responses.every((item) => typeof item === 'string'))
   ) {
     return errorResponse('clarification_responses must be an array of strings', 400);
+  }
+  if (body.execution_session_id !== undefined && body.execution_session_id !== null && typeof body.execution_session_id !== 'string') {
+    return errorResponse('execution_session_id must be a string', 400);
+  }
+  if (body.output_summary !== undefined && body.output_summary !== null && typeof body.output_summary !== 'string') {
+    return errorResponse('output_summary must be a string', 400);
+  }
+  if (body.output_artifact_url !== undefined && body.output_artifact_url !== null && typeof body.output_artifact_url !== 'string') {
+    return errorResponse('output_artifact_url must be a string', 400);
   }
 
   const now = new Date().toISOString();
   const prevStatus = existing.status as TaskStatus;
   const newStatus = body.status ?? prevStatus;
 
-  // Serialize string[] fields to JSON for storage
-  const clarificationQuestionsJson =
-    body.clarification_questions !== undefined
-      ? JSON.stringify(body.clarification_questions)
-      : null;
-  const clarificationResponsesJson =
-    body.clarification_responses !== undefined
-      ? JSON.stringify(body.clarification_responses)
-      : null;
+  // Serialize string[] fields to JSON for storage (null = explicit clear)
+  const clarificationQuestionsJson: string | null =
+    body.clarification_questions == null ? null : JSON.stringify(body.clarification_questions);
+  const clarificationResponsesJson: string | null =
+    body.clarification_responses == null ? null : JSON.stringify(body.clarification_responses);
 
   db.prepare(
     `UPDATE tasks SET
@@ -225,9 +232,9 @@ export async function PUT(request: Request, { params }: RouteContext): Promise<R
     body.linked_output !== undefined ? '1' : null,
     body.linked_output ?? null,
     body.capability_tier ?? null,
+    body.clarification_questions !== undefined ? '1' : null,
     clarificationQuestionsJson,
-    clarificationQuestionsJson,
-    clarificationResponsesJson,
+    body.clarification_responses !== undefined ? '1' : null,
     clarificationResponsesJson,
     body.clarification_state ?? null,
     body.execution_session_id !== undefined ? '1' : null,

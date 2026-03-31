@@ -57,7 +57,11 @@ export async function PUT(request: Request): Promise<Response> {
 
   let body: Partial<Record<'fast' | 'default' | 'reasoning', string | null>>;
   try {
-    body = (await request.json()) as Partial<Record<'fast' | 'default' | 'reasoning', string | null>>;
+    const parsed: unknown = await request.json();
+    if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      return errorResponse('Invalid JSON body', 400);
+    }
+    body = parsed as Partial<Record<'fast' | 'default' | 'reasoning', string | null>>;
   } catch {
     return errorResponse('Invalid JSON body', 400);
   }
