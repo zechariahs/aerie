@@ -37,6 +37,17 @@ export interface TaskRow {
   output_artifact_url: string | null;
 }
 
+/** Safe JSON parse for stored string arrays. Returns undefined on malformed data. */
+function tryParseJsonArray(json: string): string[] | undefined {
+  try {
+    const parsed: unknown = JSON.parse(json);
+    if (Array.isArray(parsed) && parsed.every((item) => typeof item === 'string')) {
+      return parsed as string[];
+    }
+  } catch { /* ignore */ }
+  return undefined;
+}
+
 /** Maps a raw SQLite row to a fully-typed Task object. */
 export function rowToTask(row: TaskRow): Task {
   return {
@@ -54,10 +65,10 @@ export function rowToTask(row: TaskRow): Task {
     source: (row.source as TaskSource) ?? 'manual',
     capability_tier: (row.capability_tier as TaskCapabilityTier) ?? 'default',
     clarification_questions: row.clarification_questions
-      ? (JSON.parse(row.clarification_questions) as string[])
+      ? tryParseJsonArray(row.clarification_questions)
       : undefined,
     clarification_responses: row.clarification_responses
-      ? (JSON.parse(row.clarification_responses) as string[])
+      ? tryParseJsonArray(row.clarification_responses)
       : undefined,
     clarification_state: (row.clarification_state as TaskClarificationState) ?? 'none',
     execution_session_id: row.execution_session_id ?? undefined,

@@ -64,6 +64,12 @@ export async function PUT(request: Request): Promise<Response> {
     return errorResponse('Body must be a JSON object', 400);
   }
 
+  const ALLOWED_KEYS = new Set([
+    'AGENT_ACTIVE_START',
+    'AGENT_ACTIVE_END',
+    'AGENT_TIMEZONE',
+  ]);
+
   const db = getDb();
   const upsert = db.prepare(
     `INSERT INTO settings (key, value) VALUES (?, ?)
@@ -72,6 +78,7 @@ export async function PUT(request: Request): Promise<Response> {
 
   for (const [key, value] of Object.entries(body)) {
     if (typeof key !== 'string' || typeof value !== 'string') continue;
+    if (!ALLOWED_KEYS.has(key)) continue;
     upsert.run(key, value);
   }
 
