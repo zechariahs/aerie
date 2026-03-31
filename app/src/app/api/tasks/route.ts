@@ -109,6 +109,8 @@ interface CreateTaskBody {
   tag?: TaskTag;
   assigned_agent?: string;
   due_date?: string;
+  source?: TaskSource;
+  capability_tier?: TaskCapabilityTier;
 }
 
 /**
@@ -148,14 +150,26 @@ export async function POST(request: Request): Promise<Response> {
     ? (body.priority as TaskPriority)
     : 'P3';
 
+  const validSources: TaskSource[] = ['manual', 'agent', 'api'];
+  const source: TaskSource = agentAuthed
+    ? (validSources.includes(body.source as TaskSource) ? (body.source as TaskSource) : 'agent')
+    : (validSources.includes(body.source as TaskSource) ? (body.source as TaskSource) : 'manual');
+
+  const validTiers: TaskCapabilityTier[] = ['fast', 'default', 'reasoning', 'auto'];
+  const capabilityTier: TaskCapabilityTier = validTiers.includes(
+    body.capability_tier as TaskCapabilityTier,
+  )
+    ? (body.capability_tier as TaskCapabilityTier)
+    : 'default';
+
   const id = crypto.randomUUID();
   const now = new Date().toISOString();
 
   const db = getDb();
 
   db.prepare(
-    `INSERT INTO tasks (id, title, description, status, priority, tag, assigned_agent, due_date, linked_output, created_at, updated_at)
-     VALUES (?, ?, ?, 'inbox', ?, ?, ?, ?, NULL, ?, ?)`,
+    `INSERT INTO tasks (id, title, description, status, priority, tag, assigned_agent, due_date, linked_output, source, capability_tier, created_at, updated_at)
+     VALUES (?, ?, ?, 'inbox', ?, ?, ?, ?, NULL, ?, ?, ?, ?)`,
   ).run(
     id,
     body.title.trim(),
@@ -164,6 +178,8 @@ export async function POST(request: Request): Promise<Response> {
     body.tag ?? null,
     body.assigned_agent ?? null,
     body.due_date ?? null,
+    source,
+    capabilityTier,
     now,
     now,
   );

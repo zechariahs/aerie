@@ -136,6 +136,13 @@ const VALID_STATUSES: TaskStatus[] = [
   'archived',
 ];
 const VALID_PRIORITIES: TaskPriority[] = ['P1', 'P2', 'P3', 'P4'];
+const VALID_TIERS: TaskCapabilityTier[] = ['fast', 'default', 'reasoning', 'auto'];
+const VALID_CLARIFICATION_STATES: TaskClarificationState[] = [
+  'none',
+  'pending_message',
+  'pending_board',
+  'resolved',
+];
 
 interface UpdateTaskBody {
   title?: string;
@@ -147,6 +154,13 @@ interface UpdateTaskBody {
   due_date?: string | null;
   linked_output?: string | null;
   comment?: string;
+  capability_tier?: TaskCapabilityTier;
+  clarification_questions?: string[];
+  clarification_responses?: string[];
+  clarification_state?: TaskClarificationState;
+  execution_session_id?: string;
+  output_summary?: string;
+  output_artifact_url?: string;
 }
 
 /**
@@ -188,10 +202,29 @@ export async function PUT(request: Request, { params }: RouteContext): Promise<R
   if (body.priority !== undefined && !VALID_PRIORITIES.includes(body.priority)) {
     return errorResponse('Invalid priority value', 400);
   }
+  if (body.capability_tier !== undefined && !VALID_TIERS.includes(body.capability_tier)) {
+    return errorResponse('Invalid capability_tier value', 400);
+  }
+  if (
+    body.clarification_state !== undefined &&
+    !VALID_CLARIFICATION_STATES.includes(body.clarification_state)
+  ) {
+    return errorResponse('Invalid clarification_state value', 400);
+  }
 
   const now = new Date().toISOString();
   const prevStatus = existing.status as TaskStatus;
   const newStatus = body.status ?? prevStatus;
+
+  // Serialize string[] fields to JSON for storage
+  const clarificationQuestionsJson =
+    body.clarification_questions !== undefined
+      ? JSON.stringify(body.clarification_questions)
+      : null;
+  const clarificationResponsesJson =
+    body.clarification_responses !== undefined
+      ? JSON.stringify(body.clarification_responses)
+      : null;
 
   db.prepare(
     `UPDATE tasks SET
@@ -203,6 +236,13 @@ export async function PUT(request: Request, { params }: RouteContext): Promise<R
       assigned_agent = CASE WHEN ? IS NOT NULL THEN ? ELSE assigned_agent END,
       due_date = CASE WHEN ? IS NOT NULL THEN ? ELSE due_date END,
       linked_output = CASE WHEN ? IS NOT NULL THEN ? ELSE linked_output END,
+      capability_tier = COALESCE(?, capability_tier),
+      clarification_questions = CASE WHEN ? IS NOT NULL THEN ? ELSE clarification_questions END,
+      clarification_responses = CASE WHEN ? IS NOT NULL THEN ? ELSE clarification_responses END,
+      clarification_state = COALESCE(?, clarification_state),
+      execution_session_id = CASE WHEN ? IS NOT NULL THEN ? ELSE execution_session_id END,
+      output_summary = CASE WHEN ? IS NOT NULL THEN ? ELSE output_summary END,
+      output_artifact_url = CASE WHEN ? IS NOT NULL THEN ? ELSE output_artifact_url END,
       updated_at = ?
      WHERE id = ?`,
   ).run(
@@ -219,6 +259,18 @@ export async function PUT(request: Request, { params }: RouteContext): Promise<R
     body.due_date ?? null,
     body.linked_output !== undefined ? '1' : null,
     body.linked_output ?? null,
+    body.capability_tier ?? null,
+    clarificationQuestionsJson,
+    clarificationQuestionsJson,
+    clarificationResponsesJson,
+    clarificationResponsesJson,
+    body.clarification_state ?? null,
+    body.execution_session_id !== undefined ? '1' : null,
+    body.execution_session_id ?? null,
+    body.output_summary !== undefined ? '1' : null,
+    body.output_summary ?? null,
+    body.output_artifact_url !== undefined ? '1' : null,
+    body.output_artifact_url ?? null,
     now,
     id,
   );
