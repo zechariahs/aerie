@@ -94,6 +94,18 @@ export async function verifyTempToken(token: string): Promise<TempTokenPayload |
 }
 
 /**
+ * Returns true if the request carries a valid agent API key.
+ * Agents authenticate with: Authorization: Bearer <AGENT_API_KEY>
+ * Used as an alternative to session + TOTP on task write endpoints.
+ */
+export function isAgentRequest(request: Request): boolean {
+  const key = process.env['AGENT_API_KEY'];
+  if (!key) return false;
+  const auth = request.headers.get('authorization') ?? '';
+  return auth === `Bearer ${key}`;
+}
+
+/**
  * Validates the TOTP token from the X-TOTP-Token request header.
  * Returns true only if the token matches the current or adjacent 30-second window.
  * Every write API route must call this before executing business logic.
