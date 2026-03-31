@@ -59,6 +59,7 @@ export function TaskDetailPanel({
   const [editTag, setEditTag] = useState<TaskTag | ''>('');
   const [editAgent, setEditAgent] = useState('');
   const [editDue, setEditDue] = useState('');
+  const [editResponses, setEditResponses] = useState<string[]>([]);
   const [toast, setToast] = useState('');
 
   const showToast = useCallback((msg: string) => {
@@ -83,6 +84,7 @@ export function TaskDetailPanel({
       setEditTag(json.data.task.tag ?? '');
       setEditAgent(json.data.task.assigned_agent ?? '');
       setEditDue(json.data.task.due_date ?? '');
+      setEditResponses(json.data.task.clarification_responses ?? []);
     } catch {
       setError('Failed to load task');
     } finally {
@@ -191,6 +193,33 @@ export function TaskDetailPanel({
       onDeleted(taskId);
     } else {
       showToast('Delete failed');
+    }
+  }
+
+  async function submitResponses(token: string): Promise<void> {
+    setSaving(true);
+    try {
+      const res = await fetch(`${basePath}/api/tasks/${taskId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', 'X-TOTP-Token': token },
+        body: JSON.stringify({
+          clarification_responses: editResponses,
+          clarification_state: 'resolved',
+          status: 'inbox',
+        }),
+      });
+      if (!res.ok) {
+        showToast('Failed to submit responses');
+        return;
+      }
+      const json = (await res.json()) as { data: Task };
+      onUpdated(json.data);
+      await fetchTask();
+      showToast('Responses submitted');
+    } catch {
+      showToast('Failed to submit responses');
+    } finally {
+      setSaving(false);
     }
   }
 
@@ -350,6 +379,91 @@ export function TaskDetailPanel({
             >
               {task.linked_output}
             </a>
+          </div>
+        )}
+
+        {/* Clarification Thread */}
+        {task.clarification_questions && task.clarification_questions.length > 0 && (
+          <div style={{ borderTop: '1px solid var(--ae-border)', paddingTop: 12 }}>
+            <label className="block text-[10px] uppercase tracking-[0.14em] mb-2" style={{ color: 'var(--ae-warn)' }}>
+              ── Clarification Needed ────
+            </label>
+            <div className="space-y-2">
+              {task.clarification_questions.map((q, i) => (
+                <div key={i}>
+                  <p className="text-[10px] mb-1" style={{ color: 'var(--ae-text2)' }}>Q{i + 1}: {q}</p>
+                  <textarea
+                    value={editResponses[i] ?? ''}
+                    onChange={(e) => {
+                      const next = [...editResponses];
+                      next[i] = e.target.value;
+                      setEditResponses(next);
+                    }}
+                    rows={2}
+                    placeholder="Your answer…"
+                    style={{ ...inputStyle, resize: 'none' }}
+                    onFocus={(e) => { (e.currentTarget as HTMLElement).style.borderColor = 'var(--ae-amber)'; }}
+                    onBlur={(e) => { (e.currentTarget as HTMLElement).style.borderColor = 'var(--ae-border)'; }}
+                  />
+                </div>
+              ))}
+            </div>
+            <button
+              disabled={
+                saving ||
+                task.clarification_state === 'resolved' ||
+                !(task.clarification_questions ?? []).every((_, idx) => (editResponses[idx] ?? '').trim() !== '')
+              }
+              onClick={() => onRequestTotp(() => { void submitResponses(totpToken); })}
+              className="w-full text-[10px] uppercase tracking-[0.08em] disabled:opacity-40 mt-2"
+              style={{
+                padding: '4px 8px',
+                background: 'transparent',
+                border: '1px solid var(--ae-border-hi)',
+                color: 'var(--ae-text2)',
+              }}
+            >
+              Submit Responses
+            </button>
+          </div>
+        )}
+
+        {/* Execution Info */}
+        {task.execution_session_id && (
+          <div style={{ borderTop: '1px solid var(--ae-border)', paddingTop: 12 }}>
+            <label className="block text-[10px] uppercase tracking-[0.14em] mb-2" style={{ color: 'var(--ae-text3)' }}>
+              ── Execution ───────────────
+            </label>
+            <div className="space-y-1">
+              <div className="text-[10px]">
+                <span style={{ color: 'var(--ae-text3)' }}>Session: </span>
+                <span style={{ color: 'var(--ae-text2)' }}>{task.execution_session_id}</span>
+              </div>
+              <div className="text-[10px]">
+                <span style={{ color: 'var(--ae-text3)' }}>Summary: </span>
+                <span style={{ color: 'var(--ae-text2)' }}>{task.output_summary ?? '—'}</span>
+              </div>
+              <div className="text-[10px]">
+                <span style={{ color: 'var(--ae-text3)' }}>Artifact: </span>
+                {task.output_artifact_url ? (
+                  /^https?:\/\//i.test(task.output_artifact_url) ? (
+                    <a
+                      href={task.output_artifact_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="no-underline hover:underline break-all"
+                      style={{ color: 'var(--ae-cyan)' }}
+                    >
+                      {task.output_artifact_url}
+                    </a>
+                  ) : (
+                    <span className="break-all" style={{ color: 'var(--ae-text2)' }}>{task.output_artifact_url}</span>
+                  )
+                ) : (
+                  <span style={{ color: 'var(--ae-text2)' }}>—</span>
+                )}
+              </div>
+            </div>
           </div>
         )}
 

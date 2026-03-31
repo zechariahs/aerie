@@ -1,40 +1,18 @@
 // Copyright (c) 2026 Zack Schwenk
 // SPDX-License-Identifier: MIT
 
-import { getSession, validateTotpFromRequest } from '@/lib/auth';
+import { getSession, isAgentRequest, validateTotpFromRequest } from '@/lib/auth';
 import { getDb, writeAuditLog } from '@/lib/db';
 import { errorResponse, successResponse } from '@/lib/api-response';
-import type { Task, TaskPriority, TaskStatus, TaskTag } from '@/types';
-
-interface TaskRow {
-  id: string;
-  title: string;
-  description: string | null;
-  status: string;
-  priority: string;
-  tag: string | null;
-  assigned_agent: string | null;
-  due_date: string | null;
-  linked_output: string | null;
-  created_at: string;
-  updated_at: string;
-}
-
-function rowToTask(row: TaskRow): Task {
-  return {
-    id: row.id,
-    title: row.title,
-    description: row.description ?? undefined,
-    status: row.status as TaskStatus,
-    priority: row.priority as TaskPriority,
-    tag: (row.tag as TaskTag) ?? undefined,
-    assigned_agent: row.assigned_agent ?? undefined,
-    due_date: row.due_date ?? undefined,
-    linked_output: row.linked_output ?? undefined,
-    created_at: row.created_at,
-    updated_at: row.updated_at,
-  };
-}
+import { rowToTask, type TaskRow } from '@/lib/task-mappers';
+import type {
+  Task,
+  TaskCapabilityTier,
+  TaskPriority,
+  TaskSource,
+  TaskStatus,
+  TaskTag,
+} from '@/types';
 
 /**
  * GET /api/tasks
@@ -60,6 +38,7 @@ export async function GET(request: Request): Promise<Response> {
     inbox: [],
     assigned: [],
     in_progress: [],
+    needs_clarification: [],
     review: [],
     done: [],
     archived: [],
@@ -80,18 +59,20 @@ interface CreateTaskBody {
   tag?: TaskTag;
   assigned_agent?: string;
   due_date?: string;
+  capability_tier?: TaskCapabilityTier;
 }
 
 /**
  * POST /api/tasks
  * Creates a new task in the inbox column.
- * Requires session + valid X-TOTP-Token header.
+ * Requires session + valid X-TOTP-Token header, OR a valid agent API key.
  */
 export async function POST(request: Request): Promise<Response> {
   const session = await getSession();
-  if (!session) return errorResponse('Unauthorized', 401);
+  const agentAuthed = isAgentRequest(request);
+  if (!session && !agentAuthed) return errorResponse('Unauthorized', 401);
 
-  if (!validateTotpFromRequest(request)) {
+  if (!agentAuthed && !validateTotpFromRequest(request)) {
     writeAuditLog({
       action: 'task.create',
       resource: 'task',
@@ -118,14 +99,24 @@ export async function POST(request: Request): Promise<Response> {
     ? (body.priority as TaskPriority)
     : 'P3';
 
+  // Derive source solely from auth to prevent spoofing.
+  const source: TaskSource = agentAuthed ? 'agent' : 'manual';
+
+  const validTiers: TaskCapabilityTier[] = ['fast', 'default', 'reasoning', 'auto'];
+  const capabilityTier: TaskCapabilityTier = validTiers.includes(
+    body.capability_tier as TaskCapabilityTier,
+  )
+    ? (body.capability_tier as TaskCapabilityTier)
+    : 'default';
+
   const id = crypto.randomUUID();
   const now = new Date().toISOString();
 
   const db = getDb();
 
   db.prepare(
-    `INSERT INTO tasks (id, title, description, status, priority, tag, assigned_agent, due_date, linked_output, created_at, updated_at)
-     VALUES (?, ?, ?, 'inbox', ?, ?, ?, ?, NULL, ?, ?)`,
+    `INSERT INTO tasks (id, title, description, status, priority, tag, assigned_agent, due_date, linked_output, source, capability_tier, created_at, updated_at)
+     VALUES (?, ?, ?, 'inbox', ?, ?, ?, ?, NULL, ?, ?, ?, ?)`,
   ).run(
     id,
     body.title.trim(),
@@ -134,6 +125,8 @@ export async function POST(request: Request): Promise<Response> {
     body.tag ?? null,
     body.assigned_agent ?? null,
     body.due_date ?? null,
+    source,
+    capabilityTier,
     now,
     now,
   );

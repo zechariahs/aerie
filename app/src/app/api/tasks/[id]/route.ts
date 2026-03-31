@@ -1,43 +1,23 @@
 // Copyright (c) 2026 Zack Schwenk
 // SPDX-License-Identifier: MIT
 
-import { getSession, validateTotpFromRequest } from '@/lib/auth';
+import { getSession, isAgentRequest, validateTotpFromRequest } from '@/lib/auth';
 import { getDb, writeAuditLog } from '@/lib/db';
 import { errorResponse, successResponse } from '@/lib/api-response';
-import type { Task, TaskPriority, TaskStatus, TaskTag, TaskStatusChange, TaskComment } from '@/types';
+import { rowToTask, type TaskRow } from '@/lib/task-mappers';
+import type {
+  Task,
+  TaskCapabilityTier,
+  TaskClarificationState,
+  TaskComment,
+  TaskPriority,
+  TaskStatus,
+  TaskStatusChange,
+  TaskTag,
+} from '@/types';
 
 interface RouteContext {
   params: Promise<{ id: string }>;
-}
-
-interface TaskRow {
-  id: string;
-  title: string;
-  description: string | null;
-  status: string;
-  priority: string;
-  tag: string | null;
-  assigned_agent: string | null;
-  due_date: string | null;
-  linked_output: string | null;
-  created_at: string;
-  updated_at: string;
-}
-
-function rowToTask(row: TaskRow): Task {
-  return {
-    id: row.id,
-    title: row.title,
-    description: row.description ?? undefined,
-    status: row.status as TaskStatus,
-    priority: row.priority as TaskPriority,
-    tag: (row.tag as TaskTag) ?? undefined,
-    assigned_agent: row.assigned_agent ?? undefined,
-    due_date: row.due_date ?? undefined,
-    linked_output: row.linked_output ?? undefined,
-    created_at: row.created_at,
-    updated_at: row.updated_at,
-  };
 }
 
 /**
@@ -96,8 +76,23 @@ export async function GET(_request: Request, { params }: RouteContext): Promise<
   });
 }
 
-const VALID_STATUSES: TaskStatus[] = ['inbox', 'assigned', 'in_progress', 'review', 'done', 'archived'];
+const VALID_STATUSES: TaskStatus[] = [
+  'inbox',
+  'assigned',
+  'in_progress',
+  'needs_clarification',
+  'review',
+  'done',
+  'archived',
+];
 const VALID_PRIORITIES: TaskPriority[] = ['P1', 'P2', 'P3', 'P4'];
+const VALID_TIERS: TaskCapabilityTier[] = ['fast', 'default', 'reasoning', 'auto'];
+const VALID_CLARIFICATION_STATES: TaskClarificationState[] = [
+  'none',
+  'pending_message',
+  'pending_board',
+  'resolved',
+];
 
 interface UpdateTaskBody {
   title?: string;
@@ -109,18 +104,26 @@ interface UpdateTaskBody {
   due_date?: string | null;
   linked_output?: string | null;
   comment?: string;
+  capability_tier?: TaskCapabilityTier;
+  clarification_questions?: string[] | null;
+  clarification_responses?: string[] | null;
+  clarification_state?: TaskClarificationState;
+  execution_session_id?: string | null;
+  output_summary?: string | null;
+  output_artifact_url?: string | null;
 }
 
 /**
  * PUT /api/tasks/[id]
  * Updates any mutable fields on a task (including column move).
- * Requires session + valid X-TOTP-Token header.
+ * Requires session + valid X-TOTP-Token header, OR a valid agent API key.
  */
 export async function PUT(request: Request, { params }: RouteContext): Promise<Response> {
   const session = await getSession();
-  if (!session) return errorResponse('Unauthorized', 401);
+  const agentAuthed = isAgentRequest(request);
+  if (!session && !agentAuthed) return errorResponse('Unauthorized', 401);
 
-  if (!validateTotpFromRequest(request)) {
+  if (!agentAuthed && !validateTotpFromRequest(request)) {
     writeAuditLog({
       action: 'task.update',
       resource: 'task',
@@ -149,10 +152,51 @@ export async function PUT(request: Request, { params }: RouteContext): Promise<R
   if (body.priority !== undefined && !VALID_PRIORITIES.includes(body.priority)) {
     return errorResponse('Invalid priority value', 400);
   }
+  if (body.capability_tier !== undefined && !VALID_TIERS.includes(body.capability_tier)) {
+    return errorResponse('Invalid capability_tier value', 400);
+  }
+  if (
+    body.clarification_state !== undefined &&
+    !VALID_CLARIFICATION_STATES.includes(body.clarification_state)
+  ) {
+    return errorResponse('Invalid clarification_state value', 400);
+  }
+
+  if (
+    body.clarification_questions !== undefined &&
+    body.clarification_questions !== null &&
+    (!Array.isArray(body.clarification_questions) ||
+      !body.clarification_questions.every((item) => typeof item === 'string'))
+  ) {
+    return errorResponse('clarification_questions must be an array of strings', 400);
+  }
+  if (
+    body.clarification_responses !== undefined &&
+    body.clarification_responses !== null &&
+    (!Array.isArray(body.clarification_responses) ||
+      !body.clarification_responses.every((item) => typeof item === 'string'))
+  ) {
+    return errorResponse('clarification_responses must be an array of strings', 400);
+  }
+  if (body.execution_session_id !== undefined && body.execution_session_id !== null && typeof body.execution_session_id !== 'string') {
+    return errorResponse('execution_session_id must be a string', 400);
+  }
+  if (body.output_summary !== undefined && body.output_summary !== null && typeof body.output_summary !== 'string') {
+    return errorResponse('output_summary must be a string', 400);
+  }
+  if (body.output_artifact_url !== undefined && body.output_artifact_url !== null && typeof body.output_artifact_url !== 'string') {
+    return errorResponse('output_artifact_url must be a string', 400);
+  }
 
   const now = new Date().toISOString();
   const prevStatus = existing.status as TaskStatus;
   const newStatus = body.status ?? prevStatus;
+
+  // Serialize string[] fields to JSON for storage (null = explicit clear)
+  const clarificationQuestionsJson: string | null =
+    body.clarification_questions == null ? null : JSON.stringify(body.clarification_questions);
+  const clarificationResponsesJson: string | null =
+    body.clarification_responses == null ? null : JSON.stringify(body.clarification_responses);
 
   db.prepare(
     `UPDATE tasks SET
@@ -164,6 +208,13 @@ export async function PUT(request: Request, { params }: RouteContext): Promise<R
       assigned_agent = CASE WHEN ? IS NOT NULL THEN ? ELSE assigned_agent END,
       due_date = CASE WHEN ? IS NOT NULL THEN ? ELSE due_date END,
       linked_output = CASE WHEN ? IS NOT NULL THEN ? ELSE linked_output END,
+      capability_tier = COALESCE(?, capability_tier),
+      clarification_questions = CASE WHEN ? IS NOT NULL THEN ? ELSE clarification_questions END,
+      clarification_responses = CASE WHEN ? IS NOT NULL THEN ? ELSE clarification_responses END,
+      clarification_state = COALESCE(?, clarification_state),
+      execution_session_id = CASE WHEN ? IS NOT NULL THEN ? ELSE execution_session_id END,
+      output_summary = CASE WHEN ? IS NOT NULL THEN ? ELSE output_summary END,
+      output_artifact_url = CASE WHEN ? IS NOT NULL THEN ? ELSE output_artifact_url END,
       updated_at = ?
      WHERE id = ?`,
   ).run(
@@ -180,6 +231,18 @@ export async function PUT(request: Request, { params }: RouteContext): Promise<R
     body.due_date ?? null,
     body.linked_output !== undefined ? '1' : null,
     body.linked_output ?? null,
+    body.capability_tier ?? null,
+    body.clarification_questions !== undefined ? '1' : null,
+    clarificationQuestionsJson,
+    body.clarification_responses !== undefined ? '1' : null,
+    clarificationResponsesJson,
+    body.clarification_state ?? null,
+    body.execution_session_id !== undefined ? '1' : null,
+    body.execution_session_id ?? null,
+    body.output_summary !== undefined ? '1' : null,
+    body.output_summary ?? null,
+    body.output_artifact_url !== undefined ? '1' : null,
+    body.output_artifact_url ?? null,
     now,
     id,
   );
