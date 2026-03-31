@@ -47,12 +47,26 @@ export type TaskStatus =
   | 'inbox'
   | 'assigned'
   | 'in_progress'
+  | 'needs_clarification'
   | 'review'
   | 'done'
   | 'archived';
 
 /** Task tag — work category label. */
 export type TaskTag = 'Work' | 'Personal' | 'Other';
+
+/** Who created the task. */
+export type TaskSource = 'manual' | 'agent' | 'api';
+
+/** Which model capability class to use when executing the task. */
+export type TaskCapabilityTier = 'fast' | 'default' | 'reasoning' | 'auto';
+
+/** Lifecycle of a clarification round-trip between agent and operator. */
+export type TaskClarificationState =
+  | 'none'
+  | 'pending_message'
+  | 'pending_board'
+  | 'resolved';
 
 /** Task record as stored in SQLite. */
 export interface Task {
@@ -67,6 +81,23 @@ export interface Task {
   linked_output: string | undefined;
   created_at: string;
   updated_at: string;
+
+  // Agent task board fields
+  source: TaskSource;
+  capability_tier: TaskCapabilityTier;
+  clarification_questions: string[] | undefined;
+  clarification_responses: string[] | undefined;
+  clarification_state: TaskClarificationState;
+  execution_session_id: string | undefined;
+  output_summary: string | undefined;
+  output_artifact_url: string | undefined;
+}
+
+/** Operator-configured tier → model ID mapping. */
+export interface ModelTiers {
+  fast: string | undefined;
+  default: string | undefined;
+  reasoning: string | undefined;
 }
 
 /** Audit log record as stored in SQLite. */

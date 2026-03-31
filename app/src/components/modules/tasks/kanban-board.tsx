@@ -19,6 +19,7 @@ const COLUMN_LABELS: Record<TaskStatus, string> = {
   inbox: 'Inbox',
   assigned: 'Assigned',
   in_progress: 'In Progress',
+  needs_clarification: 'NEEDS INPUT',
   review: 'Review',
   done: 'Done',
   archived: 'Archived',
@@ -32,7 +33,7 @@ const VISIBLE_COLUMNS: TaskStatus[] = ['inbox', 'assigned', 'in_progress', 'revi
  */
 export function KanbanBoard(): React.JSX.Element {
   const [tasks, setTasks] = useState<TasksByColumn>({
-    inbox: [], assigned: [], in_progress: [], review: [], done: [], archived: [],
+    inbox: [], assigned: [], in_progress: [], needs_clarification: [], review: [], done: [], archived: [],
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');

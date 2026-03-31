@@ -110,6 +110,7 @@ function runMigrations(database: Database.Database): void {
 
   applyMigrationV1(database);
   applyMigrationV2(database);
+  applyMigrationV3(database);
 }
 
 function applyMigrationV1(database: Database.Database): void {
@@ -194,6 +195,59 @@ function applyMigrationV2(database: Database.Database): void {
   } catch (err) {
     console.error('[db] migration v2 ingestion failed (non-fatal):', err);
   }
+}
+
+function applyMigrationV3(database: Database.Database): void {
+  const current = (
+    database.prepare('SELECT MAX(version) AS v FROM schema_version').get() as { v: number | null }
+  ).v ?? 0;
+
+  if (current >= 3) return;
+
+  // Extend tasks table with agent task board columns.
+  const newColumns = [
+    "ALTER TABLE tasks ADD COLUMN source              TEXT NOT NULL DEFAULT 'manual'",
+    "ALTER TABLE tasks ADD COLUMN capability_tier     TEXT NOT NULL DEFAULT 'default'",
+    'ALTER TABLE tasks ADD COLUMN clarification_questions  TEXT',
+    'ALTER TABLE tasks ADD COLUMN clarification_responses  TEXT',
+    "ALTER TABLE tasks ADD COLUMN clarification_state      TEXT NOT NULL DEFAULT 'none'",
+    'ALTER TABLE tasks ADD COLUMN execution_session_id     TEXT',
+    'ALTER TABLE tasks ADD COLUMN output_summary           TEXT',
+    'ALTER TABLE tasks ADD COLUMN output_artifact_url      TEXT',
+  ];
+  for (const sql of newColumns) {
+    try { database.exec(sql); } catch { /* column already exists */ }
+  }
+
+  database.exec(`
+    CREATE TABLE IF NOT EXISTS model_tiers (
+      tier       TEXT PRIMARY KEY,
+      model_id   TEXT NOT NULL,
+      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS settings (
+      key        TEXT PRIMARY KEY,
+      value      TEXT NOT NULL,
+      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+  `);
+
+  // Seed model_tiers from env vars if present.
+  const tierEnvMap: Array<[string, string]> = [
+    ['fast',      process.env['AGENT_MODEL_FAST']      ?? ''],
+    ['default',   process.env['AGENT_MODEL_DEFAULT']   ?? ''],
+    ['reasoning', process.env['AGENT_MODEL_REASONING'] ?? ''],
+  ];
+  const upsertTier = database.prepare(
+    `INSERT INTO model_tiers (tier, model_id) VALUES (?, ?)
+     ON CONFLICT(tier) DO UPDATE SET model_id = excluded.model_id, updated_at = datetime('now')`,
+  );
+  for (const [tier, modelId] of tierEnvMap) {
+    if (modelId) upsertTier.run(tier, modelId);
+  }
+
+  database.prepare('INSERT INTO schema_version (version) VALUES (3)').run();
 }
 
 /**

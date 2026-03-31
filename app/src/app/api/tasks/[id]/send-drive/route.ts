@@ -5,7 +5,15 @@ import { getSession, validateTotpFromRequest } from '@/lib/auth';
 import { getDb, writeAuditLog } from '@/lib/db';
 import { writeGoogleDoc } from '@/lib/drive';
 import { errorResponse, successResponse } from '@/lib/api-response';
-import type { Task, TaskPriority, TaskStatus, TaskTag } from '@/types';
+import type {
+  Task,
+  TaskCapabilityTier,
+  TaskClarificationState,
+  TaskPriority,
+  TaskSource,
+  TaskStatus,
+  TaskTag,
+} from '@/types';
 
 interface RouteContext {
   params: Promise<{ id: string }>;
@@ -23,6 +31,14 @@ interface TaskRow {
   linked_output: string | null;
   created_at: string;
   updated_at: string;
+  source: string;
+  capability_tier: string;
+  clarification_questions: string | null;
+  clarification_responses: string | null;
+  clarification_state: string;
+  execution_session_id: string | null;
+  output_summary: string | null;
+  output_artifact_url: string | null;
 }
 
 function buildDocContent(task: Task): string {
@@ -87,6 +103,18 @@ export async function POST(request: Request, { params }: RouteContext): Promise<
     linked_output: row.linked_output ?? undefined,
     created_at: row.created_at,
     updated_at: row.updated_at,
+    source: (row.source as TaskSource) ?? 'manual',
+    capability_tier: (row.capability_tier as TaskCapabilityTier) ?? 'default',
+    clarification_questions: row.clarification_questions
+      ? (JSON.parse(row.clarification_questions) as string[])
+      : undefined,
+    clarification_responses: row.clarification_responses
+      ? (JSON.parse(row.clarification_responses) as string[])
+      : undefined,
+    clarification_state: (row.clarification_state as TaskClarificationState) ?? 'none',
+    execution_session_id: row.execution_session_id ?? undefined,
+    output_summary: row.output_summary ?? undefined,
+    output_artifact_url: row.output_artifact_url ?? undefined,
   };
 
   const title = `[Task] ${task.title}`;
