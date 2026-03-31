@@ -13,11 +13,31 @@ import React, {
 import { useRouter, useSearchParams } from 'next/navigation';
 import { ErrorBoundary } from '@/components/ui/error-boundary';
 import { basePath } from '@/lib/client-url';
-import { marked } from 'marked';
+import { Marked } from 'marked';
 
-// Disable raw HTML pass-through in the marked renderer to prevent XSS from
-// workspace .md files that may contain inline HTML (e.g. <img onerror=...>).
-marked.use({ renderer: { html(): string { return ''; } } });
+/**
+ * Renders workspace Markdown to safe HTML using a scoped Marked instance so
+ * the global `marked` singleton is never mutated (which would affect any other
+ * caller that imports `marked` on the same page load).
+ *
+ * Safety:
+ *  - Raw HTML blocks are stripped (html renderer returns '') to block
+ *    <script>/<img onerror=...> style injections.
+ *  - href/src attributes are post-processed to remove javascript:, data:, and
+ *    vbscript: protocols, covering link/image-based XSS vectors.
+ */
+function renderWorkspaceMarkdown(content: string): string {
+  const md = new Marked({
+    renderer: {
+      html(): string { return ''; },
+    },
+  });
+  const html = md.parse(content, { async: false }) as string;
+  // Strip unsafe URL schemes from href and src attributes.
+  return html.replace(/\b(href|src)\s*=\s*"[^"]*"/gi, (attr) =>
+    /\b(?:href|src)\s*=\s*"(?:javascript|data|vbscript):/i.test(attr) ? '' : attr,
+  );
+}
 import type {
   AgentConfig,
   AgentBinding,
@@ -1096,7 +1116,7 @@ function WorkspaceBrowsePanel({ agent }: { agent: AgentConfig }): React.JSX.Elem
           {viewFile.relPath.endsWith('.md') && previewMode ? (
             <div
               className="markdown-preview"
-              dangerouslySetInnerHTML={{ __html: marked.parse(viewFile.content, { async: false }) as string }}
+              dangerouslySetInnerHTML={{ __html: renderWorkspaceMarkdown(viewFile.content) }}
             />
           ) : (
             <pre
