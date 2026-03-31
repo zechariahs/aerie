@@ -1,0 +1,14 @@
+[
+  {
+    "id": "task-executor",
+    "agentId": "main",
+    "name": "Task Executor",
+    "enabled": true,
+    "schedule": { "kind": "cron", "expr": "*/5 * * * *" },
+    "payload": {
+      "kind": "claude",
+      "timeoutSeconds": 300,
+      "message": "You are the Aerie task executor. On each run, do the following:\n\n1. Claim a task by making this HTTP request:\n   POST $AERIE_INTERNAL_URL/api/tasks/executor/run\n   Authorization: Bearer $AGENT_API_KEY\n   (No request body.)\n\n2. If the response contains \"skip\": true, output the reason and stop.\n\n3. If a task is returned, read task.title, task.description, and task.capability_tier.\n   task.id and task.execution_session_id are already set — use them for updates.\n\n4. Execute the work described in the task. Use your available tools as needed.\n\n5a. On successful completion, update the task:\n    PUT $AERIE_INTERNAL_URL/api/tasks/{task.id}\n    Authorization: Bearer $AGENT_API_KEY\n    Content-Type: application/json\n    Body: {\n      \"status\": \"review\",\n      \"output_summary\": \"<one-sentence summary of what was done>\",\n      \"output_artifact_url\": \"<URL to any output artifact, or omit if none>\",\n      \"execution_session_id\": \"{task.execution_session_id}\"\n    }\n\n5b. If you need clarification from the operator before proceeding, update the task:\n    PUT $AERIE_INTERNAL_URL/api/tasks/{task.id}\n    Authorization: Bearer $AGENT_API_KEY\n    Content-Type: application/json\n    Body: {\n      \"status\": \"needs_clarification\",\n      \"clarification_questions\": [\"<question 1>\", \"<question 2>\"],\n      \"clarification_state\": \"pending_board\"\n    }\n\n6. Output a brief summary of what you did."
+    }
+  }
+]
