@@ -8,7 +8,9 @@ app/.env.production
 app/.env.local
 
 # Operational state — local only, not for public repo
-SESSION-STATE-MC.md
+SESSION-STATE*.md
+DEPLOY.md
+.claude/
 DEPENDENCY-DECISION-*.md
 
 # Planning documents — not for public repo
