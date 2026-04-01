@@ -6,8 +6,8 @@
 import { useEffect, useRef, useState } from 'react';
 import type { DockerContainer, DockerList } from '@/types/index';
 
-// Highlighted in brand color — matches CLAUDE.md known container name
-const OPENCLAW_CONTAINER = 'openclaw-v5t3-openclaw-1';
+// Highlighted in brand color — set via NEXT_PUBLIC_OPENCLAW_CONTAINER env var
+const OPENCLAW_CONTAINER = process.env['NEXT_PUBLIC_OPENCLAW_CONTAINER'] ?? '';
 
 function formatUptime(seconds: number): string {
   if (seconds <= 0) return '—';

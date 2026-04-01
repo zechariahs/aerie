@@ -272,7 +272,7 @@ function connect(): void {
 
   const url = gatewayUrl();
   const token = gatewayToken();
-  const origin = process.env['AERIE_ORIGIN'] ?? 'https://srv1398517.hstgr.cloud';
+  const origin = process.env['AERIE_ORIGIN'] ?? 'http://localhost:3100';
 
   try {
     g.ws = new WebSocket(url, { headers: { Origin: origin } });

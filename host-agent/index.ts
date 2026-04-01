@@ -17,7 +17,7 @@ const PORT = parseInt(process.env['HOST_AGENT_PORT'] ?? '3101', 10);
 // restricts to loopback and Docker bridge ranges (172.16.0.0/12) only.
 const BIND_ADDRESS = process.env['HOST_AGENT_BIND'] ?? '0.0.0.0';
 const HOST_AGENT_TOKEN = process.env['HOST_AGENT_TOKEN'];
-const OPENCLAW_DATA_DIR = process.env['OPENCLAW_DATA_DIR'] ?? '/docker/openclaw-v5t3/data/.openclaw';
+const OPENCLAW_DATA_DIR = process.env['OPENCLAW_DATA_DIR'] ?? '/docker/openclaw/data/.openclaw';
 
 // Allowlist of container names the agent may restart.
 // Read from ALLOWED_RESTART_CONTAINERS env var (comma-separated).

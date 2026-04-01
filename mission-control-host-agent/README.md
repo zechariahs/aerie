@@ -95,7 +95,7 @@ All endpoints bind to `127.0.0.1` only. Non-loopback connections are rejected wi
 ```json
 {
   "containers": [
-    { "name": "openclaw-v5t3-openclaw-1", "status": "running", "cpu_pct": 2.1, "mem_mb": 412, "uptime_seconds": 430000 }
+    { "name": "openclaw-1", "status": "running", "cpu_pct": 2.1, "mem_mb": 412, "uptime_seconds": 430000 }
   ]
 }
 ```
@@ -110,7 +110,7 @@ All endpoints bind to `127.0.0.1` only. Non-loopback connections are rejected wi
 
 Request body:
 ```json
-{ "container": "openclaw-v5t3-openclaw-1" }
+{ "container": "openclaw-1" }
 ```
 
 Requires `Authorization: Bearer <HOST_AGENT_TOKEN>` header.

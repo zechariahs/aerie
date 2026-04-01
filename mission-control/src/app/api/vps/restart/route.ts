@@ -21,7 +21,7 @@ export async function POST(request: NextRequest): Promise<Response> {
 
   if (USE_FIXTURES) {
     // In fixture mode, simulate a successful restart without calling the host agent
-    return successResponse({ ok: true, container: 'openclaw-v5t3-openclaw-1' });
+    return successResponse({ ok: true, container: 'openclaw-1' });
   }
 
   let body: unknown;

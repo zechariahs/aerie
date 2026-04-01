@@ -16,7 +16,7 @@
   "docker": {
     "containers": [
       {
-        "name": "openclaw-v5t3-openclaw-1",
+        "name": "openclaw-1",
         "status": "running",
         "cpuPct": 2.1,
         "memMb": 412,

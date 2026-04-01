@@ -16,7 +16,9 @@ const HOST_AGENT_TOKEN = process.env['HOST_AGENT_TOKEN'];
 
 // Whitelist of exact commands allowed for docker restart.
 // User input must exactly match the container name — no interpolation.
-const ALLOWED_CONTAINERS = new Set(['openclaw-v5t3-openclaw-1', 'mc-wintermute']);
+const ALLOWED_CONTAINERS = new Set(
+  process.env['ALLOWED_RESTART_CONTAINERS']?.split(',').map((s) => s.trim()).filter(Boolean) ?? [],
+);
 
 interface CpuSample {
   idle: number;
