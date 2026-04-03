@@ -147,7 +147,7 @@ export default function CronJobPanel({ job, onShowHistory, onJobUpdated }: CronJ
         method: 'POST',
         headers: { 'X-TOTP-Token': totpToken },
       });
-      if (res.status === 403 && onTotpExpired) { onTotpExpired(); return; }
+      if (res.status === 403 && onTotpExpired) { setTriggerState('idle'); setTriggerError(''); onTotpExpired(); return; }
       if (!res.ok) {
         const err = (await res.json()) as ApiError;
         setTriggerState('error');

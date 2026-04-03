@@ -18,7 +18,10 @@ export function isTotpFresh(): boolean {
   if (typeof document === 'undefined') return false;
   const match = document.cookie.match(/(?:^|;\s*)mc_totp_ts=(\d+)/);
   if (!match) return false;
-  return Date.now() - Number(match[1]) < TOTP_GRACE_MS;
+  const ts = Number(match[1]);
+  if (!Number.isFinite(ts)) return false;
+  const age = Date.now() - ts;
+  return age >= 0 && age < TOTP_GRACE_MS;
 }
 
 /**
