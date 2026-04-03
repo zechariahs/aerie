@@ -146,7 +146,7 @@ export default function SettingsPage(): React.JSX.Element {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json', 'X-TOTP-Token': token },
         body: JSON.stringify({
-          SESSION_DURATION_HOURS: sessionTimeoutHours || null,
+          SESSION_DURATION_HOURS: sessionTimeoutHours,
         }),
       });
       if (res.ok) {
@@ -167,7 +167,7 @@ export default function SettingsPage(): React.JSX.Element {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json', 'X-TOTP-Token': token },
         body: JSON.stringify({
-          DAILY_COST_ALERT_USD: dailyCostAlertUsd || null,
+          DAILY_COST_ALERT_USD: dailyCostAlertUsd,
         }),
       });
       if (res.ok) {
@@ -344,6 +344,9 @@ export default function SettingsPage(): React.JSX.Element {
       {/* Security */}
       <div className="space-y-3">
         <span className="ae-section-label">── Security ─────────────</span>
+        <p className="text-[11px]" style={{ color: 'var(--ae-text2)' }}>
+          Session timeout applies to new logins only — existing sessions are unaffected. Leave blank to use the default (8 hours).
+        </p>
 
         <div>
           <label className="block text-[10px] uppercase tracking-[0.14em] mb-1" style={{ color: 'var(--ae-text3)' }}>Session Timeout (hours)</label>

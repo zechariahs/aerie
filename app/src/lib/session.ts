@@ -12,6 +12,8 @@ import type { SessionPayload } from '@/types';
 const SESSION_COOKIE = 'mc_session';
 const TOTP_COOKIE = 'mc_totp_ts';
 const SESSION_DURATION_SECONDS = 8 * 60 * 60; // 8 hours
+/** Must match TOTP_GRACE_MS in auth.ts (same duration, in seconds for cookie maxAge). */
+const TOTP_GRACE_SECONDS = 30 * 60; // 30 minutes
 
 function getSecret(): Uint8Array {
   const secret = process.env['AUTH_SECRET'];
@@ -24,13 +26,18 @@ function getSecret(): Uint8Array {
  * Call this only after both password and TOTP are verified.
  * Returns the session's iat (issued-at) timestamp so the caller can
  * immediately record TOTP verification for the new session.
+ *
+ * @param durationSeconds - Override the default 8-hour TTL. Sourced from
+ *   the SESSION_DURATION_HOURS DB setting in the login route, which cannot
+ *   read it here because this file must remain Edge-safe (no better-sqlite3).
  */
-export async function createSession(): Promise<number> {
+export async function createSession(durationSeconds?: number): Promise<number> {
+  const ttl = durationSeconds ?? SESSION_DURATION_SECONDS;
   const iat = Math.floor(Date.now() / 1000);
   const token = await new SignJWT({ sub: 'admin' } satisfies Omit<SessionPayload, 'iat' | 'exp'>)
     .setProtectedHeader({ alg: 'HS256' })
     .setIssuedAt(iat)
-    .setExpirationTime(iat + SESSION_DURATION_SECONDS)
+    .setExpirationTime(iat + ttl)
     .sign(getSecret());
 
   const cookieStore = await cookies();
@@ -39,7 +46,7 @@ export async function createSession(): Promise<number> {
     sameSite: 'strict',
     secure: process.env.NODE_ENV === 'production',
     path: '/',
-    maxAge: SESSION_DURATION_SECONDS,
+    maxAge: ttl,
   });
 
   return iat;
@@ -57,7 +64,7 @@ export async function setTotpFreshCookie(): Promise<void> {
     sameSite: 'strict',
     secure: process.env.NODE_ENV === 'production',
     path: '/',
-    maxAge: 30 * 60, // 30 minutes
+    maxAge: TOTP_GRACE_SECONDS,
   });
 }
 

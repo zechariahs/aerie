@@ -110,6 +110,10 @@ export function readOpenClawConfig(): OpenClawConfig {
   return { agents, crons, providerModels, topLevelIdentity };
 }
 
+/**
+ * Extracts the root-level `identity` block used by single-agent
+ * "Recommended starter" configs. Returns undefined if absent or malformed.
+ */
 function parseTopLevelIdentity(obj: Record<string, unknown>): OpenClawIdentity | undefined {
   const id = obj['identity'];
   if (typeof id !== 'object' || id === null) return undefined;

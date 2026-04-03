@@ -10,9 +10,13 @@
  * the server will accept them based on the in-memory session grace record.
  * The client should pass an empty string as the token in that case.
  */
+
+/** Must match TOTP_GRACE_MS in auth.ts. */
+const TOTP_GRACE_MS = 30 * 60 * 1000; // 30 minutes
+
 export function isTotpFresh(): boolean {
   if (typeof document === 'undefined') return false;
   const match = document.cookie.match(/(?:^|;\s*)mc_totp_ts=(\d+)/);
   if (!match) return false;
-  return Date.now() - Number(match[1]) < 30 * 60 * 1000;
+  return Date.now() - Number(match[1]) < TOTP_GRACE_MS;
 }
