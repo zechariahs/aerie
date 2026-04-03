@@ -271,21 +271,21 @@ export async function PUT(request: Request, { params }: RouteContext): Promise<R
 /**
  * DELETE /api/tasks/[id]
  * Permanently deletes a task and its related records.
- * Requires session + valid X-TOTP-Token header.
+ * Requires session + valid X-TOTP-Token header (or active grace period).
  */
 export async function DELETE(request: Request, { params }: RouteContext): Promise<Response> {
-  const session = await getSession();
-  if (!session) return errorResponse('Unauthorized', 401);
-
-  if (!validateTotpFromRequest(request)) {
-    writeAuditLog({
-      action: 'task.delete',
-      resource: 'task',
-      result: 'failure',
-      ip: request.headers.get('x-forwarded-for') ?? 'unknown',
-      userAgent: request.headers.get('user-agent') ?? 'unknown',
-    });
-    return errorResponse('TOTP required', 403);
+  const auth = await requireTotpAuth(request);
+  if (!auth.ok) {
+    if (auth.status === 403) {
+      writeAuditLog({
+        action: 'task.delete',
+        resource: 'task',
+        result: 'failure',
+        ip: request.headers.get('x-forwarded-for') ?? 'unknown',
+        userAgent: request.headers.get('user-agent') ?? 'unknown',
+      });
+    }
+    return errorResponse(auth.status === 401 ? 'Unauthorized' : 'TOTP required', auth.status);
   }
 
   const { id } = await params;

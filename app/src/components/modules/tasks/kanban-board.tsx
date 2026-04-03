@@ -12,7 +12,7 @@ import { TotpDialog } from './totp-dialog';
 import { TaskSpecsInbox } from './task-specs-inbox';
 import type { Task, TaskStatus } from '@/types';
 import { basePath } from '@/lib/client-url';
-import { isTotpFresh } from '@/lib/totp-fresh';
+import { isTotpFresh, clearTotpFreshCookieClient } from '@/lib/totp-fresh';
 
 type TasksByColumn = Record<TaskStatus, Task[]>;
 
@@ -46,7 +46,7 @@ export function KanbanBoard(): React.JSX.Element {
   // TOTP dialog state
   const [totpOpen, setTotpOpen] = useState(false);
   const [totpToken, setTotpToken] = useState('');
-  const pendingActionRef = useRef<(() => void) | undefined>(undefined);
+  const pendingActionRef = useRef<((token: string) => void) | undefined>(undefined);
 
   const fetchTasks = useCallback(async () => {
     setLoading(true);
@@ -70,13 +70,17 @@ export function KanbanBoard(): React.JSX.Element {
     void fetchTasks();
   }, [fetchTasks]);
 
-  /** Opens the TOTP dialog — or runs the action immediately if TOTP is still fresh. */
-  function requestTotp(action: () => void): void {
+  /**
+   * Opens the TOTP dialog — or runs the action immediately if TOTP is still fresh.
+   * Always stores the action so a 403 fallback can re-open the dialog.
+   * The action receives the token string ('' when fresh, dialog value otherwise).
+   */
+  function requestTotp(action: (token: string) => void): void {
+    pendingActionRef.current = action;
     if (isTotpFresh()) {
-      action();
+      action('');
       return;
     }
-    pendingActionRef.current = action;
     setTotpOpen(true);
   }
 
@@ -84,7 +88,7 @@ export function KanbanBoard(): React.JSX.Element {
     setTotpToken(token);
     setTotpOpen(false);
     if (pendingActionRef.current) {
-      pendingActionRef.current();
+      pendingActionRef.current(token);
       pendingActionRef.current = undefined;
     }
   }
@@ -100,6 +104,14 @@ export function KanbanBoard(): React.JSX.Element {
       headers: { 'Content-Type': 'application/json', 'X-TOTP-Token': token },
       body: JSON.stringify({ status: newStatus }),
     });
+
+    if (res.status === 403) {
+      // Server grace period may have reset (process restart). Clear stale cookie
+      // and re-open TOTP dialog — pendingActionRef is still set from requestTotp.
+      clearTotpFreshCookieClient();
+      setTotpOpen(true);
+      return;
+    }
 
     if (!res.ok) {
       // Revert optimistic update
@@ -140,7 +152,7 @@ export function KanbanBoard(): React.JSX.Element {
 
     // Require TOTP if column actually changed
     if (srcCol !== dstCol) {
-      requestTotp(() => { void doMove(draggableId, dstCol, totpToken); });
+      requestTotp((token) => { void doMove(draggableId, dstCol, token); });
     }
   }
 

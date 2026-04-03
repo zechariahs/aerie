@@ -6,7 +6,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { TotpDialog } from '@/components/modules/tasks/totp-dialog';
 import { basePath } from '@/lib/client-url';
-import { isTotpFresh } from '@/lib/totp-fresh';
+import { isTotpFresh, clearTotpFreshCookieClient } from '@/lib/totp-fresh';
 
 const inputStyle: React.CSSProperties = {
   background: 'var(--ae-raised)',
@@ -96,11 +96,12 @@ export default function SettingsPage(): React.JSX.Element {
   }, [fetchAll]);
 
   function requestTotp(action: (token: string) => void): void {
+    // Always store the action so a 403 fallback can re-open the dialog.
+    pendingActionRef.current = action;
     if (isTotpFresh()) {
       action('');
       return;
     }
-    pendingActionRef.current = action;
     setTotpOpen(true);
   }
 
@@ -130,6 +131,9 @@ export default function SettingsPage(): React.JSX.Element {
       });
       if (res.ok) {
         showToast('Active hours saved');
+      } else if (res.status === 403) {
+        clearTotpFreshCookieClient();
+        setTotpOpen(true); // pendingActionRef still set; re-opens dialog for token entry
       } else {
         let msg = 'Failed to save active hours';
         try { const err = (await res.json()) as { error?: string }; if (err.error) msg = `Error: ${err.error}`; } catch { /* ignore */ }
@@ -151,6 +155,9 @@ export default function SettingsPage(): React.JSX.Element {
       });
       if (res.ok) {
         showToast('Security settings saved');
+      } else if (res.status === 403) {
+        clearTotpFreshCookieClient();
+        setTotpOpen(true);
       } else {
         let msg = 'Failed to save security settings';
         try { const err = (await res.json()) as { error?: string }; if (err.error) msg = `Error: ${err.error}`; } catch { /* ignore */ }
@@ -172,6 +179,9 @@ export default function SettingsPage(): React.JSX.Element {
       });
       if (res.ok) {
         showToast('Cost alerts saved');
+      } else if (res.status === 403) {
+        clearTotpFreshCookieClient();
+        setTotpOpen(true);
       } else {
         let msg = 'Failed to save cost alerts';
         try { const err = (await res.json()) as { error?: string }; if (err.error) msg = `Error: ${err.error}`; } catch { /* ignore */ }
@@ -195,6 +205,9 @@ export default function SettingsPage(): React.JSX.Element {
       });
       if (res.ok) {
         showToast('Model tiers saved');
+      } else if (res.status === 403) {
+        clearTotpFreshCookieClient();
+        setTotpOpen(true);
       } else {
         let msg = 'Failed to save model tiers';
         try { const err = (await res.json()) as { error?: string }; if (err.error) msg = `Error: ${err.error}`; } catch { /* ignore */ }

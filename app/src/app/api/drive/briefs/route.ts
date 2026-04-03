@@ -1,7 +1,7 @@
 // Copyright (c) 2026 Zack Schwenk
 // SPDX-License-Identifier: MIT
 
-import { requireTotpAuth } from '@/lib/auth';
+import { getSession, requireTotpAuth } from '@/lib/auth';
 import { getDb, writeAuditLog } from '@/lib/db';
 import { errorResponse, successResponse } from '@/lib/api-response';
 import { assembleBrief } from '@/lib/brief';

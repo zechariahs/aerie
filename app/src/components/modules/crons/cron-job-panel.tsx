@@ -10,7 +10,7 @@ import { CronExpressionParser } from 'cron-parser';
 import type { CronJob } from '@/types';
 import TotpDialog from './totp-dialog';
 import { basePath } from '@/lib/client-url';
-import { isTotpFresh } from '@/lib/totp-fresh';
+import { isTotpFresh, clearTotpFreshCookieClient } from '@/lib/totp-fresh';
 
 const TZ = 'America/Chicago';
 
@@ -138,7 +138,7 @@ export default function CronJobPanel({ job, onShowHistory, onJobUpdated }: CronJ
     setTimeout(() => setToast(''), 3000);
   }
 
-  async function handleTrigger(totpToken: string): Promise<void> {
+  async function handleTrigger(totpToken: string, onTotpExpired?: () => void): Promise<void> {
     setPendingAction(undefined);
     setTriggerState('loading');
     setTriggerError('');
@@ -147,6 +147,7 @@ export default function CronJobPanel({ job, onShowHistory, onJobUpdated }: CronJ
         method: 'POST',
         headers: { 'X-TOTP-Token': totpToken },
       });
+      if (res.status === 403 && onTotpExpired) { onTotpExpired(); return; }
       if (!res.ok) {
         const err = (await res.json()) as ApiError;
         setTriggerState('error');
@@ -162,7 +163,7 @@ export default function CronJobPanel({ job, onShowHistory, onJobUpdated }: CronJ
     }
   }
 
-  async function handleSetEnabled(totpToken: string, enabled: boolean): Promise<void> {
+  async function handleSetEnabled(totpToken: string, enabled: boolean, onTotpExpired?: () => void): Promise<void> {
     setPendingAction(undefined);
     try {
       const res = await fetch(`${basePath}/api/crons/${job.id}`, {
@@ -173,6 +174,7 @@ export default function CronJobPanel({ job, onShowHistory, onJobUpdated }: CronJ
         },
         body: JSON.stringify({ enabled }),
       });
+      if (res.status === 403 && onTotpExpired) { onTotpExpired(); return; }
       if (!res.ok) {
         const err = (await res.json()) as ApiError;
         showToast(`Error: ${err.error ?? 'Update failed'}`);
@@ -185,7 +187,7 @@ export default function CronJobPanel({ job, onShowHistory, onJobUpdated }: CronJ
     }
   }
 
-  async function handleSaveSchedule(totpToken: string): Promise<void> {
+  async function handleSaveSchedule(totpToken: string, onTotpExpired?: () => void): Promise<void> {
     setPendingAction(undefined);
     const trimmed = scheduleInput.trim();
     if (!/^\S+(\s+\S+){4}$/.test(trimmed)) {
@@ -201,6 +203,7 @@ export default function CronJobPanel({ job, onShowHistory, onJobUpdated }: CronJ
         },
         body: JSON.stringify({ schedule: trimmed, scheduleTz }),
       });
+      if (res.status === 403 && onTotpExpired) { onTotpExpired(); return; }
       if (!res.ok) {
         const err = (await res.json()) as ApiError;
         showToast(`Error: ${err.error ?? 'Update failed'}`);
@@ -215,7 +218,7 @@ export default function CronJobPanel({ job, onShowHistory, onJobUpdated }: CronJ
     }
   }
 
-  async function handleSavePrompt(totpToken: string): Promise<void> {
+  async function handleSavePrompt(totpToken: string, onTotpExpired?: () => void): Promise<void> {
     setPendingAction(undefined);
     const trimmed = promptInput.trim();
     try {
@@ -227,6 +230,7 @@ export default function CronJobPanel({ job, onShowHistory, onJobUpdated }: CronJ
         },
         body: JSON.stringify({ prompt: trimmed }),
       });
+      if (res.status === 403 && onTotpExpired) { onTotpExpired(); return; }
       if (!res.ok) {
         const err = (await res.json()) as ApiError;
         showToast(`Error: ${err.error ?? 'Update failed'}`);
@@ -248,14 +252,19 @@ export default function CronJobPanel({ job, onShowHistory, onJobUpdated }: CronJ
     else if (pendingAction === 'prompt') void handleSavePrompt(totpToken);
   }
 
-  /** Opens the TOTP dialog for a cron action — or runs it immediately if TOTP is still fresh. */
+  /**
+   * Opens the TOTP dialog for a cron action — or runs it immediately if TOTP is
+   * still fresh. Passes an onTotpExpired callback that clears the stale cookie
+   * and re-opens the dialog if the server returns 403 (e.g. after a restart).
+   */
   function requestAction(action: DialogAction): void {
     if (isTotpFresh()) {
-      if (action === 'trigger') void handleTrigger('');
-      else if (action === 'enable') void handleSetEnabled('', true);
-      else if (action === 'disable') void handleSetEnabled('', false);
-      else if (action === 'schedule') void handleSaveSchedule('');
-      else if (action === 'prompt') void handleSavePrompt('');
+      const onExpired = () => { clearTotpFreshCookieClient(); setPendingAction(action); };
+      if (action === 'trigger') void handleTrigger('', onExpired);
+      else if (action === 'enable') void handleSetEnabled('', true, onExpired);
+      else if (action === 'disable') void handleSetEnabled('', false, onExpired);
+      else if (action === 'schedule') void handleSaveSchedule('', onExpired);
+      else if (action === 'prompt') void handleSavePrompt('', onExpired);
       return;
     }
     setPendingAction(action);

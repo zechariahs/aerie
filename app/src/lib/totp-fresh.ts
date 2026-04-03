@@ -20,3 +20,13 @@ export function isTotpFresh(): boolean {
   if (!match) return false;
   return Date.now() - Number(match[1]) < TOTP_GRACE_MS;
 }
+
+/**
+ * Removes the mc_totp_ts cookie from the browser.
+ * Call when a server 403 reveals that the server-side grace period has expired
+ * (e.g., after a process restart) so the UI can re-prompt for TOTP.
+ */
+export function clearTotpFreshCookieClient(): void {
+  if (typeof document === 'undefined') return;
+  document.cookie = 'mc_totp_ts=; Max-Age=0; path=/; SameSite=Strict';
+}
