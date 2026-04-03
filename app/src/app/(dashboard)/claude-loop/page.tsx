@@ -177,8 +177,8 @@ function BriefGenerator(): React.JSX.Element {
         error?: string;
       };
       if (res.status === 403) {
-        clearTotpFreshCookieClient();
-        setErrorMsg('Session expired — enter your TOTP code and try again.');
+        if (fresh) { clearTotpFreshCookieClient(); setErrorMsg('Session expired — enter your TOTP code and try again.'); }
+        else { setErrorMsg('Invalid or expired TOTP code. Please try again.'); }
         setStatus('error');
         return;
       }
@@ -396,8 +396,12 @@ function SessionStateEditor(): React.JSX.Element {
         body: JSON.stringify({ content: contentToSave }),
       });
       if (res.status === 403) {
-        clearTotpFreshCookieClient();
-        setErrorMsg('Session expired — enter your TOTP code and save again.');
+        if (totpValue.trim() === '') {
+          clearTotpFreshCookieClient();
+          setErrorMsg('Session expired — enter your TOTP code and save again.');
+        } else {
+          setErrorMsg('Invalid or expired TOTP code. Please try again.');
+        }
         setSaveStatus('error');
         return;
       }
@@ -742,8 +746,12 @@ function TaskSpecsWriter(): React.JSX.Element {
       });
       const json = (await res.json()) as { data?: { url: string }; error?: string };
       if (res.status === 403) {
-        clearTotpFreshCookieClient();
-        setErrorMsg('Session expired — enter your TOTP code and try again.');
+        if (fresh) {
+          clearTotpFreshCookieClient();
+          setErrorMsg('Session expired — enter your TOTP code and try again.');
+        } else {
+          setErrorMsg('Invalid or expired TOTP code. Please try again.');
+        }
         setStatus('error');
         return;
       }

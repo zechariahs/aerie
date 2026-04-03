@@ -115,10 +115,14 @@ export function DockerPanel(): React.JSX.Element {
         body: JSON.stringify({ container: OPENCLAW_CONTAINER }),
       });
       if (res.status === 403) {
-        // Server grace period expired (e.g. process restart). Clear stale cookie
-        // so the next attempt uses the entered TOTP token rather than sending empty.
-        clearTotpFreshCookieClient();
-        setRestart((r) => ({ ...r, pending: false, error: 'Session expired — enter TOTP code' }));
+        if (fresh) {
+          // Empty token sent — server grace period reset. Clear cookie so the
+          // next attempt sends the entered TOTP token rather than sending empty.
+          clearTotpFreshCookieClient();
+          setRestart((r) => ({ ...r, pending: false, error: 'Session expired — enter TOTP code' }));
+        } else {
+          setRestart((r) => ({ ...r, pending: false, error: 'Invalid or expired TOTP code' }));
+        }
         return;
       }
       if (!res.ok) {

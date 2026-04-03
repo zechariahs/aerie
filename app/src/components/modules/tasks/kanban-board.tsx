@@ -110,10 +110,15 @@ export function KanbanBoard(): React.JSX.Element {
     });
 
     if (res.status === 403) {
-      // Server grace period may have reset (process restart). Clear stale cookie
-      // and re-open TOTP dialog — pendingActionRef is still set from requestTotp.
-      clearTotpFreshCookieClient();
-      setTotpOpen(true);
+      if (token.trim().length === 0) {
+        // Empty token: server grace period reset (e.g. process restart). Clear
+        // stale cookie and re-open dialog — pendingActionRef still set.
+        clearTotpFreshCookieClient();
+        setTotpOpen(true);
+      } else {
+        // Real TOTP was rejected — invalid/expired code. Revert optimistic update.
+        await fetchTasks();
+      }
       return;
     }
 

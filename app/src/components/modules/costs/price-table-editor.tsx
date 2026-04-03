@@ -93,9 +93,12 @@ export default function PriceTableEditor(): React.JSX.Element {
         body: JSON.stringify(rows),
       });
       if (r.status === 403) {
-        // Clear stale cookie so next attempt sends the entered token, not empty.
-        clearTotpFreshCookieClient();
-        setSaveError('Session expired — enter your TOTP code and save again.');
+        if (fresh) {
+          clearTotpFreshCookieClient();
+          setSaveError('Session expired — enter your TOTP code and save again.');
+        } else {
+          setSaveError('Invalid or expired TOTP code. Enter a new code and try again.');
+        }
         return;
       }
       if (!r.ok) {

@@ -132,8 +132,12 @@ export default function SettingsPage(): React.JSX.Element {
       if (res.ok) {
         showToast('Active hours saved');
       } else if (res.status === 403) {
-        clearTotpFreshCookieClient();
-        setTotpOpen(true); // pendingActionRef still set; re-opens dialog for token entry
+        if (token === '') {
+          clearTotpFreshCookieClient();
+          setTotpOpen(true); // pendingActionRef still set; re-opens dialog for token entry
+        } else {
+          showToast('Invalid or expired TOTP code');
+        }
       } else {
         let msg = 'Failed to save active hours';
         try { const err = (await res.json()) as { error?: string }; if (err.error) msg = `Error: ${err.error}`; } catch { /* ignore */ }
@@ -156,8 +160,8 @@ export default function SettingsPage(): React.JSX.Element {
       if (res.ok) {
         showToast('Security settings saved');
       } else if (res.status === 403) {
-        clearTotpFreshCookieClient();
-        setTotpOpen(true);
+        if (token === '') { clearTotpFreshCookieClient(); setTotpOpen(true); }
+        else { showToast('Invalid or expired TOTP code'); }
       } else {
         let msg = 'Failed to save security settings';
         try { const err = (await res.json()) as { error?: string }; if (err.error) msg = `Error: ${err.error}`; } catch { /* ignore */ }
@@ -180,8 +184,8 @@ export default function SettingsPage(): React.JSX.Element {
       if (res.ok) {
         showToast('Cost alerts saved');
       } else if (res.status === 403) {
-        clearTotpFreshCookieClient();
-        setTotpOpen(true);
+        if (token === '') { clearTotpFreshCookieClient(); setTotpOpen(true); }
+        else { showToast('Invalid or expired TOTP code'); }
       } else {
         let msg = 'Failed to save cost alerts';
         try { const err = (await res.json()) as { error?: string }; if (err.error) msg = `Error: ${err.error}`; } catch { /* ignore */ }
@@ -206,8 +210,8 @@ export default function SettingsPage(): React.JSX.Element {
       if (res.ok) {
         showToast('Model tiers saved');
       } else if (res.status === 403) {
-        clearTotpFreshCookieClient();
-        setTotpOpen(true);
+        if (token === '') { clearTotpFreshCookieClient(); setTotpOpen(true); }
+        else { showToast('Invalid or expired TOTP code'); }
       } else {
         let msg = 'Failed to save model tiers';
         try { const err = (await res.json()) as { error?: string }; if (err.error) msg = `Error: ${err.error}`; } catch { /* ignore */ }
