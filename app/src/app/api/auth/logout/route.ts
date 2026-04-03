@@ -1,7 +1,7 @@
 // Copyright (c) 2026 Zack Schwenk
 // SPDX-License-Identifier: MIT
 
-import { destroySession, getSession } from '@/lib/session';
+import { destroySession, getSession, clearTotpFreshCookie } from '@/lib/session';
 import { writeAuditLog } from '@/lib/db';
 import { type NextRequest } from 'next/server';
 
@@ -21,6 +21,7 @@ export async function POST(request: NextRequest): Promise<Response> {
   }
 
   await destroySession();
+  await clearTotpFreshCookie();
 
   return Response.json({ ok: true }, { status: 200 });
 }

@@ -7,9 +7,9 @@
 import { timingSafeEqual } from 'crypto';
 import { SignJWT, jwtVerify } from 'jose';
 import { authenticator } from 'otplib';
-import type { TempTokenPayload } from '@/types';
+import type { TempTokenPayload, SessionPayload } from '@/types';
 
-export { createSession, destroySession, getSession } from './session';
+export { createSession, destroySession, getSession, setTotpFreshCookie, clearTotpFreshCookie } from './session';
 
 const TEMP_TOKEN_DURATION_SECONDS = 5 * 60; // 5 minutes
 
@@ -128,4 +128,56 @@ export function validateTotpFromRequest(request: Request): boolean {
   authenticator.options = { window: 1 };
 
   return authenticator.verify({ token, secret });
+}
+
+// ── TOTP 30-minute grace period ───────────────────────────────────────────────
+
+const TOTP_GRACE_MS = 30 * 60 * 1000; // 30 minutes
+
+/**
+ * In-memory map: session iat (seconds) → Date.now() of last TOTP verification.
+ * Resets on process restart, which is acceptable — users simply re-verify.
+ */
+const totpTimestamps = new Map<number, number>();
+
+/** Record that a TOTP code was successfully verified for this session. */
+export function recordTotpVerified(sessionIat: number): void {
+  totpTimestamps.set(sessionIat, Date.now());
+}
+
+/** True if TOTP was verified for this session within the last 30 minutes. */
+export function isSessionTotpFresh(sessionIat: number): boolean {
+  const ts = totpTimestamps.get(sessionIat);
+  return ts !== undefined && Date.now() - ts < TOTP_GRACE_MS;
+}
+
+type TotpAuthResult =
+  | { ok: true; session: SessionPayload }
+  | { ok: false; status: 401 | 403 };
+
+/**
+ * Unified TOTP auth check for write routes.
+ *
+ * - If the session's TOTP was verified within the last 30 minutes, allows the
+ *   request without requiring an X-TOTP-Token header.
+ * - Otherwise, validates the header token. On success, records the verification
+ *   and sets the mc_totp_ts cookie so the client can suppress the dialog.
+ *
+ * Returns { ok: true, session } on success, or { ok: false, status: 401|403 }.
+ */
+export async function requireTotpAuth(request: Request): Promise<TotpAuthResult> {
+  const session = await getSession();
+  if (!session) return { ok: false, status: 401 };
+
+  if (isSessionTotpFresh(session.iat)) {
+    return { ok: true, session };
+  }
+
+  if (!validateTotpFromRequest(request)) {
+    return { ok: false, status: 403 };
+  }
+
+  recordTotpVerified(session.iat);
+  await setTotpFreshCookie();
+  return { ok: true, session };
 }

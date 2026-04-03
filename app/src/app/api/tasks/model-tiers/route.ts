@@ -1,7 +1,7 @@
 // Copyright (c) 2026 Zack Schwenk
 // SPDX-License-Identifier: MIT
 
-import { getSession, isAgentRequest, validateTotpFromRequest } from '@/lib/auth';
+import { getSession, isAgentRequest, requireTotpAuth } from '@/lib/auth';
 import { getDb, writeAuditLog } from '@/lib/db';
 import { errorResponse, successResponse } from '@/lib/api-response';
 import type { ModelTiers } from '@/types';
@@ -41,18 +41,12 @@ export async function GET(request: Request): Promise<Response> {
  * Requires session + valid X-TOTP-Token header (human-only — config change).
  */
 export async function PUT(request: Request): Promise<Response> {
-  const session = await getSession();
-  if (!session) return errorResponse('Unauthorized', 401);
-
-  if (!validateTotpFromRequest(request)) {
-    writeAuditLog({
-      action: 'model_tiers.update',
-      resource: 'model_tiers',
-      result: 'failure',
-      ip: request.headers.get('x-forwarded-for') ?? 'unknown',
-      userAgent: request.headers.get('user-agent') ?? 'unknown',
-    });
-    return errorResponse('TOTP required', 403);
+  const auth = await requireTotpAuth(request);
+  if (!auth.ok) {
+    if (auth.status === 403) {
+      writeAuditLog({ action: 'model_tiers.update', resource: 'model_tiers', result: 'failure', ip: request.headers.get('x-forwarded-for') ?? 'unknown', userAgent: request.headers.get('user-agent') ?? 'unknown' });
+    }
+    return errorResponse(auth.status === 401 ? 'Unauthorized' : 'TOTP required', auth.status);
   }
 
   let body: Partial<Record<'fast' | 'default' | 'reasoning', string | null>>;

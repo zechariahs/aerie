@@ -7,6 +7,7 @@
 import React, { useEffect, useState } from 'react';
 import type { ModelPrice } from '@/types';
 import { basePath } from '@/lib/client-url';
+import { isTotpFresh } from '@/lib/totp-fresh';
 
 function nowIso(): string {
   return new Date().toISOString();
@@ -74,7 +75,8 @@ export default function PriceTableEditor(): React.JSX.Element {
   }
 
   async function handleSave(): Promise<void> {
-    if (!totpToken) {
+    const fresh = isTotpFresh();
+    if (!fresh && !totpToken) {
       setSaveError('Enter your TOTP code to save.');
       return;
     }
@@ -86,7 +88,7 @@ export default function PriceTableEditor(): React.JSX.Element {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
-          'X-TOTP-Token': totpToken,
+          'X-TOTP-Token': fresh ? '' : totpToken,
         },
         body: JSON.stringify(rows),
       });

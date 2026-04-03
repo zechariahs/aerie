@@ -1,7 +1,7 @@
 // Copyright (c) 2026 Zack Schwenk
 // SPDX-License-Identifier: MIT
 
-import { getSession, validateTotpFromRequest } from '@/lib/auth';
+import { requireTotpAuth } from '@/lib/auth';
 import { writeAuditLog } from '@/lib/db';
 import { errorResponse, successResponse } from '@/lib/api-response';
 import { listFolder, writeGoogleDoc } from '@/lib/drive';
@@ -40,18 +40,12 @@ interface WriteTaskSpecBody {
  * Requires session + TOTP.
  */
 export async function POST(request: Request): Promise<Response> {
-  const session = await getSession();
-  if (!session) return errorResponse('Unauthorized', 401);
-
-  if (!validateTotpFromRequest(request)) {
-    writeAuditLog({
-      action: 'task-spec.write',
-      resource: 'drive/task-specs',
-      result: 'failure',
-      ip: request.headers.get('x-forwarded-for') ?? 'unknown',
-      userAgent: request.headers.get('user-agent') ?? 'unknown',
-    });
-    return errorResponse('TOTP required', 403);
+  const auth = await requireTotpAuth(request);
+  if (!auth.ok) {
+    if (auth.status === 403) {
+      writeAuditLog({ action: 'task-spec.write', resource: 'drive/task-specs', result: 'failure', ip: request.headers.get('x-forwarded-for') ?? 'unknown', userAgent: request.headers.get('user-agent') ?? 'unknown' });
+    }
+    return errorResponse(auth.status === 401 ? 'Unauthorized' : 'TOTP required', auth.status);
   }
 
   let body: WriteTaskSpecBody;

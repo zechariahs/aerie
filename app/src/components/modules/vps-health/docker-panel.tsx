@@ -6,6 +6,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { DockerContainer, DockerList } from '@/types/index';
 import { basePath } from '@/lib/client-url';
+import { isTotpFresh } from '@/lib/totp-fresh';
 
 // Highlighted in brand color — the configured openclaw container name
 const OPENCLAW_CONTAINER = process.env['NEXT_PUBLIC_OPENCLAW_CONTAINER'] ?? 'openclaw';
@@ -101,7 +102,8 @@ export function DockerPanel(): React.JSX.Element {
   }
 
   async function handleRestart(): Promise<void> {
-    if (!restart.totpInput.trim()) {
+    const fresh = isTotpFresh();
+    if (!fresh && !restart.totpInput.trim()) {
       setRestart((r) => ({ ...r, error: 'TOTP code required' }));
       return;
     }
@@ -109,7 +111,7 @@ export function DockerPanel(): React.JSX.Element {
     try {
       const res = await fetch(basePath + '/api/vps/restart', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-TOTP-Token': restart.totpInput.trim() },
+        headers: { 'Content-Type': 'application/json', 'X-TOTP-Token': fresh ? '' : restart.totpInput.trim() },
         body: JSON.stringify({ container: OPENCLAW_CONTAINER }),
       });
       if (!res.ok) {

@@ -61,11 +61,20 @@ export interface OpenClawAgent {
   model: string;
 }
 
+/** Top-level identity block from openclaw.json (single-agent "Recommended starter" format). */
+export interface OpenClawIdentity {
+  name?: string;
+  theme?: string;
+  emoji?: string;
+  avatar?: string;
+}
+
 /** Minimal parsed view of openclaw.json. */
 export interface OpenClawConfig {
   agents: OpenClawAgent[];
   crons: OpenClawCron[];
   providerModels: ProviderModel[];
+  topLevelIdentity?: OpenClawIdentity;
 }
 
 // ── Core parser ──────────────────────────────────────────────────────────────
@@ -96,8 +105,21 @@ export function readOpenClawConfig(): OpenClawConfig {
   const agents = parseAgents(obj);
   const crons = parseCrons(obj);
   const providerModels = parseProviderModels(obj);
+  const topLevelIdentity = parseTopLevelIdentity(obj);
 
-  return { agents, crons, providerModels };
+  return { agents, crons, providerModels, topLevelIdentity };
+}
+
+function parseTopLevelIdentity(obj: Record<string, unknown>): OpenClawIdentity | undefined {
+  const id = obj['identity'];
+  if (typeof id !== 'object' || id === null) return undefined;
+  const identity = id as Record<string, unknown>;
+  return {
+    name: typeof identity['name'] === 'string' ? identity['name'] : undefined,
+    theme: typeof identity['theme'] === 'string' ? identity['theme'] : undefined,
+    emoji: typeof identity['emoji'] === 'string' ? identity['emoji'] : undefined,
+    avatar: typeof identity['avatar'] === 'string' ? identity['avatar'] : undefined,
+  };
 }
 
 function parseAgents(obj: Record<string, unknown>): OpenClawAgent[] {

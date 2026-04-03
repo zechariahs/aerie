@@ -10,6 +10,8 @@ import {
   verifyTempToken,
   validateTotpFromRequest,
   createSession,
+  recordTotpVerified,
+  setTotpFreshCookie,
 } from '@/lib/auth';
 import { errorResponse } from '@/lib/api-response';
 import { writeAuditLog } from '@/lib/db';
@@ -86,7 +88,9 @@ export async function POST(request: NextRequest): Promise<Response> {
     }
 
     clearRateLimit(ip);
-    await createSession();
+    const sessionIat = await createSession();
+    recordTotpVerified(sessionIat);
+    await setTotpFreshCookie();
 
     writeAuditLog({ action: 'login.success', resource: '/api/auth/login', result: 'success', ip, userAgent: ua });
 

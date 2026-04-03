@@ -3,8 +3,7 @@
 
 import fs from 'fs';
 import path from 'path';
-import { getSession } from '@/lib/session';
-import { validateTotpFromRequest } from '@/lib/auth';
+import { requireTotpAuth } from '@/lib/auth';
 import { errorResponse, successResponse } from '@/lib/api-response';
 import { writeAuditLog } from '@/lib/db';
 
@@ -17,19 +16,12 @@ function getWorkspaceDir(): string {
 }
 
 export async function PUT(request: Request): Promise<Response> {
-  const session = await getSession();
-  if (!session) return errorResponse('Unauthorized', 401);
-
-  // Every write operation requires a valid TOTP token
-  if (!validateTotpFromRequest(request)) {
-    writeAuditLog({
-      action: 'write session-state',
-      resource: ALLOWED_FILENAME,
-      result: 'failure',
-      ip: request.headers.get('x-forwarded-for') ?? 'unknown',
-      userAgent: request.headers.get('user-agent') ?? 'unknown',
-    });
-    return errorResponse('TOTP required', 403, 'TOTP_REQUIRED');
+  const auth = await requireTotpAuth(request);
+  if (!auth.ok) {
+    if (auth.status === 403) {
+      writeAuditLog({ action: 'write session-state', resource: ALLOWED_FILENAME, result: 'failure', ip: request.headers.get('x-forwarded-for') ?? 'unknown', userAgent: request.headers.get('user-agent') ?? 'unknown' });
+    }
+    return errorResponse(auth.status === 401 ? 'Unauthorized' : 'TOTP required', auth.status, auth.status === 403 ? 'TOTP_REQUIRED' : undefined);
   }
 
   let body: unknown;

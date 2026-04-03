@@ -1,7 +1,7 @@
 // Copyright (c) 2026 Zack Schwenk
 // SPDX-License-Identifier: MIT
 
-import { getSession, validateTotpFromRequest } from '@/lib/auth';
+import { requireTotpAuth } from '@/lib/auth';
 import { errorResponse, successResponse } from '@/lib/api-response';
 import { writeAuditLog } from '@/lib/db';
 import type { NextRequest } from 'next/server';
@@ -11,13 +11,8 @@ const HOST_AGENT_TOKEN = process.env['HOST_AGENT_TOKEN'];
 const USE_FIXTURES = process.env['USE_FIXTURES'] === 'true';
 
 export async function POST(request: NextRequest): Promise<Response> {
-  const session = await getSession();
-  if (!session) return errorResponse('Unauthorized', 401);
-
-  // TOTP required for all write operations
-  if (!validateTotpFromRequest(request)) {
-    return errorResponse('TOTP required', 403, 'TOTP_REQUIRED');
-  }
+  const auth = await requireTotpAuth(request);
+  if (!auth.ok) return errorResponse(auth.status === 401 ? 'Unauthorized' : 'TOTP required', auth.status, auth.status === 403 ? 'TOTP_REQUIRED' : undefined);
 
   if (USE_FIXTURES) {
     // In fixture mode, simulate a successful restart without calling the host agent

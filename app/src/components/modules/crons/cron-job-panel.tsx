@@ -10,6 +10,7 @@ import { CronExpressionParser } from 'cron-parser';
 import type { CronJob } from '@/types';
 import TotpDialog from './totp-dialog';
 import { basePath } from '@/lib/client-url';
+import { isTotpFresh } from '@/lib/totp-fresh';
 
 const TZ = 'America/Chicago';
 
@@ -247,6 +248,19 @@ export default function CronJobPanel({ job, onShowHistory, onJobUpdated }: CronJ
     else if (pendingAction === 'prompt') void handleSavePrompt(totpToken);
   }
 
+  /** Opens the TOTP dialog for a cron action — or runs it immediately if TOTP is still fresh. */
+  function requestAction(action: DialogAction): void {
+    if (isTotpFresh()) {
+      if (action === 'trigger') void handleTrigger('');
+      else if (action === 'enable') void handleSetEnabled('', true);
+      else if (action === 'disable') void handleSetEnabled('', false);
+      else if (action === 'schedule') void handleSaveSchedule('');
+      else if (action === 'prompt') void handleSavePrompt('');
+      return;
+    }
+    setPendingAction(action);
+  }
+
   const statusBadge = cronStatusBadge(job.status);
 
   return (
@@ -328,7 +342,7 @@ export default function CronJobPanel({ job, onShowHistory, onJobUpdated }: CronJ
                     setScheduleError('Must be a 5-field cron expression');
                     return;
                   }
-                  setPendingAction('schedule');
+                  requestAction('schedule');
                 }}
               >
                 Save
@@ -392,7 +406,7 @@ export default function CronJobPanel({ job, onShowHistory, onJobUpdated }: CronJ
             <div className="flex gap-2">
               <button
                 disabled={promptInput.trim() === (job.prompt ?? '')}
-                onClick={() => setPendingAction('prompt')}
+                onClick={() => requestAction('prompt')}
                 style={{
                   ...btnPrimary,
                   opacity: promptInput.trim() === (job.prompt ?? '') ? 0.4 : 1,
@@ -469,7 +483,7 @@ export default function CronJobPanel({ job, onShowHistory, onJobUpdated }: CronJ
         {/* Trigger */}
         <button
           disabled={triggerState === 'loading'}
-          onClick={() => setPendingAction('trigger')}
+          onClick={() => requestAction('trigger')}
           className="text-[10px] uppercase tracking-[0.08em] px-[12px] py-[5px] transition-opacity"
           style={{
             fontFamily: 'var(--font-mono), "IBM Plex Mono", ui-monospace, monospace',
@@ -493,14 +507,14 @@ export default function CronJobPanel({ job, onShowHistory, onJobUpdated }: CronJ
         {job.status === 'disabled' ? (
           <button
             style={btnSecondary}
-            onClick={() => setPendingAction('enable')}
+            onClick={() => requestAction('enable')}
           >
             Enable
           </button>
         ) : (
           <button
             style={btnSecondary}
-            onClick={() => setPendingAction('disable')}
+            onClick={() => requestAction('disable')}
           >
             Disable
           </button>

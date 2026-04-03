@@ -1123,7 +1123,7 @@ function WorkspaceBrowsePanel({ agent }: { agent: AgentConfig }): React.JSX.Elem
         >
           <button
             onClick={() => setViewFile(null)}
-            style={{ color: 'var(--ae-amber)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontFamily: 'monospace' }}
+            style={{ color: 'var(--ae-amber)', background: 'none', border: 'none', cursor: 'pointer', padding: '4px 8px', fontFamily: 'monospace', fontSize: 16, lineHeight: 1 }}
           >
             ←
           </button>

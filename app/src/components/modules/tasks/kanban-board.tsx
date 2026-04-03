@@ -12,6 +12,7 @@ import { TotpDialog } from './totp-dialog';
 import { TaskSpecsInbox } from './task-specs-inbox';
 import type { Task, TaskStatus } from '@/types';
 import { basePath } from '@/lib/client-url';
+import { isTotpFresh } from '@/lib/totp-fresh';
 
 type TasksByColumn = Record<TaskStatus, Task[]>;
 
@@ -69,8 +70,12 @@ export function KanbanBoard(): React.JSX.Element {
     void fetchTasks();
   }, [fetchTasks]);
 
-  /** Opens the TOTP dialog. The action runs after the user submits a valid token. */
+  /** Opens the TOTP dialog — or runs the action immediately if TOTP is still fresh. */
   function requestTotp(action: () => void): void {
+    if (isTotpFresh()) {
+      action();
+      return;
+    }
     pendingActionRef.current = action;
     setTotpOpen(true);
   }
