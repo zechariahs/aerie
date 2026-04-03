@@ -91,8 +91,8 @@ export async function POST(request: NextRequest): Promise<Response> {
     // Read SESSION_DURATION_HOURS from settings so the DB value is honoured.
     // Done here rather than in session.ts to keep that file Edge-safe.
     const sessionDurationSeconds = readSessionDurationSeconds();
-    const sessionIat = await createSession(sessionDurationSeconds);
-    recordTotpVerified(sessionIat);
+    const sessionSid = await createSession(sessionDurationSeconds);
+    recordTotpVerified(sessionSid);
     await setTotpFreshCookie();
 
     writeAuditLog({ action: 'login.success', resource: '/api/auth/login', result: 'success', ip, userAgent: ua });

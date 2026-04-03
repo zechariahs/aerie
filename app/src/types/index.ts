@@ -4,6 +4,7 @@
 /** JWT payload stored in the session cookie. */
 export interface SessionPayload {
   sub: 'admin';
+  sid: string;
   iat: number;
   exp: number;
 }

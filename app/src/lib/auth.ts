@@ -136,36 +136,38 @@ export function validateTotpFromRequest(request: Request): boolean {
 const TOTP_GRACE_MS = 30 * 60 * 1000; // 30 minutes
 
 /**
- * In-memory map: session iat (seconds) → Date.now() of last TOTP verification.
+ * In-memory map: session sid (UUID) → Date.now() of last TOTP verification.
+ * Keyed by the unique per-session `sid` claim to avoid iat-collision between
+ * sessions created within the same second.
  * Resets on process restart, which is acceptable — users simply re-verify.
  * Expired entries are pruned opportunistically on reads and writes so the map
  * does not grow without bound.
  */
-const totpTimestamps = new Map<number, number>();
+const totpTimestamps = new Map<string, number>();
 
 function pruneExpiredTotpTimestamps(now: number): void {
-  for (const [sessionIat, verifiedAt] of totpTimestamps) {
+  for (const [sid, verifiedAt] of totpTimestamps) {
     if (now - verifiedAt >= TOTP_GRACE_MS) {
-      totpTimestamps.delete(sessionIat);
+      totpTimestamps.delete(sid);
     }
   }
 }
 
 /** Record that a TOTP code was successfully verified for this session. */
-export function recordTotpVerified(sessionIat: number): void {
+export function recordTotpVerified(sid: string): void {
   const now = Date.now();
   pruneExpiredTotpTimestamps(now);
-  totpTimestamps.set(sessionIat, now);
+  totpTimestamps.set(sid, now);
 }
 
 /** True if TOTP was verified for this session within the last 30 minutes. */
-export function isSessionTotpFresh(sessionIat: number): boolean {
+export function isSessionTotpFresh(sid: string): boolean {
   const now = Date.now();
   pruneExpiredTotpTimestamps(now);
-  const ts = totpTimestamps.get(sessionIat);
+  const ts = totpTimestamps.get(sid);
   if (ts === undefined) return false;
   if (now - ts >= TOTP_GRACE_MS) {
-    totpTimestamps.delete(sessionIat);
+    totpTimestamps.delete(sid);
     return false;
   }
   return true;
@@ -189,7 +191,7 @@ export async function requireTotpAuth(request: Request): Promise<TotpAuthResult>
   const session = await getSession();
   if (!session) return { ok: false, status: 401 };
 
-  if (isSessionTotpFresh(session.iat)) {
+  if (isSessionTotpFresh(session.sid)) {
     return { ok: true, session };
   }
 
@@ -197,7 +199,7 @@ export async function requireTotpAuth(request: Request): Promise<TotpAuthResult>
     return { ok: false, status: 403 };
   }
 
-  recordTotpVerified(session.iat);
+  recordTotpVerified(session.sid);
   await setTotpFreshCookie();
   return { ok: true, session };
 }

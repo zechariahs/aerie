@@ -30,14 +30,16 @@ function getSecret(): Uint8Array {
  * @param durationSeconds - Override the default 8-hour TTL. Sourced from
  *   the SESSION_DURATION_HOURS DB setting in the login route, which cannot
  *   read it here because this file must remain Edge-safe (no better-sqlite3).
+ * @returns The unique session ID (`sid`) for the new session, used by the
+ *   caller to record TOTP verification in the in-memory grace map.
  */
-export async function createSession(durationSeconds?: number): Promise<number> {
+export async function createSession(durationSeconds?: number): Promise<string> {
   const ttl = durationSeconds ?? SESSION_DURATION_SECONDS;
-  const iat = Math.floor(Date.now() / 1000);
-  const token = await new SignJWT({ sub: 'admin' } satisfies Omit<SessionPayload, 'iat' | 'exp'>)
+  const sid = crypto.randomUUID();
+  const token = await new SignJWT({ sub: 'admin', sid } satisfies Omit<SessionPayload, 'iat' | 'exp'>)
     .setProtectedHeader({ alg: 'HS256' })
-    .setIssuedAt(iat)
-    .setExpirationTime(iat + ttl)
+    .setIssuedAt()
+    .setExpirationTime(`${ttl}s`)
     .sign(getSecret());
 
   const cookieStore = await cookies();
@@ -49,7 +51,7 @@ export async function createSession(durationSeconds?: number): Promise<number> {
     maxAge: ttl,
   });
 
-  return iat;
+  return sid;
 }
 
 /**

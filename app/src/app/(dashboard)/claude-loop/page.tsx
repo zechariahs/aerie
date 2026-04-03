@@ -396,7 +396,7 @@ function SessionStateEditor(): React.JSX.Element {
         body: JSON.stringify({ content: contentToSave }),
       });
       if (res.status === 403) {
-        if (totpValue.trim() === '') {
+        if (fresh) {
           clearTotpFreshCookieClient();
           setErrorMsg('Session expired — enter your TOTP code and save again.');
         } else {
