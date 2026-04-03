@@ -8,7 +8,7 @@ import { marked } from 'marked';
 import { ErrorBoundary } from '@/components/ui/error-boundary';
 import type { BriefHistory, DriveFile } from '@/types';
 import { basePath } from '@/lib/client-url';
-import { isTotpFresh } from '@/lib/totp-fresh';
+import { isTotpFresh, clearTotpFreshCookieClient } from '@/lib/totp-fresh';
 
 // ---------------------------------------------------------------------------
 // Shared style constants
@@ -176,6 +176,12 @@ function BriefGenerator(): React.JSX.Element {
         data?: { brief: BriefHistory; driveUrl: string };
         error?: string;
       };
+      if (res.status === 403) {
+        clearTotpFreshCookieClient();
+        setErrorMsg('Session expired — enter your TOTP code and try again.');
+        setStatus('error');
+        return;
+      }
       if (!res.ok) {
         setErrorMsg(json.error ?? 'Generation failed');
         setStatus('error');
@@ -389,6 +395,12 @@ function SessionStateEditor(): React.JSX.Element {
         },
         body: JSON.stringify({ content: contentToSave }),
       });
+      if (res.status === 403) {
+        clearTotpFreshCookieClient();
+        setErrorMsg('Session expired — enter your TOTP code and save again.');
+        setSaveStatus('error');
+        return;
+      }
       if (!res.ok) {
         const json = (await res.json()) as { error?: string };
         setErrorMsg(json.error ?? 'Save failed');
@@ -729,6 +741,12 @@ function TaskSpecsWriter(): React.JSX.Element {
         body: JSON.stringify({ title: title.trim(), content }),
       });
       const json = (await res.json()) as { data?: { url: string }; error?: string };
+      if (res.status === 403) {
+        clearTotpFreshCookieClient();
+        setErrorMsg('Session expired — enter your TOTP code and try again.');
+        setStatus('error');
+        return;
+      }
       if (!res.ok) {
         setErrorMsg(json.error ?? 'Write failed');
         setStatus('error');

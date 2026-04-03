@@ -7,7 +7,7 @@
 import React, { useEffect, useState } from 'react';
 import type { ModelPrice } from '@/types';
 import { basePath } from '@/lib/client-url';
-import { isTotpFresh } from '@/lib/totp-fresh';
+import { isTotpFresh, clearTotpFreshCookieClient } from '@/lib/totp-fresh';
 
 function nowIso(): string {
   return new Date().toISOString();
@@ -93,7 +93,9 @@ export default function PriceTableEditor(): React.JSX.Element {
         body: JSON.stringify(rows),
       });
       if (r.status === 403) {
-        setSaveError('Invalid or expired TOTP code.');
+        // Clear stale cookie so next attempt sends the entered token, not empty.
+        clearTotpFreshCookieClient();
+        setSaveError('Session expired — enter your TOTP code and save again.');
         return;
       }
       if (!r.ok) {

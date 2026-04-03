@@ -95,6 +95,10 @@ export function KanbanBoard(): React.JSX.Element {
 
   function onTotpCancel(): void {
     setTotpOpen(false);
+    if (pendingActionRef.current) {
+      // Revert any optimistic board update that was applied before the dialog opened.
+      void fetchTasks();
+    }
     pendingActionRef.current = undefined;
   }
 

@@ -6,7 +6,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { DockerContainer, DockerList } from '@/types/index';
 import { basePath } from '@/lib/client-url';
-import { isTotpFresh } from '@/lib/totp-fresh';
+import { isTotpFresh, clearTotpFreshCookieClient } from '@/lib/totp-fresh';
 
 // Highlighted in brand color — the configured openclaw container name
 const OPENCLAW_CONTAINER = process.env['NEXT_PUBLIC_OPENCLAW_CONTAINER'] ?? 'openclaw';
@@ -114,6 +114,13 @@ export function DockerPanel(): React.JSX.Element {
         headers: { 'Content-Type': 'application/json', 'X-TOTP-Token': fresh ? '' : restart.totpInput.trim() },
         body: JSON.stringify({ container: OPENCLAW_CONTAINER }),
       });
+      if (res.status === 403) {
+        // Server grace period expired (e.g. process restart). Clear stale cookie
+        // so the next attempt uses the entered TOTP token rather than sending empty.
+        clearTotpFreshCookieClient();
+        setRestart((r) => ({ ...r, pending: false, error: 'Session expired — enter TOTP code' }));
+        return;
+      }
       if (!res.ok) {
         const err = await res.json().catch(() => ({ error: 'Restart failed' })) as { error?: string };
         setRestart((r) => ({ ...r, pending: false, error: err.error ?? 'Restart failed' }));
