@@ -24,7 +24,7 @@ function getSecret(): Uint8Array {
 /**
  * Creates a full session JWT and sets it as an HttpOnly cookie.
  * Call this only after both password and TOTP are verified.
- * Returns the session's iat (issued-at) timestamp so the caller can
+ * Returns the session's unique `sid` claim so the caller can
  * immediately record TOTP verification for the new session.
  *
  * @param durationSeconds - Override the default 8-hour TTL. Sourced from

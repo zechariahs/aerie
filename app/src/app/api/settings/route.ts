@@ -20,7 +20,8 @@ export async function GET(request: Request): Promise<Response> {
 
 /**
  * PUT /api/settings
- * Upserts one or more settings keys.
+ * Upserts or deletes one or more settings keys.
+ * Sending an empty string for a value deletes that key; any other string upserts it.
  * Requires session + valid X-TOTP-Token header (human-only — config change).
  */
 export async function PUT(request: Request): Promise<Response> {

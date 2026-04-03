@@ -8,10 +8,9 @@ import type { Task, TaskCapabilityTier, TaskPriority, TaskTag } from '@/types';
 import { basePath } from '@/lib/client-url';
 
 interface NewTaskFormProps {
-  totpToken: string;
   onCreated: (task: Task) => void;
   onCancel: () => void;
-  onRequestTotp: (action: () => void) => void;
+  onRequestTotp: (action: (token: string) => void) => void;
 }
 
 const inputStyle: React.CSSProperties = {
@@ -28,7 +27,7 @@ const inputStyle: React.CSSProperties = {
 /**
  * Slide-over form for creating a new task.
  */
-export function NewTaskForm({ totpToken, onCreated, onCancel, onRequestTotp }: NewTaskFormProps): React.JSX.Element {
+export function NewTaskForm({ onCreated, onCancel, onRequestTotp }: NewTaskFormProps): React.JSX.Element {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [priority, setPriority] = useState<TaskPriority>('P3');
@@ -82,7 +81,7 @@ export function NewTaskForm({ totpToken, onCreated, onCancel, onRequestTotp }: N
 
   function handleSubmit(e: React.FormEvent): void {
     e.preventDefault();
-    onRequestTotp(() => { void doCreate(totpToken); });
+    onRequestTotp((token) => { void doCreate(token); });
   }
 
   const focusAmber = (e: React.FocusEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {

@@ -117,7 +117,7 @@ function readSessionDurationSeconds(): number | undefined {
     if (!row) return undefined;
     const hours = parseFloat(row.value);
     if (!isFinite(hours) || hours <= 0) return undefined;
-    return Math.round(hours * 3600);
+    return Math.max(60, Math.floor(hours * 3600));
   } catch {
     return undefined;
   }

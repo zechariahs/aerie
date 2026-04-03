@@ -313,7 +313,6 @@ export function KanbanBoard(): React.JSX.Element {
           <TaskDetailPanel
             key={selectedId}
             taskId={selectedId}
-            totpToken={totpToken}
             onClose={() => setSelectedId(undefined)}
             onUpdated={onTaskUpdated}
             onDeleted={onTaskDeleted}
@@ -325,7 +324,6 @@ export function KanbanBoard(): React.JSX.Element {
       {/* Task-Specs inbox */}
       <div className="flex-shrink-0">
         <TaskSpecsInbox
-          totpToken={totpToken}
           onImported={onTaskCreated}
           onRequestTotp={requestTotp}
         />
@@ -334,7 +332,6 @@ export function KanbanBoard(): React.JSX.Element {
       {/* New task form */}
       {showNewForm && (
         <NewTaskForm
-          totpToken={totpToken}
           onCreated={onTaskCreated}
           onCancel={() => setShowNewForm(false)}
           onRequestTotp={requestTotp}

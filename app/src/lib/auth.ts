@@ -191,6 +191,11 @@ export async function requireTotpAuth(request: Request): Promise<TotpAuthResult>
   const session = await getSession();
   if (!session) return { ok: false, status: 401 };
 
+  // Reject sessions minted before the sid claim was introduced, or malformed tokens.
+  if (typeof session.sid !== 'string' || session.sid.length === 0) {
+    return { ok: false, status: 403 };
+  }
+
   if (isSessionTotpFresh(session.sid)) {
     return { ok: true, session };
   }
