@@ -116,7 +116,12 @@ export function isAgentRequest(request: Request): boolean {
 /**
  * Validates the TOTP token from the X-TOTP-Token request header.
  * Returns true only if the token matches the current or adjacent 30-second window.
- * Every write API route must call this before executing business logic.
+ *
+ * Write routes should call `requireTotpAuth()` instead of this function directly.
+ * `requireTotpAuth()` handles the 30-minute grace period — the header token may be
+ * absent or empty during an active grace period and the request will still be
+ * accepted. This low-level helper is exposed for callers that need raw TOTP
+ * validation without session/grace-period logic.
  */
 export function validateTotpFromRequest(request: Request): boolean {
   const token = request.headers.get('X-TOTP-Token');
@@ -191,9 +196,11 @@ export async function requireTotpAuth(request: Request): Promise<TotpAuthResult>
   const session = await getSession();
   if (!session) return { ok: false, status: 401 };
 
-  // Reject sessions minted before the sid claim was introduced, or malformed tokens.
+  // Sessions minted before the sid claim was introduced, or malformed tokens,
+  // cannot satisfy TOTP freshness checks. Return 401 so the client re-authenticates
+  // (full login) rather than looping on TOTP prompts indefinitely.
   if (typeof session.sid !== 'string' || session.sid.length === 0) {
-    return { ok: false, status: 403 };
+    return { ok: false, status: 401 };
   }
 
   if (isSessionTotpFresh(session.sid)) {

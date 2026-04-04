@@ -6,9 +6,10 @@
  * within the last 30 minutes. The cookie is non-HttpOnly and set by the server
  * whenever TOTP is successfully validated (login or write operation).
  *
- * When this returns true, write API calls may omit the X-TOTP-Token header —
- * the server will accept them based on the in-memory session grace record.
- * The client should pass an empty string as the token in that case.
+ * When this returns true, write API calls should send an empty string as the
+ * X-TOTP-Token header value. The server treats an absent header and an empty
+ * string identically (both are falsy in `validateTotpFromRequest`), and will
+ * accept the request based on the in-memory session grace record.
  */
 
 /** Must match TOTP_GRACE_MS in auth.ts. */
