@@ -45,7 +45,6 @@ export function KanbanBoard(): React.JSX.Element {
 
   // TOTP dialog state
   const [totpOpen, setTotpOpen] = useState(false);
-  const [totpToken, setTotpToken] = useState('');
   const pendingActionRef = useRef<((token: string) => void) | undefined>(undefined);
 
   const fetchTasks = useCallback(async () => {
@@ -85,7 +84,6 @@ export function KanbanBoard(): React.JSX.Element {
   }
 
   function onTotpConfirm(token: string): void {
-    setTotpToken(token);
     setTotpOpen(false);
     if (pendingActionRef.current) {
       pendingActionRef.current(token);
