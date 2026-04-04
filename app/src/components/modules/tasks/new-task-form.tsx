@@ -6,6 +6,7 @@
 import { useState } from 'react';
 import type { Task, TaskCapabilityTier, TaskPriority, TaskTag } from '@/types';
 import { basePath } from '@/lib/client-url';
+import { clearTotpFreshCookieClient } from '@/lib/totp-fresh';
 
 interface NewTaskFormProps {
   onCreated: (task: Task) => void;
@@ -64,6 +65,15 @@ export function NewTaskForm({ onCreated, onCancel, onRequestTotp }: NewTaskFormP
         }),
       });
 
+      if (res.status === 403) {
+        if (token === '') {
+          clearTotpFreshCookieClient();
+          onRequestTotp((t) => { void doCreate(t); });
+        } else {
+          setError('Invalid or expired TOTP code');
+        }
+        return;
+      }
       if (!res.ok) {
         const err = (await res.json()) as { error: string };
         setError(err.error);

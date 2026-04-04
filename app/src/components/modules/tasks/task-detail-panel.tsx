@@ -6,6 +6,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import type { Task, TaskPriority, TaskStatus, TaskTag, TaskStatusChange, TaskComment } from '@/types';
 import { basePath } from '@/lib/client-url';
+import { clearTotpFreshCookieClient } from '@/lib/totp-fresh';
 
 interface TaskDetailData {
   task: Task;
@@ -113,6 +114,11 @@ export function TaskDetailPanel({
           due_date: editDue || null,
         }),
       });
+      if (res.status === 403) {
+        if (token === '') { clearTotpFreshCookieClient(); onRequestTotp((t) => { void saveChanges(t); }); }
+        else { showToast('Invalid or expired TOTP code'); }
+        return;
+      }
       if (!res.ok) {
         const err = (await res.json()) as { error: string };
         showToast(`Error: ${err.error}`);
@@ -141,6 +147,11 @@ export function TaskDetailPanel({
         },
         body: JSON.stringify({ comment: comment.trim() }),
       });
+      if (res.status === 403) {
+        if (token === '') { clearTotpFreshCookieClient(); onRequestTotp((t) => { void postComment(t); }); }
+        else { showToast('Invalid or expired TOTP code'); }
+        return;
+      }
       if (!res.ok) {
         showToast('Failed to post comment');
         return;
@@ -160,6 +171,11 @@ export function TaskDetailPanel({
       method: 'POST',
       headers: { 'X-TOTP-Token': token },
     });
+    if (res.status === 403) {
+      if (token === '') { clearTotpFreshCookieClient(); onRequestTotp((t) => { void sendTelegram(t); }); }
+      else { showToast('Invalid or expired TOTP code'); }
+      return;
+    }
     if (res.ok) {
       showToast('Sent to Telegram');
     } else {
@@ -173,6 +189,11 @@ export function TaskDetailPanel({
       method: 'POST',
       headers: { 'X-TOTP-Token': token },
     });
+    if (res.status === 403) {
+      if (token === '') { clearTotpFreshCookieClient(); onRequestTotp((t) => { void sendDrive(t); }); }
+      else { showToast('Invalid or expired TOTP code'); }
+      return;
+    }
     if (res.ok) {
       showToast('Written to Drive');
       await fetchTask();
@@ -187,6 +208,11 @@ export function TaskDetailPanel({
       method: 'DELETE',
       headers: { 'X-TOTP-Token': token },
     });
+    if (res.status === 403) {
+      if (token === '') { clearTotpFreshCookieClient(); onRequestTotp((t) => { void handleDelete(t); }); }
+      else { showToast('Invalid or expired TOTP code'); }
+      return;
+    }
     if (res.ok) {
       onDeleted(taskId);
     } else {
@@ -206,6 +232,11 @@ export function TaskDetailPanel({
           status: 'inbox',
         }),
       });
+      if (res.status === 403) {
+        if (token === '') { clearTotpFreshCookieClient(); onRequestTotp((t) => { void submitResponses(t); }); }
+        else { showToast('Invalid or expired TOTP code'); }
+        return;
+      }
       if (!res.ok) {
         showToast('Failed to submit responses');
         return;
@@ -227,6 +258,11 @@ export function TaskDetailPanel({
       headers: { 'Content-Type': 'application/json', 'X-TOTP-Token': token },
       body: JSON.stringify({ status: newStatus }),
     });
+    if (res.status === 403) {
+      if (token === '') { clearTotpFreshCookieClient(); onRequestTotp((t) => { void handleQuickStatus(newStatus, t); }); }
+      else { showToast('Invalid or expired TOTP code'); }
+      return;
+    }
     if (res.ok) {
       const json = (await res.json()) as { data: Task };
       onUpdated(json.data);

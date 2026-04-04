@@ -6,6 +6,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import type { DriveFile, Task } from '@/types';
 import { basePath } from '@/lib/client-url';
+import { clearTotpFreshCookieClient } from '@/lib/totp-fresh';
 
 interface TaskSpecsResponse {
   files: DriveFile[];
@@ -59,6 +60,14 @@ export function TaskSpecsInbox({ onImported, onRequestTotp }: TaskSpecsInboxProp
           driveUrl: file.webViewLink,
         }),
       });
+      if (res.status === 403) {
+        if (token === '') {
+          clearTotpFreshCookieClient();
+          onRequestTotp((t) => { void doImport(file, t); });
+        }
+        // Silent on invalid-token 403 — user can retry with a new code
+        return;
+      }
       if (res.ok) {
         const json = (await res.json()) as { data: Task };
         onImported(json.data);
