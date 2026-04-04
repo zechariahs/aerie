@@ -8,6 +8,7 @@ import { marked } from 'marked';
 import { ErrorBoundary } from '@/components/ui/error-boundary';
 import type { BriefHistory, DriveFile } from '@/types';
 import { basePath } from '@/lib/client-url';
+import { isTotpFresh, clearTotpFreshCookieClient } from '@/lib/totp-fresh';
 
 // ---------------------------------------------------------------------------
 // Shared style constants
@@ -155,7 +156,8 @@ function BriefGenerator(): React.JSX.Element {
   }, []);
 
   async function handleGenerate(): Promise<void> {
-    if (!totp.trim()) {
+    const fresh = isTotpFresh();
+    if (!fresh && !totp.trim()) {
       setErrorMsg('TOTP token is required');
       return;
     }
@@ -166,7 +168,7 @@ function BriefGenerator(): React.JSX.Element {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'X-TOTP-Token': totp.trim(),
+          'X-TOTP-Token': fresh ? '' : totp.trim(),
         },
         body: JSON.stringify({ notes }),
       });
@@ -174,6 +176,12 @@ function BriefGenerator(): React.JSX.Element {
         data?: { brief: BriefHistory; driveUrl: string };
         error?: string;
       };
+      if (res.status === 403) {
+        if (fresh) { clearTotpFreshCookieClient(); setErrorMsg('Session expired — enter your TOTP code and try again.'); }
+        else { setErrorMsg('Invalid or expired TOTP code. Please try again.'); }
+        setStatus('error');
+        return;
+      }
       if (!res.ok) {
         setErrorMsg(json.error ?? 'Generation failed');
         setStatus('error');
@@ -370,7 +378,8 @@ function SessionStateEditor(): React.JSX.Element {
   }, []);
 
   async function doSave(contentToSave: string, totpValue: string): Promise<void> {
-    if (!totpValue.trim()) {
+    const fresh = isTotpFresh();
+    if (!fresh && !totpValue.trim()) {
       setErrorMsg('TOTP token is required to save');
       setSaveStatus('error');
       return;
@@ -382,10 +391,20 @@ function SessionStateEditor(): React.JSX.Element {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
-          'X-TOTP-Token': totpValue.trim(),
+          'X-TOTP-Token': fresh ? '' : totpValue.trim(),
         },
         body: JSON.stringify({ content: contentToSave }),
       });
+      if (res.status === 403) {
+        if (fresh) {
+          clearTotpFreshCookieClient();
+          setErrorMsg('Session expired — enter your TOTP code and save again.');
+        } else {
+          setErrorMsg('Invalid or expired TOTP code. Please try again.');
+        }
+        setSaveStatus('error');
+        return;
+      }
       if (!res.ok) {
         const json = (await res.json()) as { error?: string };
         setErrorMsg(json.error ?? 'Save failed');
@@ -408,7 +427,7 @@ function SessionStateEditor(): React.JSX.Element {
     if (saveTimer.current) clearTimeout(saveTimer.current);
 
     saveTimer.current = setTimeout(() => {
-      if (totpRef.current.trim()) {
+      if (totpRef.current.trim() || isTotpFresh()) {
         void doSave(newContent, totpRef.current);
       }
     }, 5000);
@@ -707,7 +726,8 @@ function TaskSpecsWriter(): React.JSX.Element {
       setErrorMsg('Content is required');
       return;
     }
-    if (!totp.trim()) {
+    const fresh = isTotpFresh();
+    if (!fresh && !totp.trim()) {
       setErrorMsg('TOTP token is required');
       return;
     }
@@ -720,11 +740,21 @@ function TaskSpecsWriter(): React.JSX.Element {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'X-TOTP-Token': totp.trim(),
+          'X-TOTP-Token': fresh ? '' : totp.trim(),
         },
         body: JSON.stringify({ title: title.trim(), content }),
       });
       const json = (await res.json()) as { data?: { url: string }; error?: string };
+      if (res.status === 403) {
+        if (fresh) {
+          clearTotpFreshCookieClient();
+          setErrorMsg('Session expired — enter your TOTP code and try again.');
+        } else {
+          setErrorMsg('Invalid or expired TOTP code. Please try again.');
+        }
+        setStatus('error');
+        return;
+      }
       if (!res.ok) {
         setErrorMsg(json.error ?? 'Write failed');
         setStatus('error');

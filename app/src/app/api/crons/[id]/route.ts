@@ -1,7 +1,7 @@
 // Copyright (c) 2026 Zack Schwenk
 // SPDX-License-Identifier: MIT
 
-import { getSession, validateTotpFromRequest } from '@/lib/auth';
+import { requireTotpAuth } from '@/lib/auth';
 import { setCronEnabled, updateCronSchedule, updateCronPrompt } from '@/lib/gateway';
 import { getRawCronPayload } from '@/lib/openclaw';
 import { writeAuditLog } from '@/lib/db';
@@ -25,18 +25,12 @@ interface CronUpdateBody {
  * Accepts: { enabled?: boolean, schedule?: string, scheduleTz?: string, prompt?: string }
  */
 export async function PUT(request: Request, { params }: RouteContext): Promise<Response> {
-  const session = await getSession();
-  if (!session) return errorResponse('Unauthorized', 401);
-
-  if (!validateTotpFromRequest(request)) {
-    writeAuditLog({
-      action: 'cron.update',
-      resource: 'cron',
-      result: 'failure',
-      ip: request.headers.get('x-forwarded-for') ?? 'unknown',
-      userAgent: request.headers.get('user-agent') ?? 'unknown',
-    });
-    return errorResponse('TOTP required', 403);
+  const auth = await requireTotpAuth(request);
+  if (!auth.ok) {
+    if (auth.status === 403) {
+      writeAuditLog({ action: 'cron.update', resource: 'cron', result: 'failure', ip: request.headers.get('x-forwarded-for') ?? 'unknown', userAgent: request.headers.get('user-agent') ?? 'unknown' });
+    }
+    return errorResponse(auth.status === 401 ? 'Unauthorized' : 'TOTP required', auth.status);
   }
 
   const { id } = await params;

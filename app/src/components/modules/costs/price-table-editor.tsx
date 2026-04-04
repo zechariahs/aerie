@@ -7,6 +7,7 @@
 import React, { useEffect, useState } from 'react';
 import type { ModelPrice } from '@/types';
 import { basePath } from '@/lib/client-url';
+import { isTotpFresh, clearTotpFreshCookieClient } from '@/lib/totp-fresh';
 
 function nowIso(): string {
   return new Date().toISOString();
@@ -74,7 +75,8 @@ export default function PriceTableEditor(): React.JSX.Element {
   }
 
   async function handleSave(): Promise<void> {
-    if (!totpToken) {
+    const fresh = isTotpFresh();
+    if (!fresh && !totpToken) {
       setSaveError('Enter your TOTP code to save.');
       return;
     }
@@ -86,12 +88,17 @@ export default function PriceTableEditor(): React.JSX.Element {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
-          'X-TOTP-Token': totpToken,
+          'X-TOTP-Token': fresh ? '' : totpToken,
         },
         body: JSON.stringify(rows),
       });
       if (r.status === 403) {
-        setSaveError('Invalid or expired TOTP code.');
+        if (fresh) {
+          clearTotpFreshCookieClient();
+          setSaveError('Session expired — enter your TOTP code and save again.');
+        } else {
+          setSaveError('Invalid or expired TOTP code. Enter a new code and try again.');
+        }
         return;
       }
       if (!r.ok) {

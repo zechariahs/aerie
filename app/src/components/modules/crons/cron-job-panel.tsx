@@ -10,6 +10,7 @@ import { CronExpressionParser } from 'cron-parser';
 import type { CronJob } from '@/types';
 import TotpDialog from './totp-dialog';
 import { basePath } from '@/lib/client-url';
+import { isTotpFresh, clearTotpFreshCookieClient } from '@/lib/totp-fresh';
 
 const TZ = 'America/Chicago';
 
@@ -137,7 +138,7 @@ export default function CronJobPanel({ job, onShowHistory, onJobUpdated }: CronJ
     setTimeout(() => setToast(''), 3000);
   }
 
-  async function handleTrigger(totpToken: string): Promise<void> {
+  async function handleTrigger(totpToken: string, onTotpExpired?: () => void): Promise<void> {
     setPendingAction(undefined);
     setTriggerState('loading');
     setTriggerError('');
@@ -146,6 +147,7 @@ export default function CronJobPanel({ job, onShowHistory, onJobUpdated }: CronJ
         method: 'POST',
         headers: { 'X-TOTP-Token': totpToken },
       });
+      if (res.status === 403 && onTotpExpired) { setTriggerState('idle'); setTriggerError(''); onTotpExpired(); return; }
       if (!res.ok) {
         const err = (await res.json()) as ApiError;
         setTriggerState('error');
@@ -161,7 +163,7 @@ export default function CronJobPanel({ job, onShowHistory, onJobUpdated }: CronJ
     }
   }
 
-  async function handleSetEnabled(totpToken: string, enabled: boolean): Promise<void> {
+  async function handleSetEnabled(totpToken: string, enabled: boolean, onTotpExpired?: () => void): Promise<void> {
     setPendingAction(undefined);
     try {
       const res = await fetch(`${basePath}/api/crons/${job.id}`, {
@@ -172,6 +174,7 @@ export default function CronJobPanel({ job, onShowHistory, onJobUpdated }: CronJ
         },
         body: JSON.stringify({ enabled }),
       });
+      if (res.status === 403 && onTotpExpired) { onTotpExpired(); return; }
       if (!res.ok) {
         const err = (await res.json()) as ApiError;
         showToast(`Error: ${err.error ?? 'Update failed'}`);
@@ -184,7 +187,7 @@ export default function CronJobPanel({ job, onShowHistory, onJobUpdated }: CronJ
     }
   }
 
-  async function handleSaveSchedule(totpToken: string): Promise<void> {
+  async function handleSaveSchedule(totpToken: string, onTotpExpired?: () => void): Promise<void> {
     setPendingAction(undefined);
     const trimmed = scheduleInput.trim();
     if (!/^\S+(\s+\S+){4}$/.test(trimmed)) {
@@ -200,6 +203,7 @@ export default function CronJobPanel({ job, onShowHistory, onJobUpdated }: CronJ
         },
         body: JSON.stringify({ schedule: trimmed, scheduleTz }),
       });
+      if (res.status === 403 && onTotpExpired) { onTotpExpired(); return; }
       if (!res.ok) {
         const err = (await res.json()) as ApiError;
         showToast(`Error: ${err.error ?? 'Update failed'}`);
@@ -214,7 +218,7 @@ export default function CronJobPanel({ job, onShowHistory, onJobUpdated }: CronJ
     }
   }
 
-  async function handleSavePrompt(totpToken: string): Promise<void> {
+  async function handleSavePrompt(totpToken: string, onTotpExpired?: () => void): Promise<void> {
     setPendingAction(undefined);
     const trimmed = promptInput.trim();
     try {
@@ -226,6 +230,7 @@ export default function CronJobPanel({ job, onShowHistory, onJobUpdated }: CronJ
         },
         body: JSON.stringify({ prompt: trimmed }),
       });
+      if (res.status === 403 && onTotpExpired) { onTotpExpired(); return; }
       if (!res.ok) {
         const err = (await res.json()) as ApiError;
         showToast(`Error: ${err.error ?? 'Update failed'}`);
@@ -245,6 +250,24 @@ export default function CronJobPanel({ job, onShowHistory, onJobUpdated }: CronJ
     else if (pendingAction === 'disable') void handleSetEnabled(totpToken, false);
     else if (pendingAction === 'schedule') void handleSaveSchedule(totpToken);
     else if (pendingAction === 'prompt') void handleSavePrompt(totpToken);
+  }
+
+  /**
+   * Opens the TOTP dialog for a cron action — or runs it immediately if TOTP is
+   * still fresh. Passes an onTotpExpired callback that clears the stale cookie
+   * and re-opens the dialog if the server returns 403 (e.g. after a restart).
+   */
+  function requestAction(action: DialogAction): void {
+    if (isTotpFresh()) {
+      const onExpired = () => { clearTotpFreshCookieClient(); setPendingAction(action); };
+      if (action === 'trigger') void handleTrigger('', onExpired);
+      else if (action === 'enable') void handleSetEnabled('', true, onExpired);
+      else if (action === 'disable') void handleSetEnabled('', false, onExpired);
+      else if (action === 'schedule') void handleSaveSchedule('', onExpired);
+      else if (action === 'prompt') void handleSavePrompt('', onExpired);
+      return;
+    }
+    setPendingAction(action);
   }
 
   const statusBadge = cronStatusBadge(job.status);
@@ -328,7 +351,7 @@ export default function CronJobPanel({ job, onShowHistory, onJobUpdated }: CronJ
                     setScheduleError('Must be a 5-field cron expression');
                     return;
                   }
-                  setPendingAction('schedule');
+                  requestAction('schedule');
                 }}
               >
                 Save
@@ -392,7 +415,7 @@ export default function CronJobPanel({ job, onShowHistory, onJobUpdated }: CronJ
             <div className="flex gap-2">
               <button
                 disabled={promptInput.trim() === (job.prompt ?? '')}
-                onClick={() => setPendingAction('prompt')}
+                onClick={() => requestAction('prompt')}
                 style={{
                   ...btnPrimary,
                   opacity: promptInput.trim() === (job.prompt ?? '') ? 0.4 : 1,
@@ -469,7 +492,7 @@ export default function CronJobPanel({ job, onShowHistory, onJobUpdated }: CronJ
         {/* Trigger */}
         <button
           disabled={triggerState === 'loading'}
-          onClick={() => setPendingAction('trigger')}
+          onClick={() => requestAction('trigger')}
           className="text-[10px] uppercase tracking-[0.08em] px-[12px] py-[5px] transition-opacity"
           style={{
             fontFamily: 'var(--font-mono), "IBM Plex Mono", ui-monospace, monospace',
@@ -493,14 +516,14 @@ export default function CronJobPanel({ job, onShowHistory, onJobUpdated }: CronJ
         {job.status === 'disabled' ? (
           <button
             style={btnSecondary}
-            onClick={() => setPendingAction('enable')}
+            onClick={() => requestAction('enable')}
           >
             Enable
           </button>
         ) : (
           <button
             style={btnSecondary}
-            onClick={() => setPendingAction('disable')}
+            onClick={() => requestAction('disable')}
           >
             Disable
           </button>

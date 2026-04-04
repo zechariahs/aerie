@@ -16,6 +16,7 @@ import { promisify } from 'util';
 import { getSession } from '@/lib/session';
 import { errorResponse, successResponse } from '@/lib/api-response';
 import { getOpenclawExec, translateOpenclawPath } from '@/lib/openclaw-exec';
+import { readOpenClawConfig } from '@/lib/openclaw';
 import type { AgentConfig } from '@/types';
 
 export const dynamic = 'force-dynamic';
@@ -94,5 +95,14 @@ export async function GET(): Promise<Response> {
   if (!data) return errorResponse(stderr ?? 'Failed to list agents', 502);
 
   const agents = extractAgentList(data);
-  return successResponse(agents);
+
+  // Enrich agents missing an identity block with the top-level identity from openclaw.json.
+  // This supports single-agent "Recommended starter" configs where identity lives at the root.
+  const clawConfig = readOpenClawConfig();
+  const fallbackIdentity = clawConfig.topLevelIdentity;
+  const enrichedAgents = fallbackIdentity
+    ? agents.map((agent) => (!agent.identity ? { ...agent, identity: fallbackIdentity } : agent))
+    : agents;
+
+  return successResponse(enrichedAgents);
 }

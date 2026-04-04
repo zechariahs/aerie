@@ -6,6 +6,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import type { DriveFile, Task } from '@/types';
 import { basePath } from '@/lib/client-url';
+import { clearTotpFreshCookieClient } from '@/lib/totp-fresh';
 
 interface TaskSpecsResponse {
   files: DriveFile[];
@@ -14,9 +15,8 @@ interface TaskSpecsResponse {
 }
 
 interface TaskSpecsInboxProps {
-  totpToken: string;
   onImported: (task: Task) => void;
-  onRequestTotp: (action: () => void) => void;
+  onRequestTotp: (action: (token: string) => void) => void;
 }
 
 /**
@@ -24,7 +24,7 @@ interface TaskSpecsInboxProps {
  * Drive docs and allows one-click import as Inbox tasks.
  * Polls every 5 minutes automatically.
  */
-export function TaskSpecsInbox({ totpToken, onImported, onRequestTotp }: TaskSpecsInboxProps): React.JSX.Element {
+export function TaskSpecsInbox({ onImported, onRequestTotp }: TaskSpecsInboxProps): React.JSX.Element {
   const [collapsed, setCollapsed] = useState(false);
   const [data, setData] = useState<TaskSpecsResponse | undefined>();
   const [importing, setImporting] = useState<string | undefined>();
@@ -60,6 +60,14 @@ export function TaskSpecsInbox({ totpToken, onImported, onRequestTotp }: TaskSpe
           driveUrl: file.webViewLink,
         }),
       });
+      if (res.status === 403) {
+        if (token === '') {
+          clearTotpFreshCookieClient();
+          onRequestTotp((t) => { void doImport(file, t); });
+        }
+        // Silent on invalid-token 403 — user can retry with a new code
+        return;
+      }
       if (res.ok) {
         const json = (await res.json()) as { data: Task };
         onImported(json.data);
@@ -146,7 +154,7 @@ export function TaskSpecsInbox({ totpToken, onImported, onRequestTotp }: TaskSpe
                     <td className="px-4 py-2 text-right">
                       <button
                         disabled={importing === file.id}
-                        onClick={() => onRequestTotp(() => { void doImport(file, totpToken); })}
+                        onClick={() => onRequestTotp((token) => { void doImport(file, token); })}
                         className="text-[10px] uppercase tracking-[0.08em] disabled:opacity-40"
                         style={{
                           padding: '3px 8px',

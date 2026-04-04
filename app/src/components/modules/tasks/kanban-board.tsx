@@ -12,6 +12,7 @@ import { TotpDialog } from './totp-dialog';
 import { TaskSpecsInbox } from './task-specs-inbox';
 import type { Task, TaskStatus } from '@/types';
 import { basePath } from '@/lib/client-url';
+import { isTotpFresh, clearTotpFreshCookieClient } from '@/lib/totp-fresh';
 
 type TasksByColumn = Record<TaskStatus, Task[]>;
 
@@ -44,8 +45,7 @@ export function KanbanBoard(): React.JSX.Element {
 
   // TOTP dialog state
   const [totpOpen, setTotpOpen] = useState(false);
-  const [totpToken, setTotpToken] = useState('');
-  const pendingActionRef = useRef<(() => void) | undefined>(undefined);
+  const pendingActionRef = useRef<((token: string) => void) | undefined>(undefined);
 
   const fetchTasks = useCallback(async () => {
     setLoading(true);
@@ -69,23 +69,34 @@ export function KanbanBoard(): React.JSX.Element {
     void fetchTasks();
   }, [fetchTasks]);
 
-  /** Opens the TOTP dialog. The action runs after the user submits a valid token. */
-  function requestTotp(action: () => void): void {
+  /**
+   * Opens the TOTP dialog — or runs the action immediately if TOTP is still fresh.
+   * Always stores the action so a 403 fallback can re-open the dialog.
+   * The action receives the token string ('' when fresh, dialog value otherwise).
+   */
+  function requestTotp(action: (token: string) => void): void {
     pendingActionRef.current = action;
+    if (isTotpFresh()) {
+      action('');
+      return;
+    }
     setTotpOpen(true);
   }
 
   function onTotpConfirm(token: string): void {
-    setTotpToken(token);
     setTotpOpen(false);
     if (pendingActionRef.current) {
-      pendingActionRef.current();
+      pendingActionRef.current(token);
       pendingActionRef.current = undefined;
     }
   }
 
   function onTotpCancel(): void {
     setTotpOpen(false);
+    if (pendingActionRef.current) {
+      // Revert any optimistic board update that was applied before the dialog opened.
+      void fetchTasks();
+    }
     pendingActionRef.current = undefined;
   }
 
@@ -95,6 +106,19 @@ export function KanbanBoard(): React.JSX.Element {
       headers: { 'Content-Type': 'application/json', 'X-TOTP-Token': token },
       body: JSON.stringify({ status: newStatus }),
     });
+
+    if (res.status === 403) {
+      if (token.trim().length === 0) {
+        // Empty token: server grace period reset (e.g. process restart). Clear
+        // stale cookie and re-open dialog — pendingActionRef still set.
+        clearTotpFreshCookieClient();
+        setTotpOpen(true);
+      } else {
+        // Real TOTP was rejected — invalid/expired code. Revert optimistic update.
+        await fetchTasks();
+      }
+      return;
+    }
 
     if (!res.ok) {
       // Revert optimistic update
@@ -135,7 +159,7 @@ export function KanbanBoard(): React.JSX.Element {
 
     // Require TOTP if column actually changed
     if (srcCol !== dstCol) {
-      requestTotp(() => { void doMove(draggableId, dstCol, totpToken); });
+      requestTotp((token) => { void doMove(draggableId, dstCol, token); });
     }
   }
 
@@ -287,7 +311,6 @@ export function KanbanBoard(): React.JSX.Element {
           <TaskDetailPanel
             key={selectedId}
             taskId={selectedId}
-            totpToken={totpToken}
             onClose={() => setSelectedId(undefined)}
             onUpdated={onTaskUpdated}
             onDeleted={onTaskDeleted}
@@ -299,7 +322,6 @@ export function KanbanBoard(): React.JSX.Element {
       {/* Task-Specs inbox */}
       <div className="flex-shrink-0">
         <TaskSpecsInbox
-          totpToken={totpToken}
           onImported={onTaskCreated}
           onRequestTotp={requestTotp}
         />
@@ -308,7 +330,6 @@ export function KanbanBoard(): React.JSX.Element {
       {/* New task form */}
       {showNewForm && (
         <NewTaskForm
-          totpToken={totpToken}
           onCreated={onTaskCreated}
           onCancel={() => setShowNewForm(false)}
           onRequestTotp={requestTotp}

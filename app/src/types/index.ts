@@ -4,6 +4,9 @@
 /** JWT payload stored in the session cookie. */
 export interface SessionPayload {
   sub: 'admin';
+  /** Unique session ID — present in sessions minted after the sid claim was introduced.
+   *  May be absent in older sessions; treat as optional at runtime. */
+  sid?: string;
   iat: number;
   exp: number;
 }

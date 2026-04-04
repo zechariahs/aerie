@@ -6,6 +6,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { TotpDialog } from '@/components/modules/tasks/totp-dialog';
 import { basePath } from '@/lib/client-url';
+import { isTotpFresh, clearTotpFreshCookieClient } from '@/lib/totp-fresh';
 
 const inputStyle: React.CSSProperties = {
   background: 'var(--ae-raised)',
@@ -35,6 +36,12 @@ export default function SettingsPage(): React.JSX.Element {
   const [fastModel, setFastModel] = useState('');
   const [defaultModel, setDefaultModel] = useState('');
   const [reasoningModel, setReasoningModel] = useState('');
+
+  // Security state
+  const [sessionTimeoutHours, setSessionTimeoutHours] = useState('');
+
+  // Cost Alerts state
+  const [dailyCostAlertUsd, setDailyCostAlertUsd] = useState('');
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -70,6 +77,8 @@ export default function SettingsPage(): React.JSX.Element {
       setActiveStart(s['AGENT_ACTIVE_START'] ?? '07:00');
       setActiveEnd(s['AGENT_ACTIVE_END'] ?? '21:00');
       setTimezone(s['AGENT_TIMEZONE'] ?? 'UTC');
+      setSessionTimeoutHours(s['SESSION_DURATION_HOURS'] ?? '');
+      setDailyCostAlertUsd(s['DAILY_COST_ALERT_USD'] ?? '');
 
       const t = tiersJson.data;
       setFastModel(t.fast ?? '');
@@ -87,7 +96,12 @@ export default function SettingsPage(): React.JSX.Element {
   }, [fetchAll]);
 
   function requestTotp(action: (token: string) => void): void {
+    // Always store the action so a 403 fallback can re-open the dialog.
     pendingActionRef.current = action;
+    if (isTotpFresh()) {
+      action('');
+      return;
+    }
     setTotpOpen(true);
   }
 
@@ -117,6 +131,13 @@ export default function SettingsPage(): React.JSX.Element {
       });
       if (res.ok) {
         showToast('Active hours saved');
+      } else if (res.status === 403) {
+        if (token === '') {
+          clearTotpFreshCookieClient();
+          setTotpOpen(true); // pendingActionRef still set; re-opens dialog for token entry
+        } else {
+          showToast('Invalid or expired TOTP code');
+        }
       } else {
         let msg = 'Failed to save active hours';
         try { const err = (await res.json()) as { error?: string }; if (err.error) msg = `Error: ${err.error}`; } catch { /* ignore */ }
@@ -124,6 +145,54 @@ export default function SettingsPage(): React.JSX.Element {
       }
     } catch {
       showToast('Failed to save active hours');
+    }
+  }
+
+  async function saveSecuritySettings(token: string): Promise<void> {
+    try {
+      const res = await fetch(`${basePath}/api/settings`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', 'X-TOTP-Token': token },
+        body: JSON.stringify({
+          SESSION_DURATION_HOURS: sessionTimeoutHours,
+        }),
+      });
+      if (res.ok) {
+        showToast('Security settings saved');
+      } else if (res.status === 403) {
+        if (token === '') { clearTotpFreshCookieClient(); setTotpOpen(true); }
+        else { showToast('Invalid or expired TOTP code'); }
+      } else {
+        let msg = 'Failed to save security settings';
+        try { const err = (await res.json()) as { error?: string }; if (err.error) msg = `Error: ${err.error}`; } catch { /* ignore */ }
+        showToast(msg);
+      }
+    } catch {
+      showToast('Failed to save security settings');
+    }
+  }
+
+  async function saveCostAlerts(token: string): Promise<void> {
+    try {
+      const res = await fetch(`${basePath}/api/settings`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', 'X-TOTP-Token': token },
+        body: JSON.stringify({
+          DAILY_COST_ALERT_USD: dailyCostAlertUsd,
+        }),
+      });
+      if (res.ok) {
+        showToast('Cost alerts saved');
+      } else if (res.status === 403) {
+        if (token === '') { clearTotpFreshCookieClient(); setTotpOpen(true); }
+        else { showToast('Invalid or expired TOTP code'); }
+      } else {
+        let msg = 'Failed to save cost alerts';
+        try { const err = (await res.json()) as { error?: string }; if (err.error) msg = `Error: ${err.error}`; } catch { /* ignore */ }
+        showToast(msg);
+      }
+    } catch {
+      showToast('Failed to save cost alerts');
     }
   }
 
@@ -140,6 +209,9 @@ export default function SettingsPage(): React.JSX.Element {
       });
       if (res.ok) {
         showToast('Model tiers saved');
+      } else if (res.status === 403) {
+        if (token === '') { clearTotpFreshCookieClient(); setTotpOpen(true); }
+        else { showToast('Invalid or expired TOTP code'); }
       } else {
         let msg = 'Failed to save model tiers';
         try { const err = (await res.json()) as { error?: string }; if (err.error) msg = `Error: ${err.error}`; } catch { /* ignore */ }
@@ -283,6 +355,71 @@ export default function SettingsPage(): React.JSX.Element {
           }}
         >
           Save Model Tiers
+        </button>
+      </div>
+
+      {/* Security */}
+      <div className="space-y-3">
+        <span className="ae-section-label">── Security ─────────────</span>
+        <p className="text-[11px]" style={{ color: 'var(--ae-text2)' }}>
+          Session timeout applies to new logins only — existing sessions are unaffected. Leave blank to use the default (8 hours).
+        </p>
+
+        <div>
+          <label className="block text-[10px] uppercase tracking-[0.14em] mb-1" style={{ color: 'var(--ae-text3)' }}>Session Timeout (hours)</label>
+          <input
+            type="text"
+            value={sessionTimeoutHours}
+            onChange={(e) => setSessionTimeoutHours(e.target.value)}
+            placeholder="8"
+            style={inputStyle}
+            onFocus={focusAmber}
+            onBlur={blurBorder}
+          />
+        </div>
+
+        <button
+          onClick={() => requestTotp((token) => { void saveSecuritySettings(token); })}
+          className="text-[10px] uppercase tracking-[0.08em]"
+          style={{
+            padding: '5px 12px',
+            background: 'var(--ae-amber)',
+            border: 'none',
+            color: 'var(--ae-void)',
+          }}
+        >
+          Save Security Settings
+        </button>
+      </div>
+
+      {/* Cost Alerts */}
+      <div className="space-y-3">
+        <span className="ae-section-label">── Cost Alerts ──────────</span>
+
+        <div>
+          <label className="block text-[10px] uppercase tracking-[0.14em] mb-1" style={{ color: 'var(--ae-text3)' }}>Daily Alert Threshold (USD)</label>
+          <input
+            type="text"
+            value={dailyCostAlertUsd}
+            onChange={(e) => setDailyCostAlertUsd(e.target.value)}
+            placeholder="e.g. 5.00 (leave blank to disable)"
+            style={inputStyle}
+            onFocus={focusAmber}
+            onBlur={blurBorder}
+          />
+        </div>
+
+        <button
+          onClick={() => requestTotp((token) => { void saveCostAlerts(token); })}
+          className="text-[10px] uppercase tracking-[0.08em]"
+          style={{
+            padding: '5px 12px',
+            background: 'var(--ae-amber)',
+            border: 'none',
+            color: 'var(--ae-void)',
+          }}
+        >
+          Save Cost Alerts
         </button>
       </div>
 

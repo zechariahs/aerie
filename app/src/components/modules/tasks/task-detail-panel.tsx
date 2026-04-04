@@ -6,6 +6,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import type { Task, TaskPriority, TaskStatus, TaskTag, TaskStatusChange, TaskComment } from '@/types';
 import { basePath } from '@/lib/client-url';
+import { clearTotpFreshCookieClient } from '@/lib/totp-fresh';
 
 interface TaskDetailData {
   task: Task;
@@ -15,11 +16,10 @@ interface TaskDetailData {
 
 interface TaskDetailPanelProps {
   taskId: string;
-  totpToken: string;
   onClose: () => void;
   onUpdated: (task: Task) => void;
   onDeleted: (id: string) => void;
-  onRequestTotp: (action: () => void) => void;
+  onRequestTotp: (action: (token: string) => void) => void;
 }
 
 const PRIORITY_OPTIONS: TaskPriority[] = ['P1', 'P2', 'P3', 'P4'];
@@ -42,7 +42,6 @@ const inputStyle: React.CSSProperties = {
  */
 export function TaskDetailPanel({
   taskId,
-  totpToken,
   onClose,
   onUpdated,
   onDeleted,
@@ -115,6 +114,11 @@ export function TaskDetailPanel({
           due_date: editDue || null,
         }),
       });
+      if (res.status === 403) {
+        if (token === '') { clearTotpFreshCookieClient(); onRequestTotp((t) => { void saveChanges(t); }); }
+        else { showToast('Invalid or expired TOTP code'); }
+        return;
+      }
       if (!res.ok) {
         const err = (await res.json()) as { error: string };
         showToast(`Error: ${err.error}`);
@@ -143,6 +147,11 @@ export function TaskDetailPanel({
         },
         body: JSON.stringify({ comment: comment.trim() }),
       });
+      if (res.status === 403) {
+        if (token === '') { clearTotpFreshCookieClient(); onRequestTotp((t) => { void postComment(t); }); }
+        else { showToast('Invalid or expired TOTP code'); }
+        return;
+      }
       if (!res.ok) {
         showToast('Failed to post comment');
         return;
@@ -162,6 +171,11 @@ export function TaskDetailPanel({
       method: 'POST',
       headers: { 'X-TOTP-Token': token },
     });
+    if (res.status === 403) {
+      if (token === '') { clearTotpFreshCookieClient(); onRequestTotp((t) => { void sendTelegram(t); }); }
+      else { showToast('Invalid or expired TOTP code'); }
+      return;
+    }
     if (res.ok) {
       showToast('Sent to Telegram');
     } else {
@@ -175,6 +189,11 @@ export function TaskDetailPanel({
       method: 'POST',
       headers: { 'X-TOTP-Token': token },
     });
+    if (res.status === 403) {
+      if (token === '') { clearTotpFreshCookieClient(); onRequestTotp((t) => { void sendDrive(t); }); }
+      else { showToast('Invalid or expired TOTP code'); }
+      return;
+    }
     if (res.ok) {
       showToast('Written to Drive');
       await fetchTask();
@@ -189,6 +208,11 @@ export function TaskDetailPanel({
       method: 'DELETE',
       headers: { 'X-TOTP-Token': token },
     });
+    if (res.status === 403) {
+      if (token === '') { clearTotpFreshCookieClient(); onRequestTotp((t) => { void handleDelete(t); }); }
+      else { showToast('Invalid or expired TOTP code'); }
+      return;
+    }
     if (res.ok) {
       onDeleted(taskId);
     } else {
@@ -208,6 +232,11 @@ export function TaskDetailPanel({
           status: 'inbox',
         }),
       });
+      if (res.status === 403) {
+        if (token === '') { clearTotpFreshCookieClient(); onRequestTotp((t) => { void submitResponses(t); }); }
+        else { showToast('Invalid or expired TOTP code'); }
+        return;
+      }
       if (!res.ok) {
         showToast('Failed to submit responses');
         return;
@@ -229,6 +258,11 @@ export function TaskDetailPanel({
       headers: { 'Content-Type': 'application/json', 'X-TOTP-Token': token },
       body: JSON.stringify({ status: newStatus }),
     });
+    if (res.status === 403) {
+      if (token === '') { clearTotpFreshCookieClient(); onRequestTotp((t) => { void handleQuickStatus(newStatus, t); }); }
+      else { showToast('Invalid or expired TOTP code'); }
+      return;
+    }
     if (res.ok) {
       const json = (await res.json()) as { data: Task };
       onUpdated(json.data);
@@ -414,7 +448,7 @@ export function TaskDetailPanel({
                 task.clarification_state === 'resolved' ||
                 !(task.clarification_questions ?? []).every((_, idx) => (editResponses[idx] ?? '').trim() !== '')
               }
-              onClick={() => onRequestTotp(() => { void submitResponses(totpToken); })}
+              onClick={() => onRequestTotp((token) => { void submitResponses(token); })}
               className="w-full text-[10px] uppercase tracking-[0.08em] disabled:opacity-40 mt-2"
               style={{
                 padding: '4px 8px',
@@ -470,7 +504,7 @@ export function TaskDetailPanel({
         {/* Save button */}
         <button
           disabled={saving}
-          onClick={() => onRequestTotp(() => { void saveChanges(totpToken); })}
+          onClick={() => onRequestTotp((token) => { void saveChanges(token); })}
           className="w-full text-[10px] uppercase tracking-[0.08em] disabled:opacity-50"
           style={{
             padding: '5px 12px',
@@ -486,7 +520,7 @@ export function TaskDetailPanel({
         <div className="flex gap-2">
           {task.status !== 'done' && (
             <button
-              onClick={() => onRequestTotp(() => { void handleQuickStatus('done', totpToken); })}
+              onClick={() => onRequestTotp((token) => { void handleQuickStatus('done', token); })}
               className="flex-1 text-[10px] uppercase tracking-[0.08em]"
               style={{
                 padding: '4px 8px',
@@ -500,7 +534,7 @@ export function TaskDetailPanel({
           )}
           {task.status !== 'archived' && (
             <button
-              onClick={() => onRequestTotp(() => { void handleQuickStatus('archived', totpToken); })}
+              onClick={() => onRequestTotp((token) => { void handleQuickStatus('archived', token); })}
               className="flex-1 text-[10px] uppercase tracking-[0.08em]"
               style={{
                 padding: '4px 8px',
@@ -517,7 +551,7 @@ export function TaskDetailPanel({
         {/* Integrations */}
         <div className="flex gap-2 pt-1" style={{ borderTop: '1px solid var(--ae-border)' }}>
           <button
-            onClick={() => onRequestTotp(() => { void sendTelegram(totpToken); })}
+            onClick={() => onRequestTotp((token) => { void sendTelegram(token); })}
             className="flex-1 text-[10px] uppercase tracking-[0.08em]"
             style={{
               padding: '4px 8px',
@@ -529,7 +563,7 @@ export function TaskDetailPanel({
             Send Telegram
           </button>
           <button
-            onClick={() => onRequestTotp(() => { void sendDrive(totpToken); })}
+            onClick={() => onRequestTotp((token) => { void sendDrive(token); })}
             className="flex-1 text-[10px] uppercase tracking-[0.08em]"
             style={{
               padding: '4px 8px',
@@ -583,7 +617,7 @@ export function TaskDetailPanel({
           />
           <button
             disabled={!comment.trim() || saving}
-            onClick={() => onRequestTotp(() => { void postComment(totpToken); })}
+            onClick={() => onRequestTotp((token) => { void postComment(token); })}
             className="w-full text-[10px] uppercase tracking-[0.08em] disabled:opacity-40"
             style={{
               padding: '4px 8px',
@@ -599,7 +633,7 @@ export function TaskDetailPanel({
         {/* Delete */}
         <div className="pt-2" style={{ borderTop: '1px solid var(--ae-border)' }}>
           <button
-            onClick={() => onRequestTotp(() => { void handleDelete(totpToken); })}
+            onClick={() => onRequestTotp((token) => { void handleDelete(token); })}
             className="w-full text-[10px] uppercase tracking-[0.08em]"
             style={{
               padding: '4px 8px',

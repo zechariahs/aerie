@@ -1,7 +1,7 @@
 // Copyright (c) 2026 Zack Schwenk
 // SPDX-License-Identifier: MIT
 
-import { getSession, isAgentRequest, validateTotpFromRequest } from '@/lib/auth';
+import { getSession, isAgentRequest, requireTotpAuth } from '@/lib/auth';
 import { getDb, writeAuditLog } from '@/lib/db';
 import { errorResponse, successResponse } from '@/lib/api-response';
 import { rowToTask, type TaskRow } from '@/lib/task-mappers';
@@ -68,19 +68,17 @@ interface CreateTaskBody {
  * Requires session + valid X-TOTP-Token header, OR a valid agent API key.
  */
 export async function POST(request: Request): Promise<Response> {
-  const session = await getSession();
   const agentAuthed = isAgentRequest(request);
-  if (!session && !agentAuthed) return errorResponse('Unauthorized', 401);
-
-  if (!agentAuthed && !validateTotpFromRequest(request)) {
-    writeAuditLog({
-      action: 'task.create',
-      resource: 'task',
-      result: 'failure',
-      ip: request.headers.get('x-forwarded-for') ?? 'unknown',
-      userAgent: request.headers.get('user-agent') ?? 'unknown',
-    });
-    return errorResponse('TOTP required', 403);
+  if (agentAuthed) {
+    // Agent requests bypass TOTP — validated by API key
+  } else {
+    const auth = await requireTotpAuth(request);
+    if (!auth.ok) {
+      if (auth.status === 403) {
+        writeAuditLog({ action: 'task.create', resource: 'task', result: 'failure', ip: request.headers.get('x-forwarded-for') ?? 'unknown', userAgent: request.headers.get('user-agent') ?? 'unknown' });
+      }
+      return errorResponse(auth.status === 401 ? 'Unauthorized' : 'TOTP required', auth.status);
+    }
   }
 
   let body: CreateTaskBody;

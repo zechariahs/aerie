@@ -10,7 +10,10 @@ import type { NextRequest } from 'next/server';
 import type { SessionPayload } from '@/types';
 
 const SESSION_COOKIE = 'mc_session';
+const TOTP_COOKIE = 'mc_totp_ts';
 const SESSION_DURATION_SECONDS = 8 * 60 * 60; // 8 hours
+/** Must match TOTP_GRACE_MS in auth.ts (same duration, in seconds for cookie maxAge). */
+const TOTP_GRACE_SECONDS = 30 * 60; // 30 minutes
 
 function getSecret(): Uint8Array {
   const secret = process.env['AUTH_SECRET'];
@@ -21,12 +24,22 @@ function getSecret(): Uint8Array {
 /**
  * Creates a full session JWT and sets it as an HttpOnly cookie.
  * Call this only after both password and TOTP are verified.
+ * Returns the session's unique `sid` claim so the caller can
+ * immediately record TOTP verification for the new session.
+ *
+ * @param durationSeconds - Override the default 8-hour TTL. Sourced from
+ *   the SESSION_DURATION_HOURS DB setting in the login route, which cannot
+ *   read it here because this file must remain Edge-safe (no better-sqlite3).
+ * @returns The unique session ID (`sid`) for the new session, used by the
+ *   caller to record TOTP verification in the in-memory grace map.
  */
-export async function createSession(): Promise<void> {
-  const token = await new SignJWT({ sub: 'admin' } satisfies Omit<SessionPayload, 'iat' | 'exp'>)
+export async function createSession(durationSeconds?: number): Promise<string> {
+  const ttl = durationSeconds ?? SESSION_DURATION_SECONDS;
+  const sid = crypto.randomUUID();
+  const token = await new SignJWT({ sub: 'admin', sid } satisfies Omit<SessionPayload, 'iat' | 'exp'>)
     .setProtectedHeader({ alg: 'HS256' })
     .setIssuedAt()
-    .setExpirationTime(`${SESSION_DURATION_SECONDS}s`)
+    .setExpirationTime(`${ttl}s`)
     .sign(getSecret());
 
   const cookieStore = await cookies();
@@ -35,8 +48,32 @@ export async function createSession(): Promise<void> {
     sameSite: 'strict',
     secure: process.env.NODE_ENV === 'production',
     path: '/',
-    maxAge: SESSION_DURATION_SECONDS,
+    maxAge: ttl,
   });
+
+  return sid;
+}
+
+/**
+ * Sets a non-HttpOnly cookie recording when TOTP was last verified.
+ * Client-side JS can read this to decide whether to show the TOTP dialog.
+ * The cookie is intentionally not a secret — it contains only a timestamp.
+ */
+export async function setTotpFreshCookie(): Promise<void> {
+  const cookieStore = await cookies();
+  cookieStore.set(TOTP_COOKIE, String(Date.now()), {
+    httpOnly: false,
+    sameSite: 'strict',
+    secure: process.env.NODE_ENV === 'production',
+    path: '/',
+    maxAge: TOTP_GRACE_SECONDS,
+  });
+}
+
+/** Removes the TOTP-fresh cookie (call on logout). */
+export async function clearTotpFreshCookie(): Promise<void> {
+  const cookieStore = await cookies();
+  cookieStore.delete(TOTP_COOKIE);
 }
 
 /**

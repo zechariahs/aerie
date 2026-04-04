@@ -6,6 +6,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { DockerContainer, DockerList } from '@/types/index';
 import { basePath } from '@/lib/client-url';
+import { isTotpFresh, clearTotpFreshCookieClient } from '@/lib/totp-fresh';
 
 // Highlighted in brand color — the configured openclaw container name
 const OPENCLAW_CONTAINER = process.env['NEXT_PUBLIC_OPENCLAW_CONTAINER'] ?? 'openclaw';
@@ -101,7 +102,8 @@ export function DockerPanel(): React.JSX.Element {
   }
 
   async function handleRestart(): Promise<void> {
-    if (!restart.totpInput.trim()) {
+    const fresh = isTotpFresh();
+    if (!fresh && !restart.totpInput.trim()) {
       setRestart((r) => ({ ...r, error: 'TOTP code required' }));
       return;
     }
@@ -109,9 +111,20 @@ export function DockerPanel(): React.JSX.Element {
     try {
       const res = await fetch(basePath + '/api/vps/restart', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-TOTP-Token': restart.totpInput.trim() },
+        headers: { 'Content-Type': 'application/json', 'X-TOTP-Token': fresh ? '' : restart.totpInput.trim() },
         body: JSON.stringify({ container: OPENCLAW_CONTAINER }),
       });
+      if (res.status === 403) {
+        if (fresh) {
+          // Empty token sent — server grace period reset. Clear cookie so the
+          // next attempt sends the entered TOTP token rather than sending empty.
+          clearTotpFreshCookieClient();
+          setRestart((r) => ({ ...r, pending: false, error: 'Session expired — enter TOTP code' }));
+        } else {
+          setRestart((r) => ({ ...r, pending: false, error: 'Invalid or expired TOTP code' }));
+        }
+        return;
+      }
       if (!res.ok) {
         const err = await res.json().catch(() => ({ error: 'Restart failed' })) as { error?: string };
         setRestart((r) => ({ ...r, pending: false, error: err.error ?? 'Restart failed' }));
