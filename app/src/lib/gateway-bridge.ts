@@ -285,7 +285,7 @@ function connect(): void {
   g.ws.on('open', () => {
     console.log('[gateway-bridge] connected to Gateway');
     getG().gatewayStatus = 'connected';
-    getG().reconnectDelay = 2000;
+    getG().reconnectDelay = 15000;
   });
 
   g.ws.on('message', (data) => {
